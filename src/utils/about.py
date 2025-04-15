@@ -28,13 +28,12 @@ from src.utils.update import check_update
 
 """设置本项目的入口路径"""
 # 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
-if False:
+if True:
     BasePath = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# 方法二：直接读取主函数的路径，获取项目入口目录
-if True: # 暂时禁用，不支持单独运行该模块
+# 方法二：直接读取主函数的路径，获取项目入口目录,只适用于hiviewer.py同级目录下的py文件调用
+if False: # 暂时禁用，不支持单独运行该模块
     BasePath = os.path.dirname(os.path.abspath(sys.argv[0]))
-
-
+    
 
 # 全局函数，版本号初始化
 def version_init(VERSION=str):
@@ -57,20 +56,18 @@ def version_init(VERSION=str):
 
 
 class AboutDialog(QDialog):
-    def __init__(self, markdown_path=None):
+    def __init__(self, md_path_user=None, md_path_version=None):
         super().__init__()
 
         # 设置使用说明markdown文件，备用文件
-        if not markdown_path or not os.path.exists(markdown_path):
-            # 直接获取markdown文件的路径
-            markdown_path = os.path.join(BasePath, "docs", "User_Manual.md")
-        self.User_Manual_Mdpath = markdown_path
+        if not md_path_user or not os.path.exists(md_path_user):
+            md_path_user = os.path.join(BasePath, "docs", "User_Manual.md")
+        self.User_Manual_Mdpath = md_path_user
 
         # 设置版本更新markdown文件
-        Version_Update_Mdpath = os.path.join(BasePath, "docs", "Version_Updates.md")
-        if not Version_Update_Mdpath or not os.path.exists(Version_Update_Mdpath):
-            Version_Update_Mdpath = False
-        self.Version_Update_Mdpath = Version_Update_Mdpath
+        if not md_path_version or not os.path.exists(md_path_version):
+            md_path_version = os.path.join(BasePath, "docs", "Version_Updates.md")
+        self.Version_Update_Mdpath = md_path_version
         
         # 设置默认版本号，并从version.ini配置文件中读取当前最新的版本号
         self.VERSION = version_init(VERSION='release-v2.3.2')
@@ -125,14 +122,15 @@ class AboutDialog(QDialog):
         
         # 设置四个功能按钮
         self.button_layout = QHBoxLayout()
-        self.check_update_button = QPushButton("检查更新")
-        self.homepage_button = QPushButton("使用说明")
-        self.faq_button = QPushButton("更新日志")
+        
+        self.user_manual_button = QPushButton("使用说明")
+        self.change_log_button = QPushButton("更新日志")
         self.feedback_button = QPushButton("建议反馈")
-        self.button_layout.addWidget(self.homepage_button)
-        self.button_layout.addWidget(self.faq_button)
-        self.button_layout.addWidget(self.check_update_button)
+        self.check_update_button = QPushButton("检查更新")
+        self.button_layout.addWidget(self.user_manual_button)
+        self.button_layout.addWidget(self.change_log_button)
         self.button_layout.addWidget(self.feedback_button)
+        self.button_layout.addWidget(self.check_update_button)
         self.main_layout.addLayout(self.button_layout)
 
         # 设置QTextBrowser组件，支持导入markdown文件显示
@@ -151,8 +149,8 @@ class AboutDialog(QDialog):
 
         # 设置按钮槽函数
         self.check_update_button.clicked.connect(self.release_updates)
-        self.homepage_button.clicked.connect(self.open_homepage_url)
-        self.faq_button.clicked.connect(self.open_faq_url)
+        self.user_manual_button.clicked.connect(self.open_homepage_url)
+        self.change_log_button.clicked.connect(self.open_faq_url)
         self.feedback_button.clicked.connect(self.open_feedback_url)
         
 
@@ -171,8 +169,6 @@ class AboutDialog(QDialog):
         self.resize(self.width, self.height)
         
         # 设置图标下的标题和描述信息的字体
-        # jet_font_path = os.path.join(BasePath, "fonts", "JetBrainsMapleMono_Regular.ttf")
-        # font_manager_10 = SingleFontManager.get_font(size=10,font_path=jet_font_path)
         font_manager_10 = SingleFontManager.get_font(10)
         font_manager_12 = SingleFontManager.get_font(12)
         font_manager_20 = SingleFontManager.get_font(20)
@@ -198,9 +194,9 @@ class AboutDialog(QDialog):
 
         # 四个功能按钮
         self.check_update_button.setFont(font_manager_12)
-        self.homepage_button.setFont(font_manager_12)
+        self.user_manual_button.setFont(font_manager_12)
         self.feedback_button.setFont(font_manager_12)
-        self.faq_button.setFont(font_manager_12)
+        self.change_log_button.setFont(font_manager_12)
 
         # 设置显示markdow文件的组件样式
         self.changelog_content = self.read_changelog(self.User_Manual_Mdpath)
@@ -242,8 +238,6 @@ class AboutDialog(QDialog):
 
     """ 移除该段逻辑，使用线程运行自动检测更新"""
     def release_updates(self):
-        # check_update(self)  # self 是主窗口实例 # 调用自动检查更新模块update.py
-        # QDesktopServices.openUrl(QUrl("https://github.com/diamond-cz/Hiviewer_releases/releases/"))
         try:
             # 初始化对话框并绑定销毁事件
             self.update_dialog = check_update()
@@ -257,11 +251,3 @@ class AboutDialog(QDialog):
             error_msg = f"检查更新报错:\n{str(e)}"
             print(error_msg)
     
-
-
-# 示例用法
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    dialog = AboutDialog()
-    dialog.show()
-    sys.exit(app.exec_())

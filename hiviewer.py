@@ -4167,17 +4167,18 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         try:
             # 单例模式管理帮助窗口
             if not hasattr(self, 'help_dialog'):
-                # 构建文档路径
+                # 构建文档路径,使用说明文档+版本更新文档
                 doc_dir = os.path.join(os.path.dirname(__file__), "docs")
-                markdown_path = os.path.join(doc_dir, "User_Manual.md")
+                User_path = os.path.join(doc_dir, "User_Manual.md")
+                Version_path = os.path.join(doc_dir, "Version_Updates.md")
                 
                 # 验证文档文件存在性
-                if not os.path.isfile(markdown_path):
-                    show_message_box(f"帮助文档未找到:\n{markdown_path}", "配置错误", 2000)
+                if not os.path.isfile(User_path) or not os.path.isfile(Version_path):
+                    show_message_box(f"帮助文档未找到:\n{User_path}or{Version_path}", "配置错误", 2000)
                     return
                 
                 # 初始化对话框
-                self.help_dialog = AboutDialog(markdown_path)
+                self.help_dialog = AboutDialog(User_path,Version_path)
 
             # 激活现有窗口
             self.help_dialog.show()

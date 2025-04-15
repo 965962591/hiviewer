@@ -5,11 +5,12 @@ from PyQt5.QtGui import  QFontDatabase, QFont
 
 """设置根目录"""
 # 通过当前py文件来定位项目主入口路径，向上找两层父文件夹
-if False:
+if True:
     BASE_PATH = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # 通过主函数hiviewer.py文件来定位项目主入口路径
-if True:
+if False:
     BASE_PATH = os.path.dirname(os.path.abspath(sys.argv[0]))
+    
 
 
 class SingleFontManager:
