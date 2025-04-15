@@ -39,17 +39,17 @@ from PyQt5.QtCore import (Qt, QDir, QTimer, QSize, QTimer, QRunnable, QThreadPoo
                            QThread, QSize, QAbstractListModel, QModelIndex, QVariant, QItemSelection, QItemSelectionModel)
 
 # 导入用户自定义的模块
-from src.ui.main_ui import Ui_MainWindow, DraggableTableWidget  # 假设你的主窗口类名为Ui_MainWindow
+from src.ui.main_ui import Ui_MainWindow                        # 假设你的主窗口类名为Ui_MainWindow
 from src.modules.sub_compare_image_view import SubMainWindow    # 假设这是你的子窗口类名
 from src.modules.sub_compare_video_view import VideoWall        # 假设这是你的子窗口类名 
 from src.modules.sub_rename_view import FileOrganizer           # 添加这行以导入批量重名名类名
 from src.modules.sub_image_process import SubCompare            # 确保导入 SubCompare 类
 from src.modules.sub_bat_view import LogVerboseMaskApp          # 导入批量执行命令的类
 # from sub_image_size_reduce import ImageCompressorApp          # 导入图片尺寸压缩工具，暂不使用该方法，使用jpgc_tool中的方法
-from src.utils.about import AboutDialog                   # 导入关于对话框类,显示帮助信息
-from src.utils.hisnot import WScreenshot                  # 导入截图工具类
-from src.utils.raw2jpg import Mipi2RawConverterApp        # 导入MIPI RAW文件转换为JPG文件的类
-from src.utils.dialog_class import Qualcom_Dialog  # 导入自定义对话框的类
+from src.utils.about import AboutDialog                         # 导入关于对话框类,显示帮助信息
+from src.utils.hisnot import WScreenshot                        # 导入截图工具类
+from src.utils.raw2jpg import Mipi2RawConverterApp              # 导入MIPI RAW文件转换为JPG文件的类
+from src.utils.dialog_class import Qualcom_Dialog               # 导入自定义对话框的类
 from src.utils.font_class import SingleFontManager, MultiFontManager  # 字体管理器
 
 

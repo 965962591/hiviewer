@@ -1722,11 +1722,11 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         # 获取鼠标所在屏幕，并根据当前屏幕计算界面大小与居中位置，调整大小并移动到该位置
         screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
         screen_geometry = QtWidgets.QApplication.desktop().screenGeometry(screen)
-        x = screen_geometry.x() + (screen_geometry.width() - self.width()) // 2
-        y = screen_geometry.y() + (screen_geometry.height() - self.height()) // 2
         width = int(screen_geometry.width() * 0.8)
         height = int(screen_geometry.height() * 0.65)
         self.resize(width, height)
+        x = screen_geometry.x() + (screen_geometry.width() - self.width()) // 2
+        y = screen_geometry.y() + (screen_geometry.height() - self.height()) // 2
         self.move(x, y)
 
         # 设置第一排标签
@@ -3203,22 +3203,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             cache_dir.mkdir(parents=True, exist_ok=True)
 
             settings = self.dict_exif_info_visibility
-            
-            # settings = {
-            #     '品牌' : self.exif_text_brand,
-            #     '型号' : self.exif_text_model,
-            #     '曝光时间' : self.exif_text_exposure_time,
-            #     '光圈值' : self.exif_text_aperture_value,
-            #     'ISO值' : self.exif_text_iso_value,
-            #     '原始时间' : self.exif_text_original_time,
-            #     '测光模式' : self.exif_text_metering_mode,
-            #     '图片名称' : self.exif_text_image_name,
-            #     '图片大小' : self.exif_text_image_size,
-            #     '图片尺寸' : self.exif_text_image_dimensions,
-            #     '图片张数' : self.exif_text_image_count,
-            #     'HDR' : self.exif_text_hdr,
-            #     'Zoom' : self.exif_text_zoom
-            # }
             
             settings_file = cache_dir / "exif_setting.json"
             with open(settings_file, 'w', encoding='utf-8', errors='ignore') as f:

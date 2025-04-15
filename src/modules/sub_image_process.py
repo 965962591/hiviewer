@@ -1,12 +1,12 @@
 import os
 import sys
 import logging
-from PyQt5.QtWidgets import (
-    QApplication, QWidget, QGraphicsView, QGraphicsScene, QVBoxLayout, 
-    QHBoxLayout, QPushButton, QSlider, QLabel, QDoubleSpinBox, QFileDialog
-)
-from PyQt5.QtGui import QPixmap, QMouseEvent, QColor, QIcon, QTransform
-from PyQt5.QtCore import Qt, QPoint, pyqtSignal
+from PyQt5 import QtWidgets
+from PyQt5.QtWidgets import (QApplication, QWidget, QGraphicsView, QGraphicsScene, QVBoxLayout,
+    QHBoxLayout, QPushButton, QLabel, QDoubleSpinBox, QFileDialog 
+    )
+from PyQt5.QtGui import QPixmap, QMouseEvent, QColor, QTransform , QIcon
+from PyQt5.QtCore import Qt, pyqtSignal, QPoint
 import cv2
 import piexif
 import numpy as np
@@ -92,10 +92,24 @@ class SubCompare(QWidget):
         super().__init__()
         if log_enable:
             logging.info("初始化 ImageEditor 窗口")
+        
+        # 获取鼠标所在屏幕，并根据当前屏幕计算界面大小与居中位置，调整大小并移动到该位置
+        screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
+        screen_geometry = QtWidgets.QApplication.desktop().screenGeometry(screen)
+        width = int(screen_geometry.width() * 0.6)
+        height = int(screen_geometry.height() * 0.8)
+        self.resize(width, height)
+        x = screen_geometry.x() + (screen_geometry.width() - self.width()) // 2
+        y = screen_geometry.y() + (screen_geometry.height() - self.height()) // 2
+        self.move(x, y)
+
         # 设置窗口初始大小
-        self.resize(1800, 1200)
+        # self.resize(1800, 1200)
+
         # 初始化UI
         self.initUI()
+
+
         self.selected_color = None  # 存储选中的颜色
         # 初始化图片
         if image_path:
