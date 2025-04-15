@@ -1,5 +1,6 @@
 import sys
 import os
+from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QLineEdit, QComboBox, QPushButton, 
                             QFileDialog, QGraphicsView, QSplitter, QMessageBox, QFormLayout, QRadioButton, QButtonGroup, QSizePolicy, 
                             QGraphicsScene, QGraphicsPixmapItem, QVBoxLayout, QMessageBox, QProgressBar, QShortcut)
@@ -7,7 +8,6 @@ from PyQt5.QtCore import Qt, QSettings, pyqtSignal
 from PyQt5.QtGui import QPixmap, QImage, QWheelEvent, QPainter, QIcon, QKeySequence
 import cv2
 import json 
-
 
 
 # 导入自定义的模块
@@ -49,7 +49,19 @@ class Mipi2RawConverterApp(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("MIPI to RAW Converter")
-        self.setGeometry(100, 100, 1200, 900)  # 设置初始化大小为1200x900
+
+        # self.setGeometry(100, 100, 1200, 900)  # 设置初始化大小为1200x900
+        
+        # 获取鼠标所在屏幕，并根据当前屏幕计算界面大小与居中位置，调整大小并移动到该位置
+        screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
+        screen_geometry = QtWidgets.QApplication.desktop().screenGeometry(screen)
+        width = int(screen_geometry.width() * 0.55)
+        height = int(screen_geometry.height() * 0.55)
+        self.resize(width, height)
+        x = screen_geometry.x() + (screen_geometry.width() - self.width()) // 2
+        y = screen_geometry.y() + (screen_geometry.height() - self.height()) // 2
+        self.move(x, y)
+        
         icon_path = r"D:\tuning\tools\AE\aebox_v3\icon\icon.ico"
         self.setWindowIcon(QIcon(icon_path))       
 

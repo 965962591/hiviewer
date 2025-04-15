@@ -621,6 +621,7 @@ class GraphicsView(QGraphicsView):
         else:
             super().mousePressEvent(event)
 
+
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     image_path = sys.argv[1] if len(sys.argv) > 1 else None
