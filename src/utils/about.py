@@ -229,8 +229,11 @@ class AboutDialog(QDialog):
         self.changelog_content = self.read_changelog(self.Version_Update_Mdpath)
         self.changelog_browser.setMarkdown(self.changelog_content)
 
-    def open_auther1_url(self):
-        QDesktopServices.openUrl(QUrl("https://gitee.com/diamond-cz"))
+    def open_auther1_url(self): 
+        # gitee
+        # QDesktopServices.openUrl(QUrl("https://gitee.com/diamond-cz"))
+        # github
+        QDesktopServices.openUrl(QUrl("https://github.com/diamond-cz"))
 
     def open_auther2_url(self):
         QDesktopServices.openUrl(QUrl("https://github.com/965962591"))

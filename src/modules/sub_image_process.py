@@ -92,7 +92,10 @@ class SubCompare(QWidget):
         super().__init__()
         if log_enable:
             logging.info("初始化 ImageEditor 窗口")
-        
+
+        # 设置窗口初始大小
+        # self.resize(1600, 1200)
+
         # 获取鼠标所在屏幕，并根据当前屏幕计算界面大小与居中位置，调整大小并移动到该位置
         screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
         screen_geometry = QtWidgets.QApplication.desktop().screenGeometry(screen)
@@ -103,14 +106,12 @@ class SubCompare(QWidget):
         y = screen_geometry.y() + (screen_geometry.height() - self.height()) // 2
         self.move(x, y)
 
-        # 设置窗口初始大小
-        # self.resize(1800, 1200)
-
         # 初始化UI
         self.initUI()
 
-
-        self.selected_color = None  # 存储选中的颜色
+        # 存储选中的颜色
+        self.selected_color = None  
+        
         # 初始化图片
         if image_path:
             self.original_pixmap = ImageTransform.auto_rotate_image(image_path)
@@ -122,6 +123,9 @@ class SubCompare(QWidget):
                 self.update_images()
         else:
             self.original_pixmap = QPixmap()  # 默认空白
+
+
+
 
     def initUI(self):
         if log_enable:
@@ -263,8 +267,6 @@ class SubCompare(QWidget):
         compare_button.released.connect(self.restore_modified_image)
         reset_button.clicked.connect(self.reset_parameters)
         save_as_button.clicked.connect(self.save_as)
-        # 设置窗口标题
-        self.setWindowTitle('图片调整')
 
         # 设置主布局
         self.setLayout(main_layout)
