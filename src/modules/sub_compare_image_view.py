@@ -29,10 +29,10 @@ from PyQt5.QtGui import QIcon, QColor, QPixmap, QKeySequence, QPainter, QCursor,
 from PyQt5.QtCore import Qt, QEvent, pyqtSignal, QTimer, QThreadPool, QRunnable
 
 # 导入自定义的模块
-from src.ui.sub_ui import Ui_MainWindow                     # 看图子界面，导入界面UI
-from src.utils.AI_tips import CustomLLM_Siliconflow         # 看图子界面，AI提示看图复选框功能模块
-from src.utils.Custom_Font_class import SingleFontManager   # 看图子界面，导入字体管理器
-from src.utils.hisnot import WScreenshot                    # 看图子界面，导入自定义截图的类
+from src.ui.sub_ui import Ui_MainWindow               # 看图子界面，导入界面UI
+from src.utils.ai_tips import CustomLLM_Siliconflow   # 看图子界面，AI提示看图复选框功能模块
+from src.utils.font_class import SingleFontManager    # 看图子界面，导入字体管理器
+from src.utils.hisnot import WScreenshot              # 看图子界面，导入自定义截图的类
 
     
 
@@ -1719,16 +1719,15 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.setWindowIcon(QIcon(icon_path))
         self.setWindowTitle("看图界面")
 
-        # 获取当前屏幕并计算居中位置，移动到该位置
+        # 获取鼠标所在屏幕，并根据当前屏幕计算界面大小与居中位置，调整大小并移动到该位置
         screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
         screen_geometry = QtWidgets.QApplication.desktop().screenGeometry(screen)
         x = screen_geometry.x() + (screen_geometry.width() - self.width()) // 2
         y = screen_geometry.y() + (screen_geometry.height() - self.height()) // 2
-        self.move(x, y)
-
         width = int(screen_geometry.width() * 0.8)
         height = int(screen_geometry.height() * 0.65)
         self.resize(width, height)
+        self.move(x, y)
 
         # 设置第一排标签
         self.label_0.setText("提示:鼠标左键拖动所有图像,滚轮控制放大/缩小;按住Ctrl+滚轮或者鼠标右键操作单独图像")

@@ -56,7 +56,7 @@ compile_commands.json
 
 GitCommitInfo.txt
 
-# 忽略 cache/icons/ 下的所有文件
+# 忽略 cache/icons/ 下的所有文件, 若是不生效可以先清一波缓存 git rm -r --cached .
 __pycache__/
 hiviewer/__pycache__/
 ui/__pycache__/

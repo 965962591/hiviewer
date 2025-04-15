@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (QApplication, QLabel, QDialogButtonBox, QDialog, QV
 from PyQt5.QtCore import Qt
 
 # 导入自定义的模块
-from src.utils.Custom_Font_class import SingleFontManager
+from src.utils.font_class import SingleFontManager
 
 class Qualcom_Dialog(QDialog):
     """自定义对话框类, 用于输入信息"""

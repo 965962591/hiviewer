@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QKeySequence  # 添加这行导入
 
 # 导入自定义模块
-from src.utils.Custom_Font_class import SingleFontManager # 字体管理器
+from src.utils.font_class import SingleFontManager # 字体管理器
 
 
 # 全局函数

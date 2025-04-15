@@ -2,6 +2,16 @@ import os
 import sys
 from PyQt5.QtGui import  QFontDatabase, QFont
 
+
+"""设置根目录"""
+# 通过当前py文件来定位项目主入口路径，向上找两层父文件夹
+if False:
+    BASE_PATH = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 通过主函数hiviewer.py文件来定位项目主入口路径
+if True:
+    BASE_PATH = os.path.dirname(os.path.abspath(sys.argv[0]))
+
+
 class SingleFontManager:
     """单个字体管理类（支持传入字体路径）"""
     _instance = None
@@ -14,11 +24,7 @@ class SingleFontManager:
         if not cls._initialized or font_path is not None:
             try:
                 if font_path is None:
-                    # 通过当前py文件来定位项目主入口路径，向上找两层父文件夹
-                    # base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                    # 通过主函数py文件来定位项目主入口路径
-                    base_path = os.path.dirname(os.path.abspath(sys.argv[0]))
-                    font_path = os.path.join(base_path, "fonts", "xialu_wenkai.ttf")
+                    font_path = os.path.join(BASE_PATH, "fonts", "xialu_wenkai.ttf")
                 if not os.path.exists(font_path):
                     print(f"字体管理类SingleFontManager中: {font_path}不存在,请检查字体文件是否存在")
                     
