@@ -4,8 +4,6 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 
 
-
-
 """全局函数"""
 
 def toRectF(rect):

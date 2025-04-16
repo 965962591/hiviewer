@@ -1,4 +1,4 @@
-# 导入python内置模块
+"""导入python内置模块"""
 import re
 import os
 import io
@@ -11,7 +11,7 @@ import threading
 from multiprocessing import cpu_count
 from concurrent.futures import ThreadPoolExecutor
 
-# 导入python第三方模块
+"""导入python第三方模块"""
 import cv2
 import piexif
 import openpyxl
@@ -21,20 +21,26 @@ import matplotlib.pyplot as plt
 import xml.etree.ElementTree as ET
 from PIL import Image, ImageCms
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QLabel, QHeaderView, QShortcut, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QMessageBox, 
-    QProgressBar, QGraphicsRectItem, QGraphicsItem, QDialogButtonBox, QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
-    QLineEdit, QCheckBox, QComboBox, QFileDialog)
 from PyQt5.QtGui import QIcon, QColor, QPixmap, QKeySequence, QPainter, QCursor, QTransform, QImage, QPen
 from PyQt5.QtCore import Qt, QEvent, pyqtSignal, QTimer, QThreadPool, QRunnable
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QLabel, QHeaderView, QShortcut, QGraphicsView, 
+    QGraphicsScene, QGraphicsPixmapItem, QMessageBox, QProgressBar, QGraphicsRectItem, 
+    QGraphicsItem, QDialogButtonBox, QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QCheckBox, QComboBox, QFileDialog)
 
-# 导入自定义的模块
+"""导入自定义模块"""
 from src.ui.sub_ui import Ui_MainWindow               # 看图子界面，导入界面UI
 from src.utils.ai_tips import CustomLLM_Siliconflow   # 看图子界面，AI提示看图复选框功能模块
 from src.utils.font_class import SingleFontManager    # 看图子界面，导入字体管理器
 from src.utils.hisnot import WScreenshot              # 看图子界面，导入自定义截图的类
 
-    
+"""设置本项目的入口路径,全局变量BasePath"""
+# 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
+if True:
+    BasePath = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 方法二：直接读取主函数的路径，获取项目入口目录,只适用于hiviewer.py同级目录下的py文件调用
+if False: # 暂时禁用，不支持单独运行该模块
+    BasePath = os.path.dirname(os.path.abspath(sys.argv[0]))    
 
 """
 设置全局函数区域开始线
@@ -447,7 +453,7 @@ class CameraTestDialog(QDialog):
         self.setFixedSize(1200, 600)  # 设置对话框大小
         
         # 初始化字体管理器，标签组件使用;设置全局变量，定义项目基础路径
-        BasePath = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        # BasePath = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) # 使用全局变量 BasePath
         font_path_jetbrains = os.path.join(BasePath, "fonts", "JetBrainsMapleMono_Regular.ttf")
         self.font_manager_jetbrains_big = SingleFontManager.get_font(size=12, font_path=font_path_jetbrains) 
         self.font_manager_jetbrains_small = SingleFontManager.get_font(size=10, font_path=font_path_jetbrains)
@@ -802,7 +808,7 @@ class CameraTestDialog(QDialog):
             "AF": [self.combo_box5.itemText(i) for i in range(self.combo_box5.count())],
             "ISP": [self.combo_box6.itemText(i) for i in range(self.combo_box6.count())],
         }
-        save_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache", "test_settings.json")
+        save_path = os.path.join(BasePath, "cache", "test_settings.json")
         with open(save_path, 'w', encoding='utf-8') as f:
             json.dump(settings, f, ensure_ascii=False, indent=4)
 
@@ -1581,7 +1587,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.custom_font = SingleFontManager.get_font(12)
 
         # 初始化字体管理器，标签组件使用
-        BasePath = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         font_path_jetbrains = os.path.join(BasePath, "fonts", "JetBrainsMapleMono_Regular.ttf")
         self.font_manager_jetbrains = SingleFontManager.get_font(size=11, font_path=font_path_jetbrains)   
         
@@ -1715,7 +1720,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         第三排, self.label_bottom
         """
         # 设置主界面图标以及标题
-        icon_path = os.path.join(os.path.dirname(__file__), "images", "viewer.ico")
+        icon_path = os.path.join(BasePath, "images", "viewer.ico")
         self.setWindowIcon(QIcon(icon_path))
         self.setWindowTitle("看图界面")
 

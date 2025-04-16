@@ -1,16 +1,18 @@
-import sys
+"""python标准库"""
 import os
-from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QLineEdit, QComboBox, QPushButton, 
-                            QFileDialog, QGraphicsView, QSplitter, QMessageBox, QFormLayout, QRadioButton, QButtonGroup, QSizePolicy, 
-                            QGraphicsScene, QGraphicsPixmapItem, QVBoxLayout, QMessageBox, QProgressBar, QShortcut)
-from PyQt5.QtCore import Qt, QSettings, pyqtSignal
-from PyQt5.QtGui import QPixmap, QImage, QWheelEvent, QPainter, QIcon, QKeySequence
-import cv2
+import sys
 import json 
 
-
-# 导入自定义的模块
+"""python三方模块"""
+import cv2
+from PyQt5 import QtWidgets
+from PyQt5.QtCore import Qt, QSettings, pyqtSignal
+from PyQt5.QtGui import QPixmap, QImage, QWheelEvent, QPainter, QIcon, QKeySequence
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, 
+                            QLabel, QLineEdit, QPushButton, QFileDialog, QGraphicsView, QMessageBox, 
+                            QRadioButton, QButtonGroup, QSizePolicy, QGraphicsScene, QVBoxLayout, QMessageBox)
+                            
+"""导入自定义的模块"""
 from src.utils.mipi2raw import convertMipi2Raw, bayer_order_maps
 
 """子界面，实现MIPI RAW文件转换为JPG文件"""

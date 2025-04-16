@@ -4,8 +4,16 @@ import json
 from PyQt5.QtWidgets import (QApplication, QLabel, QDialogButtonBox, QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog)
 from PyQt5.QtCore import Qt
 
-# 导入自定义的模块
+"""导入自定义的模块"""
 from src.utils.font_class import SingleFontManager
+
+"""设置本项目的入口路径,全局变量BasePath"""
+# 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
+if True:
+    BasePath = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 方法二：直接读取主函数的路径，获取项目入口目录,只适用于hiviewer.py同级目录下的py文件调用
+if False: # 暂时禁用，不支持单独运行该模块
+    BasePath = os.path.dirname(os.path.abspath(sys.argv[0]))    
 
 class Qualcom_Dialog(QDialog):
     """自定义对话框类, 用于输入信息"""
@@ -46,12 +54,11 @@ class Qualcom_Dialog(QDialog):
         # 设置窗口大小
         self.setFixedSize(1200, 300)  # 设置对话框大小
         
-        # 设置根路径以及保存的json路径
-        self.root_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        self.json_path = os.path.join(self.root_path, "cache", "Qualcom_exif_settings.json")
+        # 设置保存的json路径
+        self.json_path = os.path.join(BasePath, "cache", "Qualcom_exif_settings.json")
 
-        # 初始化字体管理器，标签组件使用 D:\Image_process\hiviewer-master\fonts\JetBrainsMapleMono_Regular.ttf
-        self.font_path_jetbrains = os.path.join(self.root_path, "fonts", "JetBrainsMapleMono_Regular.ttf")
+        # 初始化字体管理器
+        self.font_path_jetbrains = os.path.join(BasePath, "fonts", "JetBrainsMapleMono_Regular.ttf")
         self.font_manager_jetbrains_big = SingleFontManager.get_font(size=12, font_path=self.font_path_jetbrains) 
         self.font_manager_jetbrains_small = SingleFontManager.get_font(size=10, font_path=self.font_path_jetbrains)
 

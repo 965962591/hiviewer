@@ -1,10 +1,12 @@
-# 导入python第三方库
-from PIL import Image
-from openai import OpenAI
-# 导入python内置库
+
+"""导入python内置库"""
 import os
 import base64
 from io import BytesIO
+
+"""导入python第三方库"""
+from PIL import Image
+from openai import OpenAI
 
 # 设置API密钥
 API_KEY = "sk-bbokuaxjdsshoqtibaikradapkbhqgcsetdyjyvtheldbwbr"

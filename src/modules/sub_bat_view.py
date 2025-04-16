@@ -1,12 +1,25 @@
+"""导入python内置模块"""
 import os
 import sys
 import json
 import threading
 import subprocess
+
+"""导入python三方模块"""
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import QMetaObject, Qt, pyqtSlot,pyqtSignal
-from PyQt5.QtWidgets import QApplication, QWidget, QCheckBox, QGridLayout, QTextEdit, QPushButton, QHBoxLayout, QVBoxLayout, QMessageBox, QLabel, QMenu, QInputDialog, QSplitter, QDialog, QLineEdit, QTextEdit, QDialogButtonBox
+from PyQt5.QtWidgets import (QApplication, QWidget, QCheckBox, QGridLayout, QTextEdit, 
+                             QPushButton, QHBoxLayout, QVBoxLayout, QMessageBox, QLabel, QMenu, 
+                             QInputDialog, QSplitter, QDialog, QLineEdit, QTextEdit, QDialogButtonBox)
 
+
+"""设置本项目的入口路径,全局变量BasePath"""
+# 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
+if False:
+    BasePath = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 方法二：直接读取主函数的路径，获取项目入口目录,只适用于hiviewer.py同级目录下的py文件调用
+if False: # 暂时禁用，不支持单独运行该模块
+    BasePath = os.path.dirname(os.path.abspath(sys.argv[0]))  
 
 class LogVerboseMaskApp(QWidget):
 	# 将命令保存到commands.json文件中，放到cache目录下

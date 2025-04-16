@@ -1,21 +1,21 @@
+"""导入python内置模块"""
 import os
 import sys
 import logging
-from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import (QApplication, QWidget, QGraphicsView, QGraphicsScene, QVBoxLayout,
-    QHBoxLayout, QPushButton, QLabel, QDoubleSpinBox, QFileDialog 
-    )
-from PyQt5.QtGui import QPixmap, QMouseEvent, QColor, QTransform , QIcon
-from PyQt5.QtCore import Qt, pyqtSignal, QPoint
+
+"""导入python三方模块"""
 import cv2
 import piexif
 import numpy as np
-from PyQt5.QtGui import QImage
+from PyQt5 import QtWidgets
 from PIL import Image, ImageEnhance
+from PyQt5.QtGui import QPixmap, QMouseEvent, QColor, QTransform , QImage
+from PyQt5.QtCore import Qt, pyqtSignal, QPoint
+from PyQt5.QtWidgets import (
+    QApplication, QWidget, QGraphicsView, QGraphicsScene, QVBoxLayout,
+    QHBoxLayout, QPushButton, QLabel, QDoubleSpinBox, QFileDialog)
 
-# 检查并创建 cache 目录
-if not os.path.exists('./cache'):
-    os.makedirs('./cache')  # 创建 cache 目录
+
 
 # 增加全局日志控制字段
 log_enable = False

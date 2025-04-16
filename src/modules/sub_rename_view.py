@@ -1,12 +1,22 @@
-import sys
+"""导入python内置模块"""
 import os
-from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QTreeWidget, QMessageBox,
-                             QTreeWidgetItem, QFileDialog, QLabel, QDialog, QTableWidget, QTableWidgetItem, QComboBox, 
-                             QHeaderView, QCheckBox, QMenu, QAction)
-from PyQt5.QtCore import QSettings, Qt, pyqtSignal
-from PyQt5.QtGui import QKeySequence, QIcon
-from PyQt5.QtWidgets import QShortcut
+import sys
 
+"""导入python三方模块"""
+from PyQt5.QtGui import QKeySequence, QIcon
+from PyQt5.QtCore import QSettings, Qt, pyqtSignal
+from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QDialog,
+                             QLineEdit, QPushButton, QTreeWidget, QMessageBox, QTreeWidgetItem, QTableWidget,
+                             QHeaderView, QCheckBox, QMenu, QAction , QShortcut, QFileDialog, QTableWidgetItem, QComboBox)
+
+
+"""设置本项目的入口路径,全局变量BasePath"""
+# 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
+if True:
+    BasePath = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 方法二：直接读取主函数的路径，获取项目入口目录,只适用于hiviewer.py同级目录下的py文件调用
+if False: # 暂时禁用，不支持单独运行该模块
+    BasePath = os.path.dirname(os.path.abspath(sys.argv[0]))  
 
 class PreviewDialog(QDialog):
     def __init__(self, rename_data):
@@ -46,7 +56,7 @@ class FileOrganizer(QWidget):
         self.resize(1200, 800)
 
         # 设置窗口图标
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "viewer_3.ico")
+        icon_path = os.path.join(BasePath, "icons", "viewer_3.ico")
         self.setWindowIcon(QIcon(icon_path))
 
         # 主布局

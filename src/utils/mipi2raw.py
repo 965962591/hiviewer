@@ -1,7 +1,7 @@
 import os
-import numpy as np
 import time
 import cv2
+import numpy as np
 
 global bayer_order_maps
 

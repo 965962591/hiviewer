@@ -11,19 +11,24 @@ from PyQt5.QtWidgets import (QApplication, QMessageBox, QProgressDialog)
 from PyQt5.QtCore import Qt, QPoint
 from PyQt5.QtGui import QIcon,QCursor
 
-# 设置本项目的基本路径为当前路径
-base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# 设置保存版本号的文件
-default_version_path = os.path.join(base_path, "cache", "version.ini")
+
+"""设置本项目的入口路径,全局变量BasePath"""
+# 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
+if True:
+    BasePath = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 方法二：直接读取主函数的路径，获取项目入口目录,只适用于hiviewer.py同级目录下的py文件调用
+if False: # 暂时禁用，不支持单独运行该模块
+    BasePath = os.path.dirname(os.path.abspath(sys.argv[0]))  
+
 
 class Updater:
     def __init__(self):
         self.proxy_prefix = "https://ghproxy.net/"
         self.github_url = "https://api.github.com/repos/diamond-cz/Hiviewer_releases/releases/latest"
-        self.download_path = os.path.join(base_path, "downloads")
+        self.download_path = os.path.join(BasePath, "downloads")
         self.install_path = "."
         self.update_success = False
-        self.version_file = default_version_path  # 添加版本文件路径
+        self.version_file = os.path.join(BasePath, "cache", "version.ini")  # 添加版本文件路径
         self.current_version = self._read_version()  # 从文件读取当前版本
         self.main_executable = "hiviewer.exe"  # 添加主程序可执行文件名
         # 检查文件是否存在，如果不存在则创建并写入默认版本号
@@ -333,7 +338,7 @@ def start_program_subprocess(program_path=None, work_path=None, args=None):
 def check_update(parent_window=None):
     """检查更新的主函数，供主程序调用"""
     try:
-        icon_path = os.path.join(base_path, "icons", "viewer_3.ico")
+        icon_path = os.path.join(BasePath, "icons", "viewer_3.ico")
         gui = UpdaterGUI(icon_path, parent_window)
         updater = Updater()
         cursor_pos = QPoint(QCursor.pos())
@@ -401,14 +406,14 @@ def check_update(parent_window=None):
 
         if reply == QMessageBox.Ok:
             # installer.exe放在，默认使用window系统打开exe，该方法不适用于mac/libux
-            program_path_main = os.path.join(base_path, "installer.exe")
+            program_path_main = os.path.join(BasePath, "installer.exe")
             if os.path.exists(program_path_main):
                 os.startfile(program_path_main)
                 return True
             else:
                 # 适用于多平台的运行方法
-                program_path = os.path.join(base_path, "tools", "installer.exe")
-                work_path = base_path
+                program_path = os.path.join(BasePath, "tools", "installer.exe")
+                work_path = BasePath
                 # zip_path = os.path.join(base_path, "downloads", "latest.zip")
                 start_program_subprocess(program_path, work_path, f"-z {zip_path} -c 1")
             

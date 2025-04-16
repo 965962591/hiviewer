@@ -1,4 +1,4 @@
-# 导入python内置模块
+"""导入python内置模块"""
 import re
 import gc
 import os
@@ -22,7 +22,7 @@ from typing import Optional, Tuple
 from itertools import zip_longest, chain
 from logging.handlers import RotatingFileHandler
 
-# 导入python第三方模块
+"""导入python第三方模块"""
 # import av # 比原生 OpenCV 快 35%（实测 1000 个视频处理仅需 8.2 秒）  
 import cv2
 import piexif
@@ -31,21 +31,23 @@ from openpyxl import Workbook
 import xml.etree.ElementTree as ET
 from PIL import Image
 from PyQt5 import QtWidgets, QtGui, QtCore
-from PyQt5.QtGui import (QIcon, QKeySequence, QPixmap, QColor, QTransform, QFont, QPainter, QImageReader,QImage)
-from PyQt5.QtWidgets import (QFileSystemModel, QAbstractItemView, QTableWidgetItem, QHeaderView, QShortcut, QSplashScreen, 
-                            QMessageBox, QStyledItemDelegate, QStyleOptionButton, QStyle, QApplication, QMenu, QProgressBar,
-                            QProgressDialog, QDialog, QVBoxLayout, QLabel, QHBoxLayout, QPushButton, QLineEdit, QCheckBox)
-from PyQt5.QtCore import (Qt, QDir, QTimer, QSize, QTimer, QRunnable, QThreadPool, QObject, pyqtSignal, QAbstractListModel,
-                           QThread, QSize, QAbstractListModel, QModelIndex, QVariant, QItemSelection, QItemSelectionModel)
+from PyQt5.QtGui import (
+    QIcon, QKeySequence, QPixmap, QColor, QTransform, QFont, QPainter, QImageReader,QImage)
+from PyQt5.QtWidgets import (
+    QFileSystemModel, QAbstractItemView, QTableWidgetItem, QHeaderView, QShortcut, QSplashScreen, 
+    QMessageBox, QStyledItemDelegate, QStyleOptionButton, QStyle, QApplication, QMenu, QProgressBar,
+    QProgressDialog, QDialog, QVBoxLayout, QLabel, QHBoxLayout, QPushButton, QLineEdit, QCheckBox)
+from PyQt5.QtCore import (
+    Qt, QDir, QTimer, QSize, QTimer, QRunnable, QThreadPool, QObject, pyqtSignal, QAbstractListModel,
+    QThread, QSize, QAbstractListModel, QModelIndex, QVariant, QItemSelection, QItemSelectionModel)
 
-# 导入用户自定义的模块
+"""导入用户自定义的模块"""
 from src.ui.main_ui import Ui_MainWindow                        # 假设你的主窗口类名为Ui_MainWindow
 from src.modules.sub_compare_image_view import SubMainWindow    # 假设这是你的子窗口类名
 from src.modules.sub_compare_video_view import VideoWall        # 假设这是你的子窗口类名 
 from src.modules.sub_rename_view import FileOrganizer           # 添加这行以导入批量重名名类名
 from src.modules.sub_image_process import SubCompare            # 确保导入 SubCompare 类
 from src.modules.sub_bat_view import LogVerboseMaskApp          # 导入批量执行命令的类
-# from sub_image_size_reduce import ImageCompressorApp          # 导入图片尺寸压缩工具，暂不使用该方法，使用jpgc_tool中的方法
 from src.utils.about import AboutDialog                         # 导入关于对话框类,显示帮助信息
 from src.utils.hisnot import WScreenshot                        # 导入截图工具类
 from src.utils.raw2jpg import Mipi2RawConverterApp              # 导入MIPI RAW文件转换为JPG文件的类
@@ -1466,7 +1468,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
     ---------------------------------------------------------------------------------------------------------------------------------------------
     """
 
-    # 初始化主界面相关组件
     def set_stylesheet(self):
         """设置主界面图标以及标题"""
         print("set_stylesheet()--设置主界面相关组件")
@@ -1481,8 +1482,8 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 根据鼠标的位置返回当前光标所在屏幕的几何信息
         screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
         screen_geometry = QtWidgets.QApplication.desktop().screenGeometry(screen)
-        width = int(screen_geometry.width() * 0.7)
-        height = int(screen_geometry.height() * 0.6)
+        width = int(screen_geometry.width() * 0.65)
+        height = int(screen_geometry.height() * 0.65)
         self.resize(width, height)
 
         # 启用拖放功能
@@ -1560,239 +1561,11 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.RT_QComboBox1.lineEdit().setReadOnly(True)  # 设置不可编辑
         self.RT_QComboBox1.lineEdit().setPlaceholderText("请选择")  # 设置提示文本
         
-        # 添加初始化选项的调用，暂时移除，在input_enter_action() 中初始化
-        # self.RT_QComboBox1_init()  # 确保在创建后初始化选项
-        
         # 初始化标签文本
-        self.RB_Label1.setText(" 选中或筛选的文件夹中包含[]张图 | 已选0张")  # 根据需要设置标签的文本
+        self.RB_Label1.setText(" 选中或筛选的文件夹中包含[]张图 ")  # 根据需要设置标签的文本
         self.RB_Label2.setText(" 这是一个进度提示标签,显示图标加载的进度信息 ")  # 根据需要设置标签的文本
 
-        
-        # 更新颜色样式表
-        self.update_ui_styles()
 
-    def update_ui_styles(self):
-        """更新UI组件样式
-        设置所有UI组件的样式表,包括:
-        - 左侧文件浏览区域样式
-        - 右侧表格区域样式 
-        - 按钮和输入框等通用控件样式
-        """
-        print("update_ui_styles()--更新主界面UI的样式表")
-
-        """定义通用颜色变量"""
-        # 定义通用颜色变量
-        BACKCOLOR = self.background_color_default  # 浅蓝色背景
-        FONTCOLOR = self.font_color_default  # 默认字体颜色
-        FILLCOLOR = self.background_color_table  # 填充颜色
-
-        WHITE = "rgb(255, 255, 255)"       # 纯白色
-        GRAY = "rgb(127, 127, 127)"       # 18度灰
-
-        # 按钮组件和复选框组件样式
-        button_style = f"""
-            QPushButton {{
-                background-color: {FILLCOLOR};
-                color: {FONTCOLOR};
-                text-align: center;
-                font-family: "{self.custom_font.family()}";
-                font-size: {self.custom_font.pointSize()}pt;
-            }}
-            QPushButton:hover {{
-                border: 1px solid {BACKCOLOR};
-                background-color: {BACKCOLOR};
-            }}
-        """
-        button_style2 = f"""
-            QPushButton {{
-                background-color: {FILLCOLOR};
-                color: {FONTCOLOR};
-                text-align: center;
-                font-family: "{self.custom_font.family()}";
-                font-size: {self.custom_font.pointSize()}pt;
-            }}
-            QPushButton:hover {{
-                border: 1px solid {BACKCOLOR};
-                background-color: {BACKCOLOR};
-            }}
-        """
-
-        # 设置单选按钮样式
-        radio_button_style = f"""   
-            QRadioButton {{
-                text-align: left;
-                color: {FONTCOLOR};
-                font-family: "{self.custom_font.family()}";
-                font-size: {self.custom_font.pointSize()}pt;
-            }}
-        """
-
-
-        # 左侧文件浏览区域样式
-        left_area_style = f"""
-            QTreeView#Left_QTreeView {{
-                background-color: {BACKCOLOR};
-                color: {FONTCOLOR};
-                border-radius: 10px;
-            }}
-        """
-        
-        # 左侧框架样式
-        left_qframe_style = f"""
-            QFrame#Left_QFrame {{ 
-                background-color: {FILLCOLOR};
-                color: {FONTCOLOR};
-                border-radius: 10px;
-            }}
-        """
-
-        # 右侧表格区域样式
-        table_style = f"""
-            QTableWidget#RB_QTableWidget0 {{
-                /* 表格整体样式 */
-                background-color: {FILLCOLOR};
-                color: {FONTCOLOR};
-            }}
-            
-            QTableWidget#RB_QTableWidget0::item {{
-                /* 单元格样式 */
-                background-color: {FILLCOLOR};
-                color: {FONTCOLOR};
-            }}
-            
-            QTableWidget#RB_QTableWidget0::item:selected {{
-                /* 选中单元格样式 */
-                background-color: {BACKCOLOR};
-                color: {FONTCOLOR};
-            }}
-            
-            /* 添加表头样式 */
-            QHeaderView::section {{
-                background-color: {BACKCOLOR};
-                color: {FONTCOLOR};
-                text-align: center;
-                padding: 3px;
-                margin: 1px;
-                font-family: "{self.custom_font.family()}";
-                font-size: {self.custom_font.pointSize()}pt;
-            }}
-            
-            /* 修改左上角区域样式 */
-            QTableWidget#RB_QTableWidget0::corner {{
-                background-color: {BACKCOLOR};  /* 设置左上角背景色 */
-                color: {FONTCOLOR};
-            }}
-        """
-        
-        # 下拉框通用样式模板
-        combobox_style = f"""
-            QComboBox {{
-                /* 下拉框本体样式 */
-                background-color: {FILLCOLOR};
-                color: {FONTCOLOR};
-                selection-background-color: {BACKCOLOR};
-                selection-color: {FONTCOLOR};
-                min-height: 30px;
-                font-family: "{self.custom_font.family()}";
-                font-size: {self.custom_font.pointSize()}pt;
-            }}
-            
-            QComboBox QAbstractItemView {{
-                /* 下拉列表样式 */
-                background-color: {FILLCOLOR};
-                color: {FONTCOLOR};
-                selection-background-color: {BACKCOLOR};
-                selection-color: {FONTCOLOR};
-                font-family: "{self.custom_font.family()}";
-                font-size: {self.custom_font.pointSize()}pt;
-            }}
-            
-            QComboBox QAbstractItemView::item {{
-                /* 下拉项样式 */
-                min-height: 25px;
-                padding: 5px;
-                font-family: "{self.custom_font.family()}";
-                font-size: {self.custom_font.pointSize()}pt;
-            }}
-
-            QComboBox::hover {{
-                background-color: {BACKCOLOR};
-                color: {FONTCOLOR};
-            }}  
-
-        """
-
-        # 下拉框通用样式模板2
-        combobox_style2 = f"""
-            QComboBox {{
-                /* 下拉框本体样式 */
-                background-color: {FILLCOLOR};
-                color: {FONTCOLOR};
-                selection-background-color: {BACKCOLOR};
-                selection-color: {FONTCOLOR};
-                min-height: 30px;
-                font-family: "{self.custom_font.family()}";
-                font-size: {self.custom_font.pointSize()}pt;
-            }}
-            
-            QComboBox QAbstractItemView {{
-                /* 下拉列表样式 */
-                background-color: {FILLCOLOR};
-                color: {FONTCOLOR};
-                selection-background-color: {BACKCOLOR};
-                selection-color: {FONTCOLOR};
-                font-family: "{self.custom_font.family()}";
-                font-size: {self.custom_font.pointSize()}pt;
-            }}
-            
-            QComboBox QAbstractItemView::item {{
-                /* 下拉项样式 */
-                min-height: 25px;
-                padding: 5px;
-                font-family: "{self.custom_font.family()}";
-                font-size: {self.custom_font.pointSize()}pt;
-            }}
-
-        """
- 
-        label_style2 = f"""
-            border: none;
-            background-color: {BACKCOLOR};
-            color: {FONTCOLOR};
-            font-family: {self.custom_font.family()};
-            font-size: {self.custom_font.pointSize()}pt;
-            border-radius: 10px;
-        """
-
-        # 为每个下拉框应用样式
-        self.RT_QComboBox.setStyleSheet(combobox_style2)
-        self.RT_QComboBox1.setStyleSheet(combobox_style2)
-
-        self.RT_QComboBox0.setStyleSheet(combobox_style)
-        self.RT_QComboBox2.setStyleSheet(combobox_style)
-        self.RT_QComboBox3.setStyleSheet(combobox_style)
-        
-        # 为左侧文件浏览区域和右侧表格区域应用样式
-        self.Left_QTreeView.setStyleSheet(left_area_style)
-        self.RB_QTableWidget0.setStyleSheet(table_style)
-        self.Left_QFrame.setStyleSheet(left_qframe_style)
-
-        # 为标签应用样式
-        self.RB_Label1.setStyleSheet(label_style2)
-        self.RB_Label2.setStyleSheet(label_style2)
-
-        # 为按钮组件和复选框组件应用样式
-        # self.RT_QPushbutton6.setStyleSheet(button_style)
-        self.RT_QPushButton3.setStyleSheet(button_style)
-        # self.RT_QPushButton2.setStyleSheet(button_style)
-        self.RT_QPushButton5.setStyleSheet(button_style)
-        # self.L_pushButton1.setStyleSheet(button_style2)
-        # self.L_pushButton2.setStyleSheet(button_style2)
-        # 设置单选按钮样式
-        self.L_radioButton1.setStyleSheet(radio_button_style)  # 设置左对齐
-        self.L_radioButton2.setStyleSheet(radio_button_style)  # 设置左对齐
-
-    # 设置快捷键函数
     def set_shortcut(self):
         """快捷键和槽函数连接事件"""
 
@@ -1866,23 +1639,20 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         """2. 槽函数连接事件"""
         # 连接左侧按钮槽函数
-        self.Left_QTreeView.clicked.connect(self.update_combobox) # 点击左侧文件浏览器时的连接事件
-        # self.L_pushButton1.clicked.connect(self.handle_single_image_editing) # 单个图片编辑功能
-        # self.L_pushButton2.clicked.connect(self.batch_rename) # 批量重命名功能
+        self.Left_QTreeView.clicked.connect(self.update_combobox)        # 点击左侧文件浏览器时的连接事件
         self.L_radioButton1.toggled.connect(self.radio_button_file_off)  # 隐藏文件，只显示文件夹
         self.L_radioButton2.toggled.connect(self.radio_button_file_on)   # 显示所有文件
         
         # 连接右侧按钮槽函数
-        self.RT_QComboBox.lineEdit().returnPressed.connect(self.input_enter_action)   # 用户在地址栏输入文件路径后按下回车的动作反馈
-        self.RT_QComboBox0.activated.connect(self.handleComboBox0Pressed)  # 点击（显示图片视频所有文件）下拉框选项时的处理事件
-        self.RT_QComboBox1.view().pressed.connect(self.handleComboBoxPressed)  # 处理复选框选项被按下时的事件
-        self.RT_QComboBox1.activated.connect(self.updateComboBox1Text)  # 更新显示文本
-        self.RT_QComboBox2.activated.connect(self.handle_sort_option)  # 点击下拉框选项时，更新右侧表格
-        self.RT_QComboBox3.activated.connect(self.handle_theme_selection)  # 点击下拉框选项时，更新主题
-        self.RT_QPushButton3.clicked.connect(self.clear_combox) # 清除地址栏
-        # self.RT_QPushButton2.clicked.connect(self.execute_command) # 打开批量执行命令工具
-        self.RT_QPushButton5.clicked.connect(self.compare) # 打开看图工具
-        # self.RT_QPushbutton6.clicked.connect(self.show_exif) # 打开Exif信息显示，使用Alt+i切换
+        self.RT_QComboBox.lineEdit().returnPressed.connect(self.input_enter_action) # 用户在地址栏输入文件路径后按下回车的动作反馈
+        self.RT_QComboBox0.activated.connect(self.handleComboBox0Pressed)           # 点击（显示图片视频所有文件）下拉框选项时的处理事件
+        self.RT_QComboBox1.view().pressed.connect(self.handleComboBoxPressed)       # 处理复选框选项被按下时的事件
+        self.RT_QComboBox1.activated.connect(self.updateComboBox1Text)              # 更新显示文本
+        self.RT_QComboBox2.activated.connect(self.handle_sort_option)               # 点击下拉框选项时，更新右侧表格
+        self.RT_QComboBox3.activated.connect(self.handle_theme_selection)           # 点击下拉框选项时，更新主题
+        self.RT_QPushButton3.clicked.connect(self.clear_combox)                     # 清除地址栏
+        self.RT_QPushButton5.clicked.connect(self.compare)                          # 打开看图工具
+        
 
     """
     左侧信号槽函数
@@ -2595,8 +2365,12 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 self.Left_QTreeView.setCurrentIndex(index)    
                 # 展开该目录
                 self.Left_QTreeView.setExpanded(index, True)  
-                # 滚动到该项，使其居中
-                self.Left_QTreeView.scrollTo(index, QAbstractItemView.PositionAtCenter)  
+                # 滚动到该项，确保垂直方向居中
+                self.Left_QTreeView.scrollTo(index, QAbstractItemView.PositionAtCenter)
+                
+                # 手动设置水平方向进度条
+                self.Left_QTreeView.horizontalScrollBar().setValue(0)
+            
                 print(f"locate_in_tree_view()--定位成功")
             else:
                 print("locate_in_tree_view()--索引无效-无法定位")
@@ -3130,10 +2904,10 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # 定义通用颜色变量
         BACKCOLOR = self.background_color_default  # 浅蓝色背景
-        FONTCOLOR = self.font_color_default  # 默认字体颜色
-        GRAY = "rgb(127, 127, 127)"       # 灰色
-        WHITE = "rgb(238,238,238)"     # 白色
-        QCOMBox_BACKCOLOR = "rgb(255,242,223)"  # 下拉框背景色
+        FONTCOLOR = self.font_color_default        # 默认字体颜色
+        GRAY = "rgb(127, 127, 127)"                # 灰色
+        WHITE = "rgb(238,238,238)"                 # 白色
+        QCOMBox_BACKCOLOR = "rgb(255,242,223)"     # 下拉框背景色
 
         
         table_style = f"""
@@ -3196,20 +2970,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 color: {FONTCOLOR};
             }}
         """
-        button_style2 = f"""
-            QPushButton {{
-                background-color: {WHITE};
-                color: {FONTCOLOR};
-                text-align: center;
-                font-family: "{self.custom_font.family()}";
-                font-size: {self.custom_font.pointSize()}pt;
-            }}
-            QPushButton:hover {{
-                border: 1px solid {BACKCOLOR};
-                background-color: {BACKCOLOR};
-                color: {FONTCOLOR};
-            }}
-        """
 
         # 设置单选按钮样式
         radio_button_style = f"""   
@@ -3220,7 +2980,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 font-size: {self.custom_font.pointSize()}pt;
             }}
         """
-
 
         # 左侧文件浏览区域样式
         left_area_style = f"""
@@ -3318,13 +3077,10 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.Left_QFrame.setStyleSheet(left_qframe_style)
         self.L_radioButton1.setStyleSheet(radio_button_style)  # 设置左对齐
         self.L_radioButton2.setStyleSheet(radio_button_style)  # 设置左对齐
-        # self.L_pushButton1.setStyleSheet(button_style2)
-        # self.L_pushButton2.setStyleSheet(button_style2)
+
 
         # 设置右侧顶部按钮下拉框样式
-        # self.RT_QPushbutton6.setStyleSheet(button_style)
         self.RT_QPushButton3.setStyleSheet(button_style)
-        # self.RT_QPushButton2.setStyleSheet(button_style)
         self.RT_QPushButton5.setStyleSheet(button_style)
 
         self.RT_QComboBox.setStyleSheet(combobox_style2)
@@ -3436,19 +3192,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
             # 按钮组件和复选框组件样式
             button_style = f"""
-                QPushButton {{
-                    background-color: rgb( 58, 71, 80);
-                    color: {WHITE};
-                    text-align: center;
-                    font-family: "{self.custom_font.family()}";
-                    font-size: {self.custom_font.pointSize()}pt;
-                }}
-                QPushButton:hover {{
-                    border: 1px solid {BACKCOLOR};
-                    background-color: {BACKCOLOR};
-                }}
-            """
-            button_style2 = f"""
                 QPushButton {{
                     background-color: rgb( 58, 71, 80);
                     color: {WHITE};
@@ -3602,13 +3345,10 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.Left_QFrame.setStyleSheet(left_qframe_style)
             self.L_radioButton1.setStyleSheet(radio_button_style)  # 设置左对齐
             self.L_radioButton2.setStyleSheet(radio_button_style)  # 设置左对齐
-            # self.L_pushButton1.setStyleSheet(button_style2)
-            # self.L_pushButton2.setStyleSheet(button_style2)
+
 
             # 设置右侧顶部按钮下拉框样式
-            # self.RT_QPushbutton6.setStyleSheet(button_style)
             self.RT_QPushButton3.setStyleSheet(button_style)
-            # self.RT_QPushButton2.setStyleSheet(button_style)
             self.RT_QPushButton5.setStyleSheet(button_style)
 
             self.RT_QComboBox.setStyleSheet(combobox_style2)
@@ -3763,6 +3503,9 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
                     # 恢复拖拽模式状态,默认开启
                     self.drag_flag = settings.get("drag_flag", True)
+            else:
+                # 若没有cache/设置，则在此初始化主题设置--默认主题
+                self.apply_theme()
 
         except Exception as e:
             print(f"加载设置时出错: {e}")

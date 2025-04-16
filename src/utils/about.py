@@ -5,7 +5,7 @@ from PyQt5.QtCore import QUrl, Qt
 import os
 import sys
 
-# 导入自定义模块,主函数调用
+"""导入自定义模块,主函数调用"""
 from src.utils.font_class import SingleFontManager
 from src.utils.update import check_update
 
