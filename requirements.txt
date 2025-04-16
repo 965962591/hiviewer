@@ -11,4 +11,4 @@ tkhtmlview==0.3.1
 traitlets==5.14.3
 auto-py-to-exe>=2.45.0
 nuitka>=2.5.0
-
+lxml>=5.3.2

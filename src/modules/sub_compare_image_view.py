@@ -18,7 +18,8 @@ import openpyxl
 import numpy as np
 import win32com.client as win32
 import matplotlib.pyplot as plt
-import xml.etree.ElementTree as ET
+# import xml.etree.ElementTree as ET
+from lxml import etree as ETT
 from PIL import Image, ImageCms
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtGui import QIcon, QColor, QPixmap, QKeySequence, QPainter, QCursor, QTransform, QImage, QPen
@@ -352,30 +353,40 @@ def close_excel():
 def load_xml_data(xml_path):
     """加载XML文件并提取Lux值和DRCgain值等EXIF信息"""
     try:
-        # 加载xml文件
-        tree = ET.parse(xml_path)
+        # 加载xml文件 
+        tree = ETT.parse(xml_path)
         root = tree.getroot()
 
-        # 定义需要提取的标签
-        tags = {
-            'lux_index': 'Lux',
-            'DRCgain': 'DRCgain',
-            'safe_gain': 'Safe_gain',
-            'short_gain': 'Short_gain',
-            'long_gain': 'Long_gain',
-            'CCT': 'CCT',
-            'r_gain': 'R_gain',
-            'b_gain': 'B_gain',
-            'awb_sa': 'Awb_sa',
-            'triangle_index': 'Triangle_index'
+        # 定义需要提取的标签, tag:name
+        XPATHS = {
+            'Lux': ETT.XPath('lux_index'),
+            'DRCgain': ETT.XPath('DRCgain'),
+            'Safe_gain': ETT.XPath('safe_gain'),
+            'Short_gain': ETT.XPath('short_gain'),
+            'Long_gain': ETT.XPath('long_gain'),
+            'CCT': ETT.XPath('CCT'),
+            'R_gain': ETT.XPath('r_gain'),
+            'B_gain': ETT.XPath('b_gain'),
+            'Awb_sa': ETT.XPath('awb_sa'),
+            'Triangle_index': ETT.XPath('triangle_index'),
+            'FaceSA': ETT.XPath('.//SA/FaceSA')
         }
 
+        # ETT.XPath('lux_index')(root)[0].text
         # 提取值并拼接
         extracted_values = []
-        for tag, name in tags.items():
-            value = root.find(tag)
-            if value is not None and value.text:
-                extracted_values.append(f"\n{name}: {value.text}")
+        for name, tag  in XPATHS.items():
+            value = tag(root)
+            if name  != 'FaceSA':
+                if value and value[0].text:
+                    extracted_values.append(f"\n{name}: {value[0].text}")
+            else:
+                if value:
+                    target = ETT.XPath('.//SA/FaceSA/target/start')(root)
+                    if target and target[0].text:
+                        extracted_values.append(f"\n{name}: {target[0].text}")
+                else:
+                    extracted_values.append(f"\n{name}: 未识别人脸")
 
         # 汇总字符串    
         qualcom_exif_info = ''.join(extracted_values)
@@ -385,7 +396,7 @@ def load_xml_data(xml_path):
         print(f"解析XML失败{xml_path}:\n {e}")
         return None
     
-    
+
 
 """
 设置全局函数区域结束线
@@ -1623,6 +1634,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 'Zoom' : self.exif_settings.get("Zoom", True),
                 'Lux' : self.exif_settings.get("Lux", True),
                 'CCT' : self.exif_settings.get("CCT", True),
+                'FaceSA' : self.exif_settings.get("FaceSA", True),
                 'DRCgain' : self.exif_settings.get("DRCgain", True),
                 'Awb_sa' : self.exif_settings.get("Awb_sa", True),
                 'Triangle_index' : self.exif_settings.get("Triangle_index", True),
@@ -1935,7 +1947,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                         exif_info = basic_info
 
                     # 检测是否存在同图片路径的xml文件  将lux_index、DRCgain写入到exif信息中去
-                    # if self.checkBox_1.isChecked():
                     xml_path = os.path.join(os.path.dirname(path), os.path.basename(path).split('.')[0] + "_new.xml")
                     if os.path.exists(xml_path):
                         # 提取xml中lux_index、cct、drcgain等关键信息，拼接到exif_info
