@@ -556,9 +556,9 @@ class VideoPlayer(QWidget):
         self.color_settings = load_color_settings()
         # 设置背景色和字体颜色，使用保存的设置或默认值
         self.background_color_default = self.color_settings.get("background_color_default", "rgb(173,216,230)")  # 深色背景色_好蓝
-        self.background_color_table = self.color_settings.get("background_color_table", "rgb(127, 127, 127)")   # 表格背景色_18度灰
-        self.font_color_default = self.color_settings.get("font_color_default", "rgb(0, 0, 0)")         # 默认字体颜色_纯黑色
-        self.font_color_exif = self.color_settings.get("font_color_exif", "rgb(255, 255, 255)")        # Exif字体颜色_纯白色
+        self.background_color_table = self.color_settings.get("background_color_table", "rgb(127, 127, 127)")    # 表格背景色_18度灰
+        self.font_color_default = self.color_settings.get("font_color_default", "rgb(0, 0, 0)")                  # 默认字体颜色_纯黑色
+        self.font_color_exif = self.color_settings.get("font_color_exif", "rgb(255, 255, 255)")                  # Exif字体颜色_纯白色
         label_style_top = f"background-color: {self.background_color_default}; color: {self.font_color_default}; text-align: center;border: 2px solid rgb(127, 127, 127);"
         label_style_bottom = f"background-color: {self.background_color_default}; color: {self.font_color_default}; text-align: center; border-radius:10px;border: 2px solid rgb(127, 127, 127);"
 
@@ -603,7 +603,7 @@ class VideoPlayer(QWidget):
         self.replay_button = QPushButton(self)
         replay_icon_path = os.path.abspath(os.path.join(BasePath, "icons", "replay.ico"))
         self.replay_button.setIcon(QIcon(replay_icon_path))  # 设置重播图标
-        self.replay_button.setStyleSheet("border: none;")  # 去掉按钮边框
+        self.replay_button.setStyleSheet("border: none;")    # 去掉按钮边框
         self.replay_button.setToolTip("重播")
         self.replay_button.clicked.connect(self.replay)
 
@@ -653,10 +653,10 @@ class VideoPlayer(QWidget):
         control_layout.addWidget(self.speed_spinbox)
         control_layout.addWidget(self.frame_skip_label)
         control_layout.addWidget(self.frame_skip_spin)
-        control_layout.addWidget(self.main_button)  # 添加 "main" 按钮到布局
+        control_layout.addWidget(self.main_button)          # 添加 "main" 按钮到布局
         control_layout.addWidget(self.play_button)
         control_layout.addWidget(self.replay_button)
-        control_layout.addWidget(self.rotate_left_button)  # 添加左转按钮
+        control_layout.addWidget(self.rotate_left_button)   # 添加左转按钮
         control_layout.addWidget(self.rotate_right_button)  # 添加右转按钮
         control_layout.addStretch()
 
@@ -671,7 +671,7 @@ class VideoPlayer(QWidget):
         main_layout.addLayout(bottom_layout)
 
         self.setLayout(main_layout)
-        # self.setMinimumSize(300, 200)  # 设置最小大小，防止过小
+        self.setMinimumSize(300, 200)  # 设置最小大小，防止过小
 
         # 添加一个定时器以确保UI定期更新，即使没有新帧
         self.ui_timer = QTimer(self)
@@ -916,7 +916,7 @@ class VideoWall(QWidget):
 
         # 将窗口移动到鼠标所在的屏幕
         self.move_to_current_screen()
-        self.resize(2000, 1000)
+        self.resize(1400, 1000)
         
         # 默认全屏显示
         # self.showFullScreen()  # 添加这一行以默认全屏显示
@@ -939,6 +939,7 @@ class VideoWall(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)  # 将主布局边距也设为0
         main_layout.addWidget(self.scroll_area)
         self.setLayout(main_layout)
+        self.resize(1800, 1200)
 
     def shortcut(self):
         # 添加全屏快捷键
@@ -969,6 +970,14 @@ class VideoWall(QWidget):
         # 添加 T 快捷键用于从跳帧数开始播放所有视频
         jump_to_frame_shortcut = QShortcut(QKeySequence('T'), self)
         jump_to_frame_shortcut.activated.connect(self.jump_to_frame_all_videos)
+
+        # 添加 Z 快捷键用于逐帧后退
+        frame_backward_shortcut = QShortcut(QKeySequence('Z'), self)
+        frame_backward_shortcut.activated.connect(self.frame_backward_all_videos)
+
+        # 添加 X 快捷键用于逐帧前进
+        frame_forward_shortcut = QShortcut(QKeySequence('X'), self)
+        frame_forward_shortcut.activated.connect(self.frame_forward_all_videos)
 
         # 添加 ESC 快捷键用于退出程序
         exit_shortcut = QShortcut(QKeySequence('Esc'), self)
@@ -1120,6 +1129,115 @@ class VideoWall(QWidget):
                         print(f"视频 {os.path.basename(player.video_path)} 跳转到帧: {frame_skip}")
             except Exception as e:
                 print(f"跳转到帧时出错: {str(e)}")
+
+    def frame_forward_all_videos(self):
+        """所有视频前进一帧"""
+        try:
+            for player in self.players:
+                if hasattr(player, 'frame_reader'):
+                    # 计算下一帧的时间
+                    next_frame = min(player.total_frames - 1, player.current_frame + 1)
+                    
+                    # 暂停视频（如果正在播放）
+                    if not player.is_paused:
+                        player.play_pause()
+                    
+                    # 使用临时的视频捕获器来准确读取帧
+                    cap = cv2.VideoCapture(player.video_path)
+                    
+                    # 使用逐帧读取的方式获取目标帧
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    current = 0
+                    frame = None
+                    ret = False
+                    
+                    # 读取到目标帧
+                    while current <= next_frame:
+                        ret, temp_frame = cap.read()
+                        if not ret:
+                            break
+                        frame = temp_frame
+                        current += 1
+                    
+                    cap.release()
+                    
+                    if frame is not None:
+                        # 更新播放器状态
+                        player.current_frame = next_frame
+                        player.current_time = int(next_frame * (1000 / player.fps))
+                        
+                        # 应用旋转（如果有）
+                        if player.rotation_angle != 0:
+                            frame = player.rotate_image(frame, player.rotation_angle)
+                            
+                        # 显示帧
+                        player.display_frame(frame)
+                        
+                        # 更新进度条
+                        if player.duration_ms > 0:
+                            progress = (player.current_time / player.duration_ms) * 100
+                            player.slider.setValue(int(progress))
+                            
+                        # 更新帧读取器的位置
+                        player.frame_reader.seek(next_frame)
+                
+        except Exception as e:
+            print(f"前进一帧时出错: {str(e)}")
+
+    def frame_backward_all_videos(self):
+        """所有视频后退一帧"""
+        
+        try:
+            for player in self.players:
+                if hasattr(player, 'frame_reader'):
+                    # 计算上一帧的时间
+                    prev_frame = max(0, player.current_frame - 1)
+                    
+                    # 暂停视频（如果正在播放）
+                    if not player.is_paused:
+                        player.play_pause()
+                    
+                    # 使用临时的视频捕获器来准确读取帧
+                    cap = cv2.VideoCapture(player.video_path)
+                    
+                    # 使用逐帧读取的方式获取目标帧
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    current = 0
+                    frame = None
+                    ret = False
+                    
+                    # 读取到目标帧
+                    while current <= prev_frame:
+                        ret, temp_frame = cap.read()
+                        if not ret:
+                            break
+                        frame = temp_frame
+                        current += 1
+                    
+                    cap.release()
+                    
+                    if frame is not None:
+                        # 更新播放器状态
+                        player.current_frame = prev_frame
+                        player.current_time = int(prev_frame * (1000 / player.fps))
+                        
+                        # 应用旋转（如果有）
+                        if player.rotation_angle != 0:
+                            frame = player.rotate_image(frame, player.rotation_angle)
+                            
+                        # 显示帧
+                        player.display_frame(frame)
+                        
+                        # 更新进度条
+                        if player.duration_ms > 0:
+                            progress = (player.current_time / player.duration_ms) * 100
+                            player.slider.setValue(int(progress))
+                            
+                        # 更新帧读取器的位置
+                        player.frame_reader.seek(prev_frame)
+                
+        except Exception as e:
+            print(f"后退一帧时出错: {str(e)}")
 
     def closeEvent(self, event):
         """程序关闭时的清理"""
