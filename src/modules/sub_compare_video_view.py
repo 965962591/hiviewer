@@ -912,7 +912,7 @@ class VideoWall(QWidget):
                     video_path = video_path.lower()
                     player = VideoPlayer(video_path, parent=self)
                     self.players.append(player)
-                    self.refresh_layout()
+            self.refresh_layout()
 
         # 将窗口移动到鼠标所在的屏幕
         self.move_to_current_screen()
