@@ -8,7 +8,7 @@
 
 <img src="./icons/viewer_3.ico" alt="XianyuBot Logo" width="180">
 
-**hiviewer**是一款支持多**图片&视频**对比的**智能看图工具**。本项目采用 **Python + PyQt5** 实现，为用户提供更便捷的看图方法。
+**hiviewer**是一款多功能**图片&视频**比较工具，采用 **Python + PyQt5** 实现，旨在为用户提供更便捷的图片&视频对比方案。
 
 <p align="center">
   <a href="https://www.python.org/">
@@ -24,11 +24,11 @@
 
 </div>
 
-
 ## 项目结构
+
 ```
 
-hiviewer_root/
+hiviewer/
 ├── src/                # 存在项目主要功能模块
 │   ├── __init__.py
 │   ├── modules/        # 存放各个子界面功能模块
@@ -70,6 +70,7 @@ hiviewer_root/
 ## 使用说明
 
 ### 环境配置
+
 ```bash
 # 安装依赖
 pip3 install -r requirements.txt
@@ -91,20 +92,19 @@ python3 hiviewer.py
 
 ### 效果展示
 
-> 新的版本会有新的变化，此处仅供参考，详细地使用说明请点一下 [这里](https://github.com/diamond-cz/hiviewer_releases) ，不麻烦`-_-)o` 
+> 新的版本会有新的变化，此处仅供参考，详细地使用说明请点一下 [这里](https://github.com/diamond-cz/hiviewer_releases) ，不麻烦`-_-)o`
 
-**==主界面展示==**
+**主界面展示**
 
 ![Alt text](images/Image_mainwindow.png)
 
 ![Alt text](images/Image_mainwindow1.png)
 
-
-**==看图界面展示==**
+**看图界面展示**
 
 ![Alt text](images/Image_subwindow_pic.png)
 
-**==视频播放界面展示==**
+**视频播放界面展示**
 
 ![Alt text](images/Image_video.png)
 
@@ -112,11 +112,9 @@ python3 hiviewer.py
 
 ![Alt text](images/Image_pic.png)
 
-
 ## 许可证
 
-本项目采用 **GPL 3.0** ([GNU通用公共许可协议](https://jxself.org/translations/gpl-3.zh.shtml))进行许可，支持自由使用与修改，但是必须公开修改后源码。  
+本项目采用 **GPL 3.0** ([GNU通用公共许可协议](https://jxself.org/translations/gpl-3.zh.shtml))进行许可，支持自由使用与修改，但是必须公开修改后源码。
 有关详细信息，请参阅 [LICENSE](LICENSE) 文件。
 
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL%203.0-blue.svg)](https://jxself.org/translations/gpl-3.zh.shtml)
-

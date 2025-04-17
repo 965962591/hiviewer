@@ -26,7 +26,6 @@ from logging.handlers import RotatingFileHandler
 # import av # 比原生 OpenCV 快 35%（实测 1000 个视频处理仅需 8.2 秒）  
 import cv2
 import piexif
-import numpy as np
 from openpyxl import Workbook
 import xml.etree.ElementTree as ET
 from PIL import Image
@@ -48,7 +47,7 @@ from src.modules.sub_compare_video_view import VideoWall        # 假设这是�
 from src.modules.sub_rename_view import FileOrganizer           # 添加这行以导入批量重名名类名
 from src.modules.sub_image_process import SubCompare            # 确保导入 SubCompare 类
 from src.modules.sub_bat_view import LogVerboseMaskApp          # 导入批量执行命令的类
-from src.utils.about import AboutDialog                         # 导入关于对话框类,显示帮助信息
+from src.utils.about import AboutDialog, version_init           # 导入关于对话框类,显示帮助信息
 from src.utils.hisnot import WScreenshot                        # 导入截图工具类
 from src.utils.raw2jpg import Mipi2RawConverterApp              # 导入MIPI RAW文件转换为JPG文件的类
 from src.utils.dialog_class import Qualcom_Dialog               # 导入自定义对话框的类
@@ -1156,19 +1155,23 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def initialize_components(self):
         """初始化所有组件"""
-        
-        # 设置视频文件格式
+
+        # 设置图片&视频文件格式
+        self.IMAGE_FORMATS = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tif', '.ico', '.webp')
         self.VIDEO_FORMATS = ('.mp4', '.avi', '.mov', '.wmv', '.mpeg', '.mpg', '.mkv')
-        # 设置图片文件格式
-        self.IMAGE_FORMATS = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tif', '.ico', '.webp') 
 
         # 初始化属性
-        self.files_list = []      # 文件名及基本信息列表
-        self.paths_list = []      # 文件路径列表
-        self.dirnames_list = []   # 选中的同级文件夹列表
+        self.files_list = []            # 文件名及基本信息列表
+        self.paths_list = []            # 文件路径列表
+        self.dirnames_list = []         # 选中的同级文件夹列表
+        self.image_index_max = []       # 存储当前选中及复选框选中的，所有图片列有效行最大值
         self.preloading_file_name_paths = []  # 预加载图标前的文件路径列表
-        self.task_active = False # 定时器任务变量
+        self.compare_window = None            # 添加子窗口引用
+        self.task_active = False              # 定时器任务变量
+        self.last_key_press = False           # 记录第一次按下键盘空格键或B键
         self.selected_folders_history = False # 记录是否有效点击复选框，避免self.RT_QComboBox1的press事件出现重复连接信号的情况
+        self.simple_mode = True          # 设置默认模式为简单模式，同EXIF信息功能
+        self.current_theme = "默认主题"  # 设置初始主题为默认主题
 
         # 添加预加载相关的属性初始化
         self.current_preloader = None  # 当前预加载器引用
@@ -1178,33 +1181,28 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 初始化线程池
         self.threadpool = QThreadPool()
         self.threadpool.setMaxThreadCount(max(4, os.cpu_count()))  
-        
-        # 初始化压缩工作线程,压缩包路径
-        self.compress_worker = None
-        self.zip_path = None  
 
-        # 加载之前保存的颜色设置
+        # 初始化压缩工作线程,压缩包路径
+        self.zip_path = None  
+        self.compress_worker = None
+
+        """加载颜色相关设置""" # 设置背景色和字体颜色，使用保存的设置或默认值
         self.color_settings = load_color_settings()
-        # 设置背景色和字体颜色，使用保存的设置或默认值
         self.background_color_default = self.color_settings.get("background_color_default", "rgb(173,216,230)")  # 深色背景色_好蓝
         self.background_color_table = self.color_settings.get("background_color_table", "rgb(127, 127, 127)")    # 表格背景色_18度灰
         self.font_color_default = self.color_settings.get("font_color_default", "rgb(0, 0, 0)")                  # 默认字体颜色_纯黑色
         self.font_color_exif = self.color_settings.get("font_color_exif", "rgb(255, 255, 255)")                  # Exif字体颜色_纯白色
 
-        # 导入自定义字体的路径
+        """加载字体相关设置""" # 初始化字体管理器,并获取字体，设置默认字体 self.custom_font
         font_paths = [
             os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", "JetBrainsMapleMono_Regular.ttf"), # JetBrains Maple Mono
             os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", "xialu_wenkai.ttf"),               # LXGW WenKai
             os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", "MapleMonoNormal_Regular.ttf")     # Maple Mono Normal
         ]
-        # 初始化字体管理器
         MultiFontManager.initialize(font_paths=font_paths)
-
-        # 获取字体
-        # self.custom_font_lxgw = MultiFontManager.get_font(font_family="LXGW WenKai", size=12)
         self.custom_font_jetbrains = MultiFontManager.get_font(font_family="JetBrains Maple Mono", size=12)
         self.custom_font_jetbrains_small = MultiFontManager.get_font(font_family="JetBrains Maple Mono", size=10)
-
+        self.custom_font = self.custom_font_jetbrains
         if False: # 暂时移除，使用MultiFontManager.get_font()方法
             # 单个字体管理器，两种导入方式:
             # 第一种，直接使用字体管理器默认字体，只是恶
@@ -1212,20 +1210,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             # 第二种，使用字体管理器初始化方法，传入字体路径    
             font_path_jetbrains = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", "JetBrainsMapleMono_Regular.ttf")
             self.custom_font = SingleFontManager.get_font(size=12, font_path=font_path_jetbrains)   
-
-        # 设置默认字体
-        self.custom_font = self.custom_font_jetbrains
-
-        # 添加图片组管理相关的属性
-        self.image_index_max = []    # 存储当前选中及复选框选中的，所有图片列有效行最大值
-        self.last_key_press = False  # 记录第一次按下键盘空格键或B键
-        self.compare_window = None   # 添加子窗口引用
-
-        # 设置默认模式为简单模式，同EXIF信息功能
-        self.simple_mode = True 
-
-        # 设置初始主题为默认主题
-        self.current_theme = "默认主题"  
+        
 
         # 设置主界面相关组件
         self.set_stylesheet()
@@ -1489,6 +1474,17 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 启用拖放功能
         self.setAcceptDrops(True)
 
+        """界面底部状态栏设置"""
+        # self.statusbar --> self.statusbar_widget --> self.statusbar_QHBoxLayout --> self.statusbar_button1 self.statusbar_button2
+        # 设置按钮无边框
+        self.statusbar_button1.setFlat(True)
+        self.statusbar_button2.setFlat(True)
+ 
+        self.statusbar_button2.setText(f"🚀版本({self.version_info})")
+
+        # 初始化标签文本
+        self.statusbar_label1.setText(f"选中或筛选的文件夹中包含{self.image_index_max}张图 | 已选[]张图 | 进度提示标签")  # 根据需要设置标签的文本
+
         
         """ 左侧组件
         设置左侧组件显示风格，背景颜色为淡蓝色，四角为圆形; 下面显示左侧组件name 
@@ -1561,10 +1557,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.RT_QComboBox1.lineEdit().setReadOnly(True)  # 设置不可编辑
         self.RT_QComboBox1.lineEdit().setPlaceholderText("请选择")  # 设置提示文本
         
-        # 初始化标签文本
-        self.RB_Label1.setText(" 选中或筛选的文件夹中包含[]张图 ")  # 根据需要设置标签的文本
-        self.RB_Label2.setText(" 这是一个进度提示标签,显示图标加载的进度信息 ")  # 根据需要设置标签的文本
-
 
     def set_shortcut(self):
         """快捷键和槽函数连接事件"""
@@ -1652,6 +1644,9 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.RT_QComboBox3.activated.connect(self.handle_theme_selection)           # 点击下拉框选项时，更新主题
         self.RT_QPushButton3.clicked.connect(self.clear_combox)                     # 清除地址栏
         self.RT_QPushButton5.clicked.connect(self.compare)                          # 打开看图工具
+        
+        self.statusbar_button1.clicked.connect(self.compare)   # 🔆设置按钮槽函数
+        self.statusbar_button2.clicked.connect(self.compare)   # 🚀版本按钮槽函数
         
 
     """
@@ -2289,14 +2284,15 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         url = QtCore.QUrl.fromLocalFile(zip_path)
         mime_data.setUrls([url])
         QApplication.clipboard().setMimeData(mime_data)
-        
-        self.RB_Label2.setText(" 压缩完成")
+        # 更新状态栏信息显示
+        self.statusbar_label1.setText(f"选中或筛选的文件夹中包含{self.image_index_max}张图 | 已选[]张图 | 压缩完成")
         show_message_box(f"文件已压缩为: {zip_path} 并复制到剪贴板", "提示", 500)
 
     def on_compress_error(self, error_msg):
         """处理压缩错误"""
         self.progress_dialog.close()  # 关闭进度窗口
-        self.RB_Label2.setText(" 压缩出错")
+        # 更新状态栏信息显示
+        self.statusbar_label1.setText(f"选中或筛选的文件夹中包含{self.image_index_max}张图 | 已选[]张图 | error: 压缩出错")
         show_message_box(error_msg, "错误", 2000)
 
 
@@ -2522,8 +2518,8 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 self.RB_QTableWidget0.setRowHeight(row, 52)
 
 
-        # # 更新标签 RB_Label1 显示
-        self.RB_Label1.setText(f" 当前选中的文件夹中包含 {pic_num_list} 张图")  
+        # # 更新标签 statusbar_label1 显示  f"选中或筛选的文件夹中包含{self.image_index_max}张图 | 已选[]张图 | 进度提示标签"
+        self.statusbar_label1.setText(f" 当前选中的文件夹中包含 {pic_num_list} 张图 | 已选[]张图 | 进度提示标签")  
 
         return pic_num_list
 
@@ -2708,9 +2704,10 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         """开始预加载图片"""
         if self.preloading:
             return
-            
+        
+        # 设置预加载状态
         self.preloading = True
-        self.RB_Label2.setText(" 正在预加载图片...")
+        
         
         # 创建新的预加载器
         self.current_preloader = ImagePreloader(file_paths)
@@ -2721,6 +2718,8 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         
         # 启动预加载
         self.threadpool.start(self.current_preloader)
+
+        print("start_image_preloading函数: 开始预加载图标, 启动预加载线程")
         
     def cancel_preloading(self):
         """取消当前预加载任务"""
@@ -2760,12 +2759,14 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def update_preload_progress(self, current, total):
         """处理预加载进度"""
-        self.RB_Label2.setText(f" 图标加载进度展示...... {current}/{total} ")
+        # 更新状态栏信息显示
+        self.statusbar_label1.setText(f"选中或筛选的文件夹中包含{self.image_index_max}张图 | 已选[]张图 | 🔈: 图标加载进度...{current}/{total}")
         
     def on_preload_finished(self):
         """处理预加载完成"""
         print("on_preload_finished()--图标预加载完成")
-        self.RB_Label2.setText(" ^v^_图标已全部加载_^v^_纵享丝滑体验_^v^ ")
+        # 更新状态栏信息显示
+        self.statusbar_label1.setText(f"选中或筛选的文件夹中包含{self.image_index_max}张图 | 已选[]张图 | 🔈: 图标已全部加载")
         gc.collect()
         
     def on_preload_error(self, error):
@@ -2892,7 +2893,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         print("apply_theme()--更新当前主题")
         try:
             if self.current_theme == "暗黑主题":
-                self.setStyleSheet(self.dark_style())
+                self.setStyleSheet(self.dark_style())     # 暗黑主题
             else:
                 self.setStyleSheet(self.default_style())  # 默认主题
         except Exception as e:
@@ -3061,12 +3062,36 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         """
 
-        label_style2 = f"""
+        statusbar_label_style = f"""
             border: none;
-            background-color: {BACKCOLOR};
             color: {FONTCOLOR};
-            font-family: {self.custom_font.family()};
-            font-size: {self.custom_font.pointSize()}pt;
+            font-family: {self.custom_font_jetbrains_small.family()};
+            font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
+            
+        """
+
+        statusbar_button_style = f"""
+            QPushButton {{
+                background-color: {WHITE};
+                color: {FONTCOLOR};
+                text-align: center;
+                font-family: "{self.custom_font_jetbrains_small.family()}";
+                font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
+            }}
+            QPushButton:hover {{
+                border: 1px solid {BACKCOLOR};
+                background-color: {BACKCOLOR};
+                color: {FONTCOLOR};
+            }}
+        """
+
+        # self.custom_font_jetbrains_small
+        statusbar_style = f"""
+            border: none;
+            background-color: {WHITE};
+            color: {FONTCOLOR};
+            font-family: {self.custom_font_jetbrains_small.family()};
+            font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
             border-radius: 10px;
         """
 
@@ -3093,9 +3118,11 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 设置右侧中间表格区域样式
         self.RB_QTableWidget0.setStyleSheet(table_style)
 
-        # 设置右侧底部标签样式
-        self.RB_Label1.setStyleSheet(label_style2)
-        self.RB_Label2.setStyleSheet(label_style2)
+        # 设置底部状态栏区域样式 self.statusbar --> self.statusbar_widget --> self.statusbar_QHBoxLayout --> self.statusbar_button1 self.statusbar_button2
+        self.statusbar.setStyleSheet(statusbar_style)
+        self.statusbar_button1.setStyleSheet(statusbar_button_style)
+        self.statusbar_button2.setStyleSheet(statusbar_button_style)
+        self.statusbar_label1.setStyleSheet(statusbar_label_style)
 
         # 返回主窗口样式
         return f""" 
@@ -3107,9 +3134,9 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
             BACKCOLOR_ = self.background_color_default  # 配置中的背景色
             # 定义通用颜色变量
-            BACKCOLOR = "rgb( 15, 17, 30)"  # 浅蓝色背景
-            GRAY = "rgb(127, 127, 127)"       # 灰色
-            WHITE = "rgb(238,238,238)"      # 白色
+            BACKCOLOR = "rgb( 15, 17, 30)"   # 浅蓝色背景
+            GRAY = "rgb(127, 127, 127)"      # 灰色
+            WHITE = "rgb(238,238,238)"       # 白色
             BLACK = "rgb( 34, 40, 49)"       # 黑色
 
             
@@ -3329,14 +3356,36 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
             """
     
-            label_style2 = f"""
+    
+            statusbar_label_style = f"""
+                border: none;
+                color: {WHITE};
+                font-family: {self.custom_font_jetbrains_small.family()};
+                font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
+                
+            """
+
+            statusbar_button_style = f"""
+                QPushButton {{
+                    background-color: {BLACK};
+                    color: {WHITE};
+                    text-align: center;
+                    font-family: "{self.custom_font_jetbrains_small.family()}";
+                    font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
+                }}
+                QPushButton:hover {{
+                    border: 1px solid {BACKCOLOR};
+                    background-color: {BACKCOLOR};
+                    color: {WHITE};
+                }}
+            """
+
+            statusbar_style = f"""
                 border: none;
                 background-color: {BLACK};
                 color: {WHITE};
-                font-family: {self.custom_font.family()};
-                font-size: {self.custom_font.pointSize()}pt;
-                border-radius: 10px;
             """
+
 
             # 设置左上侧文件浏览区域样式
             self.Left_QTreeView.setStyleSheet(left_area_style)
@@ -3361,9 +3410,11 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             # 设置右侧中间表格区域样式
             self.RB_QTableWidget0.setStyleSheet(table_style)
 
-            # 设置右侧底部标签样式
-            self.RB_Label1.setStyleSheet(label_style2)
-            self.RB_Label2.setStyleSheet(label_style2)
+            # 设置底部状态栏区域样式 self.statusbar --> self.statusbar_widget --> self.statusbar_QHBoxLayout --> self.statusbar_button1 self.statusbar_button2
+            self.statusbar.setStyleSheet(statusbar_style)
+            self.statusbar_button1.setStyleSheet(statusbar_button_style)
+            self.statusbar_button2.setStyleSheet(statusbar_button_style)
+            self.statusbar_label1.setStyleSheet(statusbar_label_style)
 
             # 返回主窗口样式
             return f"""

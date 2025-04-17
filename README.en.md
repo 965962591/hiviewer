@@ -28,7 +28,7 @@
 
 ```
 
-hiviewer_root/
+hiviewer/
 ├── src/                # Contains the main functional modules of the project
 │   ├── __init__.py
 │   ├── modules/        # Contains sub-interface functional modules

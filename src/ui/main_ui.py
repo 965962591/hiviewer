@@ -242,6 +242,50 @@ class Ui_MainWindow(object):
         MainWindow.setDocumentMode(False)
         MainWindow.setTabShape(QtWidgets.QTabWidget.Rounded)
         MainWindow.setDockNestingEnabled(False)
+
+        """添加顶部菜单栏"""
+        if False: # 移除菜单栏设置
+            self.menubar = QtWidgets.QMenuBar(MainWindow)
+            self.menubar.setGeometry(QtCore.QRect(0, 0, 964, 22))  # 设置菜单栏的位置和大小
+            self.menubar.setObjectName("menubar")
+
+            # 添加文件菜单
+            self.fileMenu = self.menubar.addMenu("文件")
+            # 添加文件菜单项
+            self.openAction = QtWidgets.QAction("打开", MainWindow)
+            self.fileMenu.addAction(self.openAction)
+            self.saveAction = QtWidgets.QAction("保存", MainWindow)
+            self.fileMenu.addAction(self.saveAction)
+            self.exitAction = QtWidgets.QAction("退出", MainWindow)
+            self.fileMenu.addAction(self.exitAction)
+            MainWindow.setMenuBar(self.menubar)
+
+        """添加底部状态栏""" 
+        self.statusbar = QtWidgets.QStatusBar(MainWindow)
+        self.statusbar.setObjectName("statusbar")
+        self.statusbar.setSizeGripEnabled(False)
+        self.statusbar.setStyleSheet("QStatusBar::item { border: none; }")
+        self.statusbar.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        
+        # 创建按钮
+        self.statusbar_button1 = QtWidgets.QPushButton("🔆设置")
+        self.statusbar_button2 = QtWidgets.QPushButton("🚀版本(2.3.5)")
+
+        # 创建标签
+        self.statusbar_label1 = QtWidgets.QLabel()
+        self.statusbar_label1.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)  # 设置为可扩展
+        self.statusbar_label1.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)  # 设置右居中对齐
+        self.statusbar_label1.setMinimumWidth(1)
+
+        # 正确添加组件的方式：注意，addWidget & addPermanentWidget 的区别
+        self.statusbar.addWidget(self.statusbar_button2)           # 普通部件（左对齐）
+        self.statusbar.addWidget(self.statusbar_button1)
+        self.statusbar.addPermanentWidget(self.statusbar_label1)  # 永久部件（右对齐）
+
+        # 设置布局方向
+        self.statusbar.setLayoutDirection(QtCore.Qt.LeftToRight)
+        MainWindow.setStatusBar(self.statusbar)
+
         # 设置主窗口的主体
         self.main_body = QtWidgets.QWidget(MainWindow)
         self.main_body.setStyleSheet("")
@@ -468,37 +512,35 @@ class Ui_MainWindow(object):
 
         self.RB_QTableWidget0.setObjectName("RB_QTableWidget0")
         self.verticalLayout_3.addWidget(self.RB_QTableWidget0)
+        
+        if False: # 移除显示界面的信息标签，迁移到底部状态栏中显示
+            self.RB_Line1 = QtWidgets.QFrame(self.Right_Bottom_QGroupBox)
+            self.RB_Line1.setFrameShape(QtWidgets.QFrame.VLine)
+            self.RB_Line1.setFrameShadow(QtWidgets.QFrame.Sunken)
+            self.RB_Line1.setObjectName("RB_Line1")
+            self.verticalLayout_3.addWidget(self.RB_Line1)
+            # 创建一个新的水平布局
+            self.RB_HLayout = QtWidgets.QHBoxLayout()
+            self.RB_HLayout.setSizeConstraint(QtWidgets.QLayout.SetDefaultConstraint)
+            self.RB_HLayout.setObjectName("RB_HLayout")
+            # 第一个右侧第五行Qlabel
+            self.RB_Label1 = QtWidgets.QLabel()
+            self.RB_Label1.setObjectName("RB_Label1")
+            self.RB_Label1.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)  # 设置为可扩展
+            self.RB_Label1.setStyleSheet("border: none;background-color: lightblue; border-radius:10px;")
+            self.RB_Label1.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)  # 设置左居中对齐
+            self.RB_HLayout.addWidget(self.RB_Label1)
+            # 第二个右侧第五行Qlabel
+            self.RB_Label2 = QtWidgets.QLabel()
+            self.RB_Label2.setObjectName("RB_Label2")
+            self.RB_Label2.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)  # 设置为可扩展
+            self.RB_Label2.setStyleSheet("border: none;background-color: lightblue; border-radius:10px;")
+            self.RB_Label2.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)  # 设置右居中对齐
+            self.RB_HLayout.addWidget(self.RB_Label2)
+            # 将水平布局添加到垂直布局中
+            self.verticalLayout_3.addLayout(self.RB_HLayout)
+            self.verticalLayout_3.setStretch(0, 10)
 
-        self.RB_Line1 = QtWidgets.QFrame(self.Right_Bottom_QGroupBox)
-        self.RB_Line1.setFrameShape(QtWidgets.QFrame.VLine)
-        self.RB_Line1.setFrameShadow(QtWidgets.QFrame.Sunken)
-        self.RB_Line1.setObjectName("RB_Line1")
-        self.verticalLayout_3.addWidget(self.RB_Line1)
-
-        # 创建一个新的水平布局
-        self.RB_HLayout = QtWidgets.QHBoxLayout()
-        self.RB_HLayout.setSizeConstraint(QtWidgets.QLayout.SetDefaultConstraint)
-        self.RB_HLayout.setObjectName("RB_HLayout")
-        
-        # 第一个右侧第五行Qlabel
-        self.RB_Label1 = QtWidgets.QLabel()
-        self.RB_Label1.setObjectName("RB_Label1")
-        self.RB_Label1.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)  # 设置为可扩展
-        self.RB_Label1.setStyleSheet("border: none;background-color: lightblue; border-radius:10px;")
-        self.RB_Label1.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)  # 设置左居中对齐
-        self.RB_HLayout.addWidget(self.RB_Label1)
-        
-        # 第二个右侧第五行Qlabel
-        self.RB_Label2 = QtWidgets.QLabel()
-        self.RB_Label2.setObjectName("RB_Label2")
-        self.RB_Label2.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)  # 设置为可扩展
-        self.RB_Label2.setStyleSheet("border: none;background-color: lightblue; border-radius:10px;")
-        self.RB_Label2.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)  # 设置右居中对齐
-        self.RB_HLayout.addWidget(self.RB_Label2)
-        
-        # 将水平布局添加到垂直布局中
-        self.verticalLayout_3.addLayout(self.RB_HLayout)
-        self.verticalLayout_3.setStretch(0, 10)
 
         # 设置右侧大的垂直layout--包含控制界面和显示界面
         self.Right_QVBoxLayout.addWidget(self.Right_Bottom_QGroupBox)
@@ -511,10 +553,6 @@ class Ui_MainWindow(object):
         self.gridLayout.addWidget(self.splitter, 0, 0, 1, 1)
         MainWindow.setCentralWidget(self.main_body)
 
-        # self.menubar = QtWidgets.QMenuBar(MainWindow)
-        # self.menubar.setGeometry(QtCore.QRect(0, 0, 964, 22))
-        # self.menubar.setObjectName("menubar")
-        # MainWindow.setMenuBar(self.menubar)
 
         self.splitter.setStretchFactor(0, 1)  # 设置左侧部件（Left_QGroupBox）的拉伸因子为1
         self.splitter.setStretchFactor(1, 2)  # 设置右侧部件（Right_QFrame）的拉伸因子为1
@@ -541,8 +579,8 @@ class Ui_MainWindow(object):
         self.RT_QPushButton5.setText(_translate("MainWindow", "对比"))
 
         self.Right_Bottom_QGroupBox.setTitle(_translate("MainWindow", "显示界面"))
-        self.RB_Label1.setText(_translate("MainWindow", "第一个标签"))
-        self.RB_Label2.setText(_translate("MainWindow", "第二个标签"))
+
+
 
 
 
