@@ -1130,8 +1130,8 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         default_version_path = os.path.join(os.path.dirname(__file__), "cache", "version.ini")
         # 读取本地配置文件中的版本信息
         self.version_info = version_init(default_version_path, VERSION='release-v2.3.2')
-        # 获取github中发布的最新版本信息,转移到函数set_stylesheet()中获取,先在此处初始化
-        # self.new_version_info = pre_check_update()
+        # 获取github中发布的最新版本信息, self.new_version_info = pre_check_update()
+        # 转移到函数self.create_splash_screen() --> self.update_splash_message --> self.pre_update() 中获取,先在此处初始化
         self.new_version_info = False 
         # 2 创建启动画面
         try:
@@ -1500,7 +1500,8 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.statusbar_button2.setText(f"🚀版本({self.version_info})")            
 
         # 初始化标签文本
-        self.statusbar_label1.setText(f"选中或筛选的文件夹中包含{self.image_index_max}张图 | 已选[]张图 | 进度提示标签")  # 根据需要设置标签的文本
+        self.statusbar_label1.setText(f"🔉: 进度提示标签🍃")  # 根据需要设置标签的文本
+        self.statusbar_label0.setText(f"📢：选中或筛选的文件夹中包含{self.image_index_max}张图")
 
         
         """ 左侧组件
@@ -2323,14 +2324,14 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         mime_data.setUrls([url])
         QApplication.clipboard().setMimeData(mime_data)
         # 更新状态栏信息显示
-        self.statusbar_label1.setText(f"选中或筛选的文件夹中包含{self.image_index_max}张图 | 已选[]张图 | 压缩完成")
+        self.statusbar_label1.setText(f"🔉: 压缩完成🍃")
         show_message_box(f"文件已压缩为: {zip_path} 并复制到剪贴板", "提示", 500)
 
     def on_compress_error(self, error_msg):
         """处理压缩错误"""
         self.progress_dialog.close()  # 关闭进度窗口
         # 更新状态栏信息显示
-        self.statusbar_label1.setText(f"选中或筛选的文件夹中包含{self.image_index_max}张图 | 已选[]张图 | error: 压缩出错")
+        self.statusbar_label1.setText(f"🔉: 压缩出错🍃")
         show_message_box(error_msg, "错误", 2000)
 
 
@@ -2556,8 +2557,8 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 self.RB_QTableWidget0.setRowHeight(row, 52)
 
 
-        # # 更新标签 statusbar_label1 显示  f"选中或筛选的文件夹中包含{self.image_index_max}张图 | 已选[]张图 | 进度提示标签"
-        self.statusbar_label1.setText(f" 当前选中的文件夹中包含 {pic_num_list} 张图 | 已选[]张图 | 进度提示标签")  
+        # # 更新标签显示  
+        self.statusbar_label0.setText(f"📢：当前选中的文件夹中包含 {pic_num_list} 张图")  
 
         return pic_num_list
 
@@ -2798,13 +2799,13 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def update_preload_progress(self, current, total):
         """处理预加载进度"""
         # 更新状态栏信息显示
-        self.statusbar_label1.setText(f"选中或筛选的文件夹中包含{self.image_index_max}张图 | 已选[]张图 | 🔈: 图标加载进度...{current}/{total}")
+        self.statusbar_label1.setText(f"🔉: 图标加载进度...{current}/{total}🍃")
         
     def on_preload_finished(self):
         """处理预加载完成"""
         print("on_preload_finished()--图标预加载完成")
         # 更新状态栏信息显示
-        self.statusbar_label1.setText(f"选中或筛选的文件夹中包含{self.image_index_max}张图 | 已选[]张图 | 🔈: 图标已全部加载")
+        self.statusbar_label1.setText(f"🔉: 图标已全部加载🍃")
         gc.collect()
         
     def on_preload_error(self, error):
@@ -3099,13 +3100,13 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             }}
 
         """
-
+        # background-color: {WHITE}; border-radius: 10px;
         statusbar_label_style = f"""
             border: none;
-            color: {FONTCOLOR};
+            color: {"rgb(255,255,255)"};
             font-family: {self.custom_font_jetbrains_small.family()};
             font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
-            
+        
         """
 
         statusbar_button_style = f"""
@@ -3115,6 +3116,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 text-align: center;
                 font-family: "{self.custom_font_jetbrains_small.family()}";
                 font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
+                border-radius: 10px;
             }}
             QPushButton:hover {{
                 border: 1px solid {BACKCOLOR};
@@ -3130,6 +3132,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 text-align: center;
                 font-family: "{self.custom_font_jetbrains_small.family()}";
                 font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
+                border-radius: 10px;
             }}
             QPushButton:hover {{
                 border: 1px solid {BACKCOLOR};
@@ -3138,14 +3141,14 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             }}
         """        
 
-        # self.custom_font_jetbrains_small
+        # self.custom_font_jetbrains_small   "rgb(234,118, 32)"
         statusbar_style = f"""
             border: none;
-            background-color: {WHITE};
+            background-color: {GRAY};
             color: {FONTCOLOR};
             font-family: {self.custom_font_jetbrains_small.family()};
             font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
-            border-radius: 10px;
+            
         """
 
         # 设置左上侧文件浏览区域样式
@@ -3179,6 +3182,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.statusbar_button2.setStyleSheet(statusbar_button_style_version)
         else:
             self.statusbar_button2.setStyleSheet(statusbar_button_style)
+        self.statusbar_label0.setStyleSheet(statusbar_label_style)
         self.statusbar_label1.setStyleSheet(statusbar_label_style)
 
 
@@ -3485,7 +3489,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
             # 设置底部状态栏区域样式 self.statusbar --> self.statusbar_widget --> self.statusbar_QHBoxLayout --> self.statusbar_button1 self.statusbar_button2
             self.statusbar.setStyleSheet(statusbar_style)
-            self.statusbar_label1.setStyleSheet(statusbar_label_style)
             self.statusbar_button1.setStyleSheet(statusbar_button_style)
             # self.statusbar_button2.setStyleSheet(statusbar_button_style)
             # 设置版本按钮更新样式
@@ -3493,6 +3496,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 self.statusbar_button2.setStyleSheet(statusbar_button_style_version)
             else:
                 self.statusbar_button2.setStyleSheet(statusbar_button_style)
+            self.statusbar_label0.setStyleSheet(statusbar_label_style)
             self.statusbar_label1.setStyleSheet(statusbar_label_style)
 
             # 返回主窗口样式
