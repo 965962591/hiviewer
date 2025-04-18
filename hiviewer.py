@@ -1501,7 +1501,8 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # 初始化标签文本
         self.statusbar_label1.setText(f"🔉: 进度提示标签🍃")  # 根据需要设置标签的文本
-        self.statusbar_label0.setText(f"📢：选中或筛选的文件夹中包含{self.image_index_max}张图")
+        self.statusbar_label0.setText(f"📢:选中或筛选的文件夹中包含{self.image_index_max}张图")
+        self.statusbar_label.setText(f"🎯[]已选中")
 
         
         """ 左侧组件
@@ -1662,7 +1663,11 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.RT_QComboBox3.activated.connect(self.handle_theme_selection)           # 点击下拉框选项时，更新主题
         self.RT_QPushButton3.clicked.connect(self.clear_combox)                     # 清除地址栏
         self.RT_QPushButton5.clicked.connect(self.compare)                          # 打开看图工具
+
+        # 添加表格选择变化的信号连接 f"🎯[{count}]已选中"
+        self.RB_QTableWidget0.itemSelectionChanged.connect(self.handle_table_selection)
         
+        # 底部状态栏按钮连接函数
         self.statusbar_button1.clicked.connect(self.setting)   # 🔆设置按钮槽函数
         self.statusbar_button2.clicked.connect(self.update)    # 🚀版本按钮槽函数
         
@@ -2558,7 +2563,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
 
         # # 更新标签显示  
-        self.statusbar_label0.setText(f"📢：当前选中的文件夹中包含 {pic_num_list} 张图")  
+        self.statusbar_label0.setText(f"📢:当前选中的文件夹中包含 {pic_num_list} 张图")  
 
         return pic_num_list
 
@@ -2878,6 +2883,17 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             print(f"getSiblingFolders()--获取同级文件夹列表失败: {e}")
             return []
 
+    def handle_table_selection(self):
+        """处理表格选中事件"""
+        selected = self.RB_QTableWidget0.selectedItems()
+        if selected:
+            # 示例：更新状态栏显示选中数量
+            # count = len({item.row() for item in selected})  # 获取不重复的行数
+            self.statusbar_label.setText(f"🎯[{len(selected)}]已选中")
+            
+            # 可以在这里添加更多选中后的处理逻辑
+            # 例如：显示选中文件的预览、获取文件详细信息等
+
     def handle_sort_option(self):
         """处理排序选项"""
         print("handle_sort_option()--处理排序选项")
@@ -3182,6 +3198,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.statusbar_button2.setStyleSheet(statusbar_button_style_version)
         else:
             self.statusbar_button2.setStyleSheet(statusbar_button_style)
+        self.statusbar_label.setStyleSheet(statusbar_label_style)
         self.statusbar_label0.setStyleSheet(statusbar_label_style)
         self.statusbar_label1.setStyleSheet(statusbar_label_style)
 
@@ -3496,6 +3513,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 self.statusbar_button2.setStyleSheet(statusbar_button_style_version)
             else:
                 self.statusbar_button2.setStyleSheet(statusbar_button_style)
+            self.statusbar_label.setStyleSheet(statusbar_label_style)
             self.statusbar_label0.setStyleSheet(statusbar_label_style)
             self.statusbar_label1.setStyleSheet(statusbar_label_style)
 

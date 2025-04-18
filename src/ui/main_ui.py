@@ -278,15 +278,16 @@ class Ui_MainWindow(object):
         self.statusbar_label1.setMinimumWidth(1)
 
         self.statusbar_label0 = QtWidgets.QLabel()
-        # self.statusbar_label0.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)  # 设置为可扩展
-        # self.statusbar_label0.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)  # 设置右居中对齐
         self.statusbar_label0.setMinimumWidth(1)
+        self.statusbar_label = QtWidgets.QLabel()
+        self.statusbar_label.setMinimumWidth(1)
 
 
         # 正确添加组件的方式：注意，addWidget & addPermanentWidget 的区别
-        self.statusbar.addWidget(self.statusbar_button1)           # 普通部件（左对齐）
-        self.statusbar.addWidget(self.statusbar_button2)
+        self.statusbar.addWidget(self.statusbar_button2)           # 普通部件（左对齐）
+        self.statusbar.addWidget(self.statusbar_button1)
         self.statusbar.addWidget(self.statusbar_label0)
+        self.statusbar.addWidget(self.statusbar_label)
         self.statusbar.addPermanentWidget(self.statusbar_label1)  # 永久部件（右对齐）
         
 
