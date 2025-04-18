@@ -1502,7 +1502,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 初始化标签文本
         self.statusbar_label1.setText(f"🔉: 进度提示标签🍃")  # 根据需要设置标签的文本
         self.statusbar_label0.setText(f"📢:选中或筛选的文件夹中包含{self.image_index_max}张图")
-        self.statusbar_label.setText(f"🎯[]已选中")
+        self.statusbar_label.setText(f"[0]已选择")
 
         
         """ 左侧组件
@@ -2373,6 +2373,10 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def update_combobox(self, index):
         """左侧文件浏览器点击定位更新右侧combobox函数"""
         print("update_combobox函数: ")
+
+        # 清空历史的已选择
+        self.statusbar_label.setText(f"[0]已选择")
+        
         # 获取左侧文件浏览器中当前点击的文件夹路径，并显示在地址栏
         current_path = self.file_system_model.filePath(index)
         if os.path.isdir(current_path):
@@ -2889,7 +2893,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         if selected:
             # 示例：更新状态栏显示选中数量
             # count = len({item.row() for item in selected})  # 获取不重复的行数
-            self.statusbar_label.setText(f"🎯[{len(selected)}]已选中")
+            self.statusbar_label.setText(f"[{len(selected)}]已选择")
             
             # 可以在这里添加更多选中后的处理逻辑
             # 例如：显示选中文件的预览、获取文件详细信息等

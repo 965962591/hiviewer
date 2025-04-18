@@ -1,12 +1,15 @@
 {
-    "combobox_history": [],
-    "current_directory": "",
-    "file_type_option": "显示视频文件",
-    "combobox1_checked_items": [],
+    "combobox_history": [
+        "D:/Tuning/O19/0_pic/0415 O19国际前置一供回归测试/0415 O19国际前置一供回归测试/超夜/O19"
+    ],
+    "current_directory": "D:/Tuning/O19/0_pic/0415 O19国际前置一供回归测试/0415 O19国际前置一供回归测试/超夜/O19",
+    "file_type_option": "显示图片文件",
+    "combobox1_checked_items": [
+        "N19"
+    ],
     "combobox1_all_items": [
         "N12",
-        "N19",
-        "O19 一供"
+        "N19"
     ],
     "sort_option": "按创建时间排序",
     "theme_option": "默认主题",
