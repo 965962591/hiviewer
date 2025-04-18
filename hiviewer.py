@@ -47,11 +47,12 @@ from src.modules.sub_compare_video_view import VideoWall        # 假设这是�
 from src.modules.sub_rename_view import FileOrganizer           # 添加这行以导入批量重名名类名
 from src.modules.sub_image_process import SubCompare            # 确保导入 SubCompare 类
 from src.modules.sub_bat_view import LogVerboseMaskApp          # 导入批量执行命令的类
-from src.utils.about import AboutDialog, version_init           # 导入关于对话框类,显示帮助信息
+from src.utils.about import AboutDialog                         # 导入关于对话框类,显示帮助信息
 from src.utils.hisnot import WScreenshot                        # 导入截图工具类
 from src.utils.raw2jpg import Mipi2RawConverterApp              # 导入MIPI RAW文件转换为JPG文件的类
 from src.utils.dialog_class import Qualcom_Dialog               # 导入自定义对话框的类
 from src.utils.font_class import SingleFontManager, MultiFontManager  # 字体管理器
+from src.utils.update import check_update,pre_check_update            # 导入自动更新检查程序
 
 
 """python项目多文件夹路径说明
@@ -1127,8 +1128,11 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # 1 设置版本信息
         default_version_path = os.path.join(os.path.dirname(__file__), "cache", "version.ini")
+        # 读取本地配置文件中的版本信息
         self.version_info = version_init(default_version_path, VERSION='release-v2.3.2')
-        
+        # 获取github中发布的最新版本信息,转移到函数set_stylesheet()中获取,先在此处初始化
+        # self.new_version_info = pre_check_update()
+        self.new_version_info = False 
         # 2 创建启动画面
         try:
             print("create_splash_screen()--创建启动画面")
@@ -1445,8 +1449,20 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             y = screen_geometry.y() + (screen_geometry.height() - self.height()) // 2
             self.move(x, y)
 
-            # 延时显示主窗口,方便启动画面渐出
-            QTimer.singleShot(1000, self.show)
+            # 预检查更新
+            self.pre_update()
+
+            # 显示主窗口
+            self.show()
+
+            # 延时显示主窗口,方便启动画面渐出  pre_update
+            # QTimer.singleShot(1000, self.show)
+
+            # 延时检查更新
+            # QTimer.singleShot(3000, self.pre_update)
+
+
+
     
     """
     设置右键菜单函数区域结束线
@@ -1479,8 +1495,9 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 设置按钮无边框
         self.statusbar_button1.setFlat(True)
         self.statusbar_button2.setFlat(True)
- 
-        self.statusbar_button2.setText(f"🚀版本({self.version_info})")
+
+        # 初始化版本更新按钮文本
+        self.statusbar_button2.setText(f"🚀版本({self.version_info})")            
 
         # 初始化标签文本
         self.statusbar_label1.setText(f"选中或筛选的文件夹中包含{self.image_index_max}张图 | 已选[]张图 | 进度提示标签")  # 根据需要设置标签的文本
@@ -1645,8 +1662,8 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.RT_QPushButton3.clicked.connect(self.clear_combox)                     # 清除地址栏
         self.RT_QPushButton5.clicked.connect(self.compare)                          # 打开看图工具
         
-        self.statusbar_button1.clicked.connect(self.compare)   # 🔆设置按钮槽函数
-        self.statusbar_button2.clicked.connect(self.compare)   # 🚀版本按钮槽函数
+        self.statusbar_button1.clicked.connect(self.setting)   # 🔆设置按钮槽函数
+        self.statusbar_button2.clicked.connect(self.update)    # 🚀版本按钮槽函数
         
 
     """
@@ -1719,6 +1736,27 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def compare(self):
         print("compare()-对比按钮被点击--调用on_space_pressed()")
         self.on_space_pressed()
+
+
+    def setting(self):
+        print("setting()-设置按钮被点击--setting()")
+        # self.on_space_pressed()
+
+    def update(self):
+        print("setting()-版本按钮被点击--update()")
+        check_update()
+
+    def pre_update(self):
+        print("pre_update()--预更新版本")
+
+        # 获取self.new_version_info最新版本信息
+        self.new_version_info = pre_check_update()
+        if self.new_version_info:
+            self.statusbar_button2.setToolTip(f"🚀有新版本可用: {self.version_info}-->{self.new_version_info}")
+            self.apply_theme() # 更新样式表
+        else:
+            self.statusbar_button2.setToolTip("当前已是最新版本")
+        
 
 
     def show_exif(self):
@@ -3085,6 +3123,21 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             }}
         """
 
+        statusbar_button_style_version = f"""
+            QPushButton {{
+                background-color: {"rgb(245,108,108)"};
+                color: {FONTCOLOR};
+                text-align: center;
+                font-family: "{self.custom_font_jetbrains_small.family()}";
+                font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
+            }}
+            QPushButton:hover {{
+                border: 1px solid {BACKCOLOR};
+                background-color: {"rgb(245,108,108)"};
+                color: {FONTCOLOR};
+            }}
+        """        
+
         # self.custom_font_jetbrains_small
         statusbar_style = f"""
             border: none;
@@ -3121,8 +3174,13 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 设置底部状态栏区域样式 self.statusbar --> self.statusbar_widget --> self.statusbar_QHBoxLayout --> self.statusbar_button1 self.statusbar_button2
         self.statusbar.setStyleSheet(statusbar_style)
         self.statusbar_button1.setStyleSheet(statusbar_button_style)
-        self.statusbar_button2.setStyleSheet(statusbar_button_style)
+        # 设置版本按钮更新样式
+        if self.new_version_info:
+            self.statusbar_button2.setStyleSheet(statusbar_button_style_version)
+        else:
+            self.statusbar_button2.setStyleSheet(statusbar_button_style)
         self.statusbar_label1.setStyleSheet(statusbar_label_style)
+
 
         # 返回主窗口样式
         return f""" 
@@ -3380,6 +3438,21 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 }}
             """
 
+            statusbar_button_style_version = f"""
+                QPushButton {{
+                    background-color: {"rgb(245,108,108)"};
+                    color: {WHITE};
+                    text-align: center;
+                    font-family: "{self.custom_font_jetbrains_small.family()}";
+                    font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
+                }}
+                QPushButton:hover {{
+                    border: 1px solid {BACKCOLOR};
+                    background-color: {"rgb(245,108,108)"};
+                    color: {WHITE};
+                }}
+            """  
+
             statusbar_style = f"""
                 border: none;
                 background-color: {BLACK};
@@ -3412,8 +3485,14 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
             # 设置底部状态栏区域样式 self.statusbar --> self.statusbar_widget --> self.statusbar_QHBoxLayout --> self.statusbar_button1 self.statusbar_button2
             self.statusbar.setStyleSheet(statusbar_style)
+            self.statusbar_label1.setStyleSheet(statusbar_label_style)
             self.statusbar_button1.setStyleSheet(statusbar_button_style)
-            self.statusbar_button2.setStyleSheet(statusbar_button_style)
+            # self.statusbar_button2.setStyleSheet(statusbar_button_style)
+            # 设置版本按钮更新样式
+            if self.new_version_info:
+                self.statusbar_button2.setStyleSheet(statusbar_button_style_version)
+            else:
+                self.statusbar_button2.setStyleSheet(statusbar_button_style)
             self.statusbar_label1.setStyleSheet(statusbar_label_style)
 
             # 返回主窗口样式

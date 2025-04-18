@@ -81,10 +81,10 @@ class Updater:
                         download_url = f"{self.proxy_prefix}{asset['browser_download_url']}"
                         return download_url, self.latest_version
                 # 如果没有找到zip文件，返回None
-                print("未找到可下载的zip文件")
+                print("check_for_updates()--未找到可下载的zip文件")
                 return None, None
             else:
-                print("当前已是最新版本")
+                print("check_for_updates()--当前已是最新版本")
                 return None, None
                 
         except requests.RequestException as e:
@@ -104,25 +104,6 @@ class Updater:
                 # 直接移除现有的安装包
                 os.remove(zip_path)
 
-                # try:
-                #     reply_ = gui.show_message(
-                #         "提示",
-                #         f"路径({zip_path})中已有安装包 \n是否移除？",
-                #         QMessageBox.Warning,
-                #         QMessageBox.Ok | QMessageBox.Cancel
-                #     )
-
-                #     if reply_ == QMessageBox.Ok:
-                #         # 移除已有安装包
-                #         os.remove(zip_path)
-                #     elif reply_ == QMessageBox.Cancel:
-                #         # print("使用已存在的本地更新包")
-                #         return zip_path, None, 0
-                # except Exception as e:
-                #     print(f"移除error: {e}")
-                #     os.remove(zip_path)
-
-            
             # 下载新的更新包
             response = requests.get(download_url, stream=True)
             response.raise_for_status()
@@ -278,7 +259,9 @@ class UpdaterGUI:
         return progress
 
 
-# 全局函数
+""" 全局函数区域
+----------------------------------------------------------------------------------------------------
+"""
 def download_with_progress(zip_path, response, total_size, progress_dialog):
     """下载文件并显示进度"""
     try:
@@ -332,6 +315,21 @@ def start_program_subprocess(program_path=None, work_path=None, args=None):
         return process  # 返回进程对象以便后续控制
     except Exception as e:
         print(f"启动程序失败: {e}")
+        return False
+
+
+def pre_check_update():
+    """预检查更新函数，供主程序调用"""
+    try:
+        print("pre_check_update()--开始检查更新...")
+        updater = Updater()
+        download_url, version = updater.check_for_updates()
+        if download_url:
+            return version
+        else:
+            return False
+    except Exception as e:
+        print(f"预检查更新发生错误: {str(e)}")
         return False
 
 # 主函数

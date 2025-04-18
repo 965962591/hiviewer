@@ -239,8 +239,9 @@ class AboutDialog(QDialog):
         QDesktopServices.openUrl(QUrl("https://github.com/965962591"))
 
 
-    """ 移除该段逻辑，使用线程运行自动检测更新"""
+    
     def release_updates(self):
+        """ 使用函数check_update自动检测更新"""
         try:
             # 初始化对话框并绑定销毁事件
             self.update_dialog = check_update()
