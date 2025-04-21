@@ -324,18 +324,21 @@ class Ui_MainWindow(object):
         self.Left_QGroupBox.setFlat(False)
         self.Left_QGroupBox.setCheckable(False)
         self.Left_QGroupBox.setObjectName("Left_QGroupBox")
+
         # 磁盘显示 里面套一个垂直layout1
         self.verticalLayout_left_1 = QtWidgets.QVBoxLayout(self.Left_QGroupBox)
         self.verticalLayout_left_1.setSizeConstraint(QtWidgets.QLayout.SetDefaultConstraint)
         self.verticalLayout_left_1.setContentsMargins(5, 5, 5, 5)
         self.verticalLayout_left_1.setSpacing(5)
         self.verticalLayout_left_1.setObjectName("verticalLayout_left_1")
+
         # 垂直layout1 里面套一个QTreeView(pyqt中的类，用来显示树形结构的数据，展示文件系统、层级结构等)
         self.Left_QTreeView = QtWidgets.QTreeView(self.Left_QGroupBox)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.Left_QTreeView.setSizePolicy(sizePolicy)
         self.Left_QTreeView.setFrameShape(QtWidgets.QFrame.NoFrame)
         self.Left_QTreeView.setObjectName("Left_QTreeView")
+
         # 磁盘显示 里面套一个QFrame框架容器
         self.Left_QFrame = QtWidgets.QFrame(self.Left_QGroupBox)
         self.Left_QFrame.setAutoFillBackground(False)
@@ -357,12 +360,20 @@ class Ui_MainWindow(object):
         self.L_radioButton2.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)  # 设置为可扩展
         self.L_radioButton2.setObjectName("L_radioButton2")
         self.verticalLayout_left_2.addWidget(self.L_radioButton2)
-        # 将Left_QTreeView和Left_QFrame套在垂直layout1中，并设置拉伸因子
-        self.verticalLayout_left_1.addWidget(self.Left_QTreeView)
-        self.verticalLayout_left_1.addWidget(self.Left_QFrame)
-        # 设置自由拉伸
-        self.verticalLayout_left_1.setStretch(0, 10)  # 第一个组件的拉伸因子
-        self.verticalLayout_left_1.setStretch(1, 0)   # 第二个组件的拉伸因子
+
+
+        # 创建垂直分割器并添加组件，在self.Left_QTreeView和self.Left_QFrame之间添加一个垂直分割器
+        self.vertical_splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
+        self.vertical_splitter.addWidget(self.Left_QTreeView)
+        self.vertical_splitter.addWidget(self.Left_QFrame)
+        # self.vertical_splitter.setChildrenCollapsible(False)  # 禁止子部件折叠
+        self.vertical_splitter.setHandleWidth(6)  # 设置分割条宽度
+
+        # 调整布局结构
+        self.verticalLayout_left_1.addWidget(self.vertical_splitter)
+        # 设置分割器拉伸比例（保持原有比例）
+        self.vertical_splitter.setStretchFactor(0, 10)
+        self.vertical_splitter.setStretchFactor(1, 0)
 
         """设置分割器右侧组件"""
         self.Right_QFrame = QtWidgets.QFrame(self.splitter)
@@ -419,7 +430,6 @@ class Ui_MainWindow(object):
         self.RT_QPushButton3.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.RT_QPushButton3.setObjectName("RT_QPushButton3")
         
-
         # 设置右侧第二行的 水平layout
         self.RT_QHBoxLayout2 = QtWidgets.QHBoxLayout()
         self.RT_QHBoxLayout2.setSizeConstraint(QtWidgets.QLayout.SetDefaultConstraint)
@@ -458,15 +468,12 @@ class Ui_MainWindow(object):
         self.RT_QPushButton5.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.RT_QPushButton5.setObjectName("RT_QPushButton5")
         
-
         # 设置右侧第一行的 水平layout的拉伸比例
         self.RT_QHBoxLayout.addWidget(self.RT_QComboBox)
         self.RT_QHBoxLayout.addWidget(self.RT_Line1)
-        
         self.RT_QHBoxLayout.setStretch(0, 8)
         # self.RT_QHBoxLayout.setStretch(1, 1)
         
-
         # 设置右侧第二行的 水平layout 的拉伸比例
         self.RT_QHBoxLayout2.addWidget(self.RT_QComboBox0)
         self.RT_QHBoxLayout2.addWidget(self.RT_QComboBox1)
@@ -562,16 +569,15 @@ class Ui_MainWindow(object):
         self.gridLayout.addWidget(self.splitter, 0, 0, 1, 1)
         MainWindow.setCentralWidget(self.main_body)
 
-
-        self.splitter.setStretchFactor(0, 1)  # 设置左侧部件（Left_QGroupBox）的拉伸因子为1
-        self.splitter.setStretchFactor(1, 2)  # 设置右侧部件（Right_QFrame）的拉伸因子为1
+        self.splitter.setStretchFactor(0, 1)   # 设置左侧部件（Left_QGroupBox）的拉伸因子为1
+        self.splitter.setStretchFactor(1, 2)   # 设置右侧部件（Right_QFrame）的拉伸因子为1
 
         # 设置分割器的初始大小比例
-        self.splitter.setSizes([200, 600])  # 左侧组件初始宽度为300，右侧组件初始宽度为600
+        self.splitter.setSizes([200, 600])     # 左侧组件初始宽度为300，右侧组件初始宽度为600
 
         # 设置左侧和右侧组件的最小大小
         self.Left_QGroupBox.setMinimumSize(200, 0)  # 左侧组件的最小宽度
-        self.Right_QFrame.setMinimumSize(400, 0)  # 右侧组件的最小宽度
+        self.Right_QFrame.setMinimumSize(400, 0)    # 右侧组件的最小宽度
 
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
@@ -587,7 +593,7 @@ class Ui_MainWindow(object):
         self.RT_QPushButton3.setText(_translate("MainWindow", "清除"))
         self.RT_QPushButton5.setText(_translate("MainWindow", "对比"))
 
-        self.Right_Bottom_QGroupBox.setTitle(_translate("MainWindow", "显示界面"))
+        # self.Right_Bottom_QGroupBox.setTitle(_translate("MainWindow", "显示界面")) # 移除组显示文字
 
 
 

@@ -1523,7 +1523,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # 隐藏不需要的列，只显示名称列
         self.Left_QTreeView.header().hide()  # 隐藏列标题
-        self.Left_QTreeView.setColumnWidth(0, 650)  # 设置名称列宽度，以显示横向滚动条
+        self.Left_QTreeView.setColumnWidth(0, 500)  # 设置名称列宽度，以显示横向滚动条
         self.Left_QTreeView.setColumnHidden(1, True)  # 隐藏大小列
         self.Left_QTreeView.setColumnHidden(2, True)  # 隐藏类型列
         self.Left_QTreeView.setColumnHidden(3, True)  # 隐藏修改日期列 
@@ -2376,7 +2376,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # 清空历史的已选择
         self.statusbar_label.setText(f"[0]已选择")
-        
+
         # 获取左侧文件浏览器中当前点击的文件夹路径，并显示在地址栏
         current_path = self.file_system_model.filePath(index)
         if os.path.isdir(current_path):
