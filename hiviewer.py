@@ -34,11 +34,11 @@ from PyQt5.QtGui import (
     QIcon, QKeySequence, QPixmap, QColor, QTransform, QFont, QPainter, QImageReader,QImage)
 from PyQt5.QtWidgets import (
     QFileSystemModel, QAbstractItemView, QTableWidgetItem, QHeaderView, QShortcut, QSplashScreen, 
-    QMessageBox, QStyledItemDelegate, QStyleOptionButton, QStyle, QApplication, QMenu, QProgressBar,
+    QMessageBox, QStyledItemDelegate, QStyleOptionButton, QStyle, QApplication, QMenu, QProgressBar,QInputDialog,
     QProgressDialog, QDialog, QVBoxLayout, QLabel, QHBoxLayout, QPushButton, QLineEdit, QCheckBox)
 from PyQt5.QtCore import (
     Qt, QDir, QTimer, QSize, QTimer, QRunnable, QThreadPool, QObject, pyqtSignal, QAbstractListModel,
-    QThread, QSize, QAbstractListModel, QModelIndex, QVariant, QItemSelection, QItemSelectionModel)
+    QThread, QSize, QAbstractListModel, QModelIndex, QVariant, QItemSelection, QItemSelectionModel,QUrl)
 
 """导入用户自定义的模块"""
 from src.ui.main_ui import Ui_MainWindow                        # 假设你的主窗口类名为Ui_MainWindow
@@ -50,7 +50,7 @@ from src.modules.sub_bat_view import LogVerboseMaskApp          # 导入批量�
 from src.utils.about import AboutDialog                         # 导入关于对话框类,显示帮助信息
 from src.utils.hisnot import WScreenshot                        # 导入截图工具类
 from src.utils.raw2jpg import Mipi2RawConverterApp              # 导入MIPI RAW文件转换为JPG文件的类
-from src.utils.dialog_class import Qualcom_Dialog               # 导入自定义对话框的类
+from src.utils.dialog_qualcom_aebox import Qualcom_Dialog               # 导入自定义对话框的类
 from src.utils.font_class import SingleFontManager, MultiFontManager  # 字体管理器
 from src.utils.update import check_update,pre_check_update            # 导入自动更新检查程序
 
@@ -1228,7 +1228,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 设置快捷键
         self.set_shortcut()
 
-        # 设置右键菜单
+        # 设置右键菜单,连接到表格组件self.RB_QTableWidget0上
         self.setup_context_menu()  
 
         # 模仿按下回车
@@ -1528,6 +1528,10 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.Left_QTreeView.setColumnHidden(2, True)  # 隐藏类型列
         self.Left_QTreeView.setColumnHidden(3, True)  # 隐藏修改日期列 
 
+        # 添加右键菜单功能,连接到文件浏览树self.Left_QTreeView上
+        self.Left_QTreeView.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.Left_QTreeView.customContextMenuRequested.connect(self.show_treeview_context_menu)
+
         # # 使用QDir的过滤器只显示文件夹
         self.file_system_model.setFilter(QDir.NoDot | QDir.NoDotDot | QDir.AllDirs)  
 
@@ -1690,22 +1694,127 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         else:
             print("L_radioButton2 未被选中")
 
-    def handle_single_image_editing(self):
-        # 单个图片编辑功能
-        print("单个图片编辑功能按钮被点击")
-        # 打开图片编辑子界面, 同按下L键
-        self.on_l_pressed()
 
-    def batch_rename(self):
-        print("批量重命名按钮被点击")
-        # 获取当前选中的文件夹上一级文件夹路径
-        current_folder = self.RT_QComboBox.currentText()
-        current_folder = os.path.dirname(current_folder) 
-        if current_folder:
-            self.open_rename_tool(current_folder)
-        else:
-            # 弹出提示框, 0.5秒后自动关闭
-            show_message_box("当前没有选中的文件夹", "提示", 500)
+    def show_treeview_context_menu(self, pos):
+        """显示文件树右键菜单"""
+
+        # 设置左侧文件浏览器的右键菜单栏
+        self.treeview_context_menu = QMenu(self)
+    
+        # 设置右键菜单样式
+        self.treeview_context_menu.setStyleSheet(f"""
+            QMenu {{
+                /*background-color: #F0F0F0;   背景色 */
+
+                font-family: "{self.custom_font_jetbrains_small.family()}";
+                font-size: {self.custom_font_jetbrains_small.pointSize()}pt;    
+            }}
+            QMenu::item:selected {{
+                background-color: {self.background_color_default};   /* 选中项背景色 */
+                color: #000000;               /* 选中项字体颜色 */
+            }}
+        """)
+
+        # 添加常用操作
+        open_action = self.treeview_context_menu.addAction("打开所在位置")
+        copy_path_action = self.treeview_context_menu.addAction("复制路径")
+        rename_action = self.treeview_context_menu.addAction("重命名")  # 新增重命名菜单项
+        
+
+        # 获取选中的文件信息
+        index = self.Left_QTreeView.indexAt(pos)
+        if index.isValid():
+            file_path = self.file_system_model.filePath(index)
+            
+            # 连接想信号槽函数
+            open_action.triggered.connect(lambda: self.open_file_location(file_path))  
+            copy_path_action.triggered.connect(lambda: self.copy_file_path(file_path))
+            rename_action.triggered.connect(lambda: self.rename_file(file_path))
+
+            
+            self.treeview_context_menu.exec_(self.Left_QTreeView.viewport().mapToGlobal(pos))
+
+    def open_file_location(self, path):
+        """在资源管理器中打开路径"""
+        # QtCore.QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+        try:
+            # 跨平台处理优化
+            if sys.platform == 'win32':
+                # 转换为Windows风格路径并处理特殊字符
+                win_path = str(path).replace('/', '\\')
+                if ' ' in win_path:  # 自动添加双引号
+                    win_path = f'"{win_path}"'
+                # 使用start命令更可靠
+                command = f'start explorer /select,{win_path}'
+                # 移除check=True参数避免误报
+                subprocess.run(command, shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
+
+            elif sys.platform == 'darwin':
+                # 使用open命令直接定位文件
+                subprocess.run(['open', '-R', str(full_path)], check=True)
+
+            else:  # Linux/Unix
+                subprocess.run(['xdg-open', str(full_path.parent)], check=True)
+
+        except subprocess.CalledProcessError as e:
+            show_message_box(f"定位命令执行失败: {str(e)}", "错误", 2000)
+        except FileNotFoundError:
+            show_message_box("找不到系统命令，请检查系统环境", "错误", 2000)
+        except Exception as e:
+            show_message_box(f"定位文件失败: {str(e)}", "错误", 2000)
+
+
+    def copy_file_path(self, path):
+        """复制文件路径到剪贴板"""
+        clipboard = QApplication.clipboard()
+        clipboard.setText(path)
+
+
+    def rename_file(self, path):
+        """重命名文件/文件夹"""
+        old_name = os.path.basename(path)
+        dialog = QInputDialog(self)  # 创建自定义对话框实例
+        dialog.setWindowTitle("重命名")
+        dialog.setLabelText("请输入新名称:")
+        dialog.setTextValue(old_name)
+        
+        # 设置对话框尺寸
+        dialog.setMinimumSize(100, 100)  # 最小尺寸
+        dialog.setFixedSize(500, 150)    # 固定尺寸（宽400px，高150px）
+        
+        # 设置输入框样式
+        dialog.setStyleSheet("""
+            QInputDialog {
+                font-family: "JetBrains Mono";
+                font-size: 14px;
+            }
+            QLineEdit {
+                padding: 8px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+            }
+        """)
+        
+        if dialog.exec_() == QDialog.Accepted:
+            new_name = dialog.textValue()
+            if new_name and new_name != old_name:
+                try:
+                    new_path = os.path.join(os.path.dirname(path), new_name)
+                    
+                    # 检查新路径是否已存在
+                    if os.path.exists(new_path):
+                        show_message_box("名称已存在！", "错误", 500)
+                        return
+                    
+                    # 执行重命名
+                    os.rename(path, new_path)
+                    
+                    # 更新文件系统模型
+                    self.file_system_model.setRootPath('')
+                    self.Left_QTreeView.viewport().update()
+                    
+                except Exception as e:
+                    show_message_box(f"重命名失败: {str(e)}", "错误", 1000)
 
     """
     右侧信号槽函数
