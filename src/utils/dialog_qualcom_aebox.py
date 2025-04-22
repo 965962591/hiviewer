@@ -14,7 +14,7 @@ if is_standalone:
 
 """导入自定义的模块"""
 from src.utils.font_class import SingleFontManager
-from src.utils.aebox_link import test_aebox_link,launch_aebox
+from src.utils.aebox_link import test_aebox_link,launch_aebox,urlencode_folder_path,get_api_data
 
 
 """设置本项目的入口路径,全局变量BasePath"""
@@ -41,8 +41,8 @@ class Qualcom_Dialog(QDialog):
 
         # 高通工具、AEBOX工具、图片文件夹等初始化状态检查
         self.test_button1()
-        self.test_connection()
         self.test_button3()
+        self.test_connection()
 
 
         # 根据传入的图片路径列表设置关联图片下拉框；
@@ -178,8 +178,6 @@ class Qualcom_Dialog(QDialog):
         self.button_box.setFont(self.font_manager_jetbrains_big)
         self.layout.addWidget(self.button_box)
 
-        
-
 
     def test_button1(self):
         """测试高通工具路径"""
@@ -221,7 +219,8 @@ class Qualcom_Dialog(QDialog):
             return
         
         # 检查当前程序tool_path，是否在运行 test_aebox_link,launch_aebox
-        if test_aebox_link():
+        list_url = self.get_url()
+        if list_url and test_aebox_link(list_url):
             self.status_button2.setText("✅")
             self.status_button2.setToolTip(f"✅当前AEBOX工具路径有效，连接测试通过")
             return
@@ -230,16 +229,64 @@ class Qualcom_Dialog(QDialog):
         self.status_button2.setToolTip(f"🚀当前AEBOX工具路径有效，程序未启动，点击按钮启动AEBOX")
 
 
+    def get_url(self):
+        """获取高通工具路径和图片文件夹路径的编码url"""
+
+        # 高通工具路径url
+        qualcom_path = self.text_input1.text()
+        if qualcom_path and os.path.exists(qualcom_path):
+            # url编码
+            qualcom_path_encoded = urlencode_folder_path(qualcom_path)
+            qualcom_path_url = f"http://127.0.0.1:8000/set_c7_path/{qualcom_path_encoded}"
+        else:
+            return []
+
+        # 图片文件夹路径url
+        image_path = self.text_input3.text()
+        if image_path and os.path.exists(image_path):
+            # url编码
+            image_path_encoded = urlencode_folder_path(image_path)
+            image_path_url = f"http://127.0.0.1:8000/set_image_folder/{image_path_encoded}"
+        else:
+            return []
+        
+        # 返回编码后的url列表
+        list_endpoints = [
+            qualcom_path_url,
+            image_path_url
+        ]
+
+        return list_endpoints
+
+
     def click_button2(self):
         """测试图片文件夹路径"""
         tool_path = self.text_input2.text()
         current_text = self.status_button2.text()
-        # 这里可以添加实际的连接测试逻辑
-        if current_text == "🚀" and tool_path and os.path.exists(tool_path):
-            # 启动aebox工具
-            launch_aebox(tool_path)
-            # test
-            self.test_connection()
+        try:
+            # 这里可以添加实际的连接测试逻辑
+            if current_text == "🚀" and tool_path and os.path.exists(tool_path):
+                # 启动aebox工具
+                launch_aebox(tool_path)
+                # test
+                self.test_connection()
+
+            image_path = self.text_input3.text()
+            image_path_url = ""
+            if image_path and os.path.exists(image_path):
+                # url编码
+                image_path_encoded = urlencode_folder_path(image_path)
+                image_path_url = f"http://127.0.0.1:8000/set_image_folder/{image_path_encoded}"
+            if current_text == "✅" and image_path_url:
+                # 发送文件夹到aebox
+                response = get_api_data(url=image_path_url, timeout=3)
+                if response:
+                    print("click_button2():发送文件成功")
+                else:
+                    print("click_button2():发送文件失败")
+        except Exception as e:
+            print(f"click_button2()--发生错误: {e}")
+                
 
     def test_button3(self):
         """测试图片文件夹路径"""

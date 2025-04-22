@@ -34,6 +34,7 @@ from src.ui.sub_ui import Ui_MainWindow               # 看图子界面，导入
 from src.utils.ai_tips import CustomLLM_Siliconflow   # 看图子界面，AI提示看图复选框功能模块
 from src.utils.font_class import SingleFontManager    # 看图子界面，导入字体管理器
 from src.utils.hisnot import WScreenshot              # 看图子界面，导入自定义截图的类
+from src.utils.aebox_link import check_process_running,urlencode_folder_path,get_api_data
 
 """设置本项目的入口路径,全局变量BasePath"""
 # 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
@@ -1868,6 +1869,14 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         # 更新当前显示的图片路径列表
         self.images_path_list = image_paths
         self.index_list = index_list
+
+        try:
+            select_image_url = f"http://127.0.0.1:8000/select_image/{self.index_list[0].split('/')[0]}"
+            response = get_api_data(url=select_image_url, timeout=3)
+            if not response:
+                print(f"看图界面--图片索引发送到aebox失败")   
+        except Exception as e:
+            print(f"看图界面--图片索引发送到aebox失败: {str(e)}")
 
 
         # 记录开始时间

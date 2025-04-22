@@ -53,6 +53,7 @@ from src.utils.raw2jpg import Mipi2RawConverterApp              # 导入MIPI RAW
 from src.utils.dialog_qualcom_aebox import Qualcom_Dialog               # 导入自定义对话框的类
 from src.utils.font_class import SingleFontManager, MultiFontManager  # 字体管理器
 from src.utils.update import check_update,pre_check_update            # 导入自动更新检查程序
+from src.utils.aebox_link import check_process_running,urlencode_folder_path,get_api_data
 
 
 """python项目多文件夹路径说明
@@ -1717,6 +1718,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # 添加常用操作
         open_action = self.treeview_context_menu.addAction("打开所在位置")
+        send_path_to_aebox = self.treeview_context_menu.addAction("发送到aebox")
         copy_path_action = self.treeview_context_menu.addAction("复制路径")
         rename_action = self.treeview_context_menu.addAction("重命名")  # 新增重命名菜单项
         
@@ -1729,6 +1731,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             # 连接想信号槽函数
             open_action.triggered.connect(lambda: self.open_file_location(file_path))  
             copy_path_action.triggered.connect(lambda: self.copy_file_path(file_path))
+            send_path_to_aebox.triggered.connect(lambda: self.send_file_path_to_aebox(file_path))
             rename_action.triggered.connect(lambda: self.rename_file(file_path))
 
             
@@ -1764,10 +1767,32 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             show_message_box(f"定位文件失败: {str(e)}", "错误", 2000)
 
 
-    def copy_file_path(self, path):
+    def copy_file_path(self, path): 
         """复制文件路径到剪贴板"""
         clipboard = QApplication.clipboard()
         clipboard.setText(path)
+
+    def send_file_path_to_aebox(self, path): 
+        """将文件夹路径发送到aebox"""
+        try:
+
+            if not check_process_running("aebox.exe"):
+                show_message_box(f"未检测到aebox进程，请先手动打开aebox软件", "错误", 1000)
+
+            # url编码
+            image_path_url = urlencode_folder_path(path)
+            if image_path_url:
+                # 拼接文件夹
+                image_path_url = f"http://127.0.0.1:8000/set_image_folder/{image_path_url}"
+                # 发送请求通信到aebox
+                response = get_api_data(url=image_path_url, timeout=3)
+                if response:
+                    print("send_file_path_to_aebox():发送文件夹成功")
+                else:
+                    print("send_file_path_to_aebox():发送文件夹失败")
+            
+        except Exception as e:
+            show_message_box(f"将文件夹路径发送到aebox失败: {str(e)}", "错误", 1000)
 
 
     def rename_file(self, path):

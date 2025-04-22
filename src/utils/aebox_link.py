@@ -126,6 +126,7 @@ def test_aebox_link(api_endpoints: list = None, process_name: str = "aebox.exe")
                     print(f"❌ 接口测试失败：{url}")
                 else:
                     print(f"✅ 接口响应成功 | 返回内容：{response}")
+                    time.sleep(1)  # 等待1秒后载执行
             except Exception as e:
                 all_success = False
                 print(f"⚠️ 测试异常: {str(e)}")
