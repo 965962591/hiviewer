@@ -23,13 +23,15 @@
         "D:/Tuning/O19/0_pic/0415 O19国际前置一供回归测试/0415 O19国际前置一供回归测试/超夜/O19",
         "D:\\Tuning\\O19\\0_pic\\0421",
         "D:/Tuning/O19/0_pic/0421/O19_GL_一供D:\\Tuning\\O19\\0_pic\\0421\\video",
-        "D:\\Tuning\\O19\\0_pic\\0423\\O19"
+        "D:\\Tuning\\O19\\0_pic\\0423\\O19",
+        "D:/Tuning/O19/0_pic/0423/O19"
     ],
-    "current_directory": "D:/Tuning/O19/0_pic/0423/N19",
+    "current_directory": "D:/Tuning/O19/0_pic/0423/N12",
     "file_type_option": "显示图片文件",
     "combobox1_checked_items": [],
     "combobox1_all_items": [
-        "N12",
+        "22222",
+        "N19",
         "O19"
     ],
     "sort_option": "按文件名称排序",

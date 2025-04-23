@@ -54,6 +54,7 @@ from src.utils.dialog_qualcom_aebox import Qualcom_Dialog               # 导入
 from src.utils.font_class import SingleFontManager, MultiFontManager  # 字体管理器
 from src.utils.update import check_update,pre_check_update            # 导入自动更新检查程序
 from src.utils.aebox_link import check_process_running,urlencode_folder_path,get_api_data
+from src.utils.preview_image import ImageViewer  # 导入自定义图片预览组件
 
 
 """python项目多文件夹路径说明
@@ -1216,6 +1217,8 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.preloading = False        # 预加载状态
         self.preload_queue = Queue()   # 预加载队列
 
+        self.media_player = None  # 在__init__方法中添加
+
         # 初始化线程池
         self.threadpool = QThreadPool()
         self.threadpool.setMaxThreadCount(max(4, os.cpu_count()))  
@@ -1511,7 +1514,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # 添加常用操作
         show_file_action = self.treeview_context_menu.addAction(
-            "显示文件" if not self.left_tree_file_display else "隐藏文件")
+            "显示所有文件" if not self.left_tree_file_display else "隐藏所有文件")
         open_action = self.treeview_context_menu.addAction("打开所在位置")
         send_path_to_aebox = self.treeview_context_menu.addAction("发送到aebox")
         copy_path_action = self.treeview_context_menu.addAction("复制路径")
@@ -1580,7 +1583,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         设置左侧组件显示风格，背景颜色为淡蓝色，四角为圆形; 下面显示左侧组件name 
         self.Left_QTreeView | self.Left_QFrame
         self.verticalLayout_left_2
-        
+
         self.L_radioButton1 | self.L_radioButton2 | self.L_pushButton1 | self.L_pushButton2
         modify by diamond_cz 20250403 移除按钮self.L_pushButton1 | self.L_pushButton2
         """  
@@ -2547,12 +2550,29 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 清空历史的已选择
         self.statusbar_label.setText(f"[0]已选择")
 
+        # 更新左侧文件浏览器中的radioButton
+        if True:
+            # 清空旧预览内容
+            self.clear_preview_layout()
+
+            preview_label = QLabel("预览区域")
+            preview_label.setFont(self.custom_font_jetbrains)
+            preview_label.setAlignment(Qt.AlignCenter)
+            self.verticalLayout_left_2.addWidget(preview_label)
+            # 重新显示radioButton，不需要重新显示
+            # self.verticalLayout_left_2.addWidget(self.L_radioButton1)
+            # self.verticalLayout_left_2.addWidget(self.L_radioButton2)
+            # self.L_radioButton1.setChecked(True)  # 默认选择第一个单选按钮
+            # self.L_radioButton1.setText("隐藏文件")  # 设置按钮文本
+            # self.L_radioButton2.setText("显示文件")  # 设置按钮文本
+
+
         # 获取左侧文件浏览器中当前点击的文件夹路径，并显示在地址栏
         current_path = self.file_system_model.filePath(index)
         if os.path.isdir(current_path):
-            self.RT_QComboBox.setCurrentText(current_path)
             if self.RT_QComboBox.findText(current_path) == -1:
-                self.RT_QComboBox.insertItem(0, current_path)
+                self.RT_QComboBox.addItem(current_path)
+            self.RT_QComboBox.setCurrentText(current_path)
             print(f"1. 点击了左侧文件，该文件夹已更新到地址栏中: {current_path}")
 
         print("2. 将地址栏文件夹的同级文件夹更新到下拉复选框")
@@ -2926,7 +2946,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 设置预加载状态
         self.preloading = True
         
-        
         # 创建新的预加载器
         self.current_preloader = ImagePreloader(file_paths)
         self.current_preloader.signals.progress.connect(self.update_preload_progress)
@@ -3057,16 +3076,115 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             print(f"getSiblingFolders()--获取同级文件夹列表失败: {e}")
             return []
 
+    # def handle_table_selection(self):
+    #     """处理表格选中事件"""
+    #     selected = self.RB_QTableWidget0.selectedItems()
+    #     if selected:
+    #         # 示例：更新状态栏显示选中数量
+    #         # count = len({item.row() for item in selected})  # 获取不重复的行数
+    #         self.statusbar_label.setText(f"[{len(selected)}]已选择")
+            
+    #         # 可以在这里添加更多选中后的处理逻辑 self.Left_QFrame，self.verticalLayout_left_2
+    #         # 例如：显示选中文件的预览、获取文件详细信息等
     def handle_table_selection(self):
-        """处理表格选中事件"""
+        """处理表格选中事件（新增预览功能）"""
         selected = self.RB_QTableWidget0.selectedItems()
         if selected:
-            # 示例：更新状态栏显示选中数量
-            # count = len({item.row() for item in selected})  # 获取不重复的行数
-            self.statusbar_label.setText(f"[{len(selected)}]已选择")
+            # 获取首个选中项的文件路径
+            file_paths = self.copy_selected_file_path(flag=0)  # 复用已有路径获取逻辑
+            if not file_paths:
+                return
+
+            # 只预览第一个选中的文件
+            preview_path = file_paths[0]
             
-            # 可以在这里添加更多选中后的处理逻辑
-            # 例如：显示选中文件的预览、获取文件详细信息等
+            # 清空旧预览内容
+            self.clear_preview_layout()
+
+            # 根据文件类型创建预览
+            if preview_path.lower().endswith(tuple(self.IMAGE_FORMATS)):
+                self.create_image_preview(preview_path)
+            elif preview_path.lower().endswith(tuple(self.VIDEO_FORMATS)):
+                self.create_video_preview(preview_path)
+
+            # 更新状态栏显示选中数量
+            self.statusbar_label.setText(f"[{len(selected)}]已选择")
+
+
+    def clear_preview_layout(self):
+        """清空预览区域"""
+        # ... existing code ...
+        while self.verticalLayout_left_2.count():
+            item = self.verticalLayout_left_2.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+    def create_image_preview(self, path):
+        """创建图片预览"""
+        try:
+            # 清空旧预览内容
+            self.clear_preview_layout()
+
+            # 创建 ImageViewer 实例
+            self.image_viewer = ImageViewer(self.Left_QFrame)
+
+            # 加载图片
+            self.image_viewer.load_image(path)
+
+            # 添加 ImageViewer 到 layout
+            self.verticalLayout_left_2.addWidget(self.image_viewer)
+
+            # 调整 self.Left_QFrame 的尺寸策略
+            self.Left_QFrame.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+
+        except Exception as e:
+            print(f"图片预览失败: {e}")
+            self.show_preview_error("图片预览不可用")
+
+    def create_video_preview(self, path):
+        """创建视频预览（优化为仅读取首帧）"""
+        try:
+            # 使用OpenCV读取视频首帧
+            cap = cv2.VideoCapture(path)
+            if not cap.isOpened():
+                raise ValueError("无法打开视频文件")
+            
+            # 读取第一帧并转换颜色空间
+            ret, frame = cap.read()
+            if not ret:
+                raise ValueError("无法读取视频帧")
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            
+            # 转换为QImage
+            height, width, _ = frame.shape
+            q_img = QImage(frame.data, width, height, QImage.Format_RGB888)
+            
+            # 创建 ImageViewer 实例
+            self.image_viewer = ImageViewer(self.Left_QFrame)
+
+            # 加载图片
+            self.image_viewer.load_image_from_qimage(q_img)
+
+            # 添加 ImageViewer 到 layout
+            self.verticalLayout_left_2.addWidget(self.image_viewer)
+
+            # 调整 self.Left_QFrame 的尺寸策略
+            self.Left_QFrame.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+
+            cap.release()
+
+        except Exception as e:
+            print(f"视频预览失败: {e}")
+            self.show_preview_error("视频预览不可用")
+
+
+    def show_preview_error(self, message):
+        """显示预览错误信息"""
+        error_label = QLabel(message)
+        error_label.setStyleSheet("color: #FF5555; font-size: 14px;")
+        error_label.setAlignment(Qt.AlignCenter)
+        self.verticalLayout_left_2.addWidget(error_label)
 
     def handle_sort_option(self):
         """处理排序选项"""
