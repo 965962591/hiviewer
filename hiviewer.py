@@ -1176,8 +1176,9 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 设置快捷键
         self.set_shortcut()
 
-        # 设置右键菜单,连接到表格组件self.RB_QTableWidget0上
+        # 设置左侧文件浏览器和右侧表格区域的右键菜单
         self.setup_context_menu()  
+        self.setup_treeview_context_menu()
 
         # 模仿按下回车
         self.input_enter_action()  
@@ -1206,8 +1207,9 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.task_active = False              # 定时器任务变量
         self.last_key_press = False           # 记录第一次按下键盘空格键或B键
         self.selected_folders_history = False # 记录是否有效点击复选框，避免self.RT_QComboBox1的press事件出现重复连接信号的情况
-        self.simple_mode = True          # 设置默认模式为简单模式，同EXIF信息功能
-        self.current_theme = "默认主题"  # 设置初始主题为默认主题
+        self.left_tree_file_display = False   # 设置左侧文件浏览器初始化标志位，只显示文件夹
+        self.simple_mode = True               # 设置默认模式为简单模式，同EXIF信息功能
+        self.current_theme = "默认主题"       # 设置初始主题为默认主题
 
         # 添加预加载相关的属性初始化
         self.current_preloader = None  # 当前预加载器引用
@@ -1478,6 +1480,15 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
 
 
+    def setup_treeview_context_menu(self):
+        """设置左侧文件浏览器右键菜单"""
+
+        # 添加右键菜单功能,连接到文件浏览树self.Left_QTreeView上
+        self.Left_QTreeView.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.Left_QTreeView.customContextMenuRequested.connect(self.show_treeview_context_menu)
+
+
+
     def show_treeview_context_menu(self, pos):
         """显示文件树右键菜单"""
 
@@ -1499,24 +1510,27 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         """)
 
         # 添加常用操作
+        show_file_action = self.treeview_context_menu.addAction(
+            "显示文件" if not self.left_tree_file_display else "隐藏文件")
         open_action = self.treeview_context_menu.addAction("打开所在位置")
         send_path_to_aebox = self.treeview_context_menu.addAction("发送到aebox")
         copy_path_action = self.treeview_context_menu.addAction("复制路径")
-        rename_action = self.treeview_context_menu.addAction("重命名")  # 新增重命名菜单项
+        rename_action = self.treeview_context_menu.addAction("重命名")  
         
-
         # 获取选中的文件信息
         index = self.Left_QTreeView.indexAt(pos)
         if index.isValid():
             file_path = self.file_system_model.filePath(index)
-            
+
             # 连接想信号槽函数
             open_action.triggered.connect(lambda: self.open_file_location(file_path))  
             copy_path_action.triggered.connect(lambda: self.copy_file_path(file_path))
             send_path_to_aebox.triggered.connect(lambda: self.send_file_path_to_aebox(file_path))
             rename_action.triggered.connect(lambda: self.rename_file(file_path))
+            show_file_action.triggered.connect(self.show_file_visibility)
 
-            
+
+            # 设置右键菜单绑定左侧文件浏览器
             self.treeview_context_menu.exec_(self.Left_QTreeView.viewport().mapToGlobal(pos))
 
 
@@ -1565,6 +1579,8 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         """ 左侧组件
         设置左侧组件显示风格，背景颜色为淡蓝色，四角为圆形; 下面显示左侧组件name 
         self.Left_QTreeView | self.Left_QFrame
+        self.verticalLayout_left_2
+        
         self.L_radioButton1 | self.L_radioButton2 | self.L_pushButton1 | self.L_pushButton2
         modify by diamond_cz 20250403 移除按钮self.L_pushButton1 | self.L_pushButton2
         """  
@@ -1585,20 +1601,14 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.Left_QTreeView.setColumnHidden(2, True)  # 隐藏类型列
         self.Left_QTreeView.setColumnHidden(3, True)  # 隐藏修改日期列 
 
-        # 添加右键菜单功能,连接到文件浏览树self.Left_QTreeView上
-        self.Left_QTreeView.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.Left_QTreeView.customContextMenuRequested.connect(self.show_treeview_context_menu)
-
-        # # 使用QDir的过滤器只显示文件夹
-        self.file_system_model.setFilter(QDir.NoDot | QDir.NoDotDot | QDir.AllDirs)  
-
-
+        # 设置QDir的过滤器默认只显示文件夹
+        self.file_system_model.setFilter(QDir.NoDot | QDir.NoDotDot | QDir.AllDirs)    # 使用QDir的过滤器,只显示文件夹
 
         """ 右侧组件
         设置右侧组件显示风格（列出了右侧第一行第二行第三行的组件名称）
         self.RT_QComboBox | self.RT_QPushButton2 | self.RT_QPushButton3
         self.RT_QComboBox0 | self.RT_QComboBox1 | self.RT_QComboBox2 | self.RT_QComboBox3 | self.RT_QPushButton5 | self.RT_QPushbutton6
-        self.RB_QTableWidget0 | self.RB_Label
+        self.RB_QTableWidget0 
         """
 
         # 设置当前目录到地址栏，并将地址栏的文件夹定位到左侧文件浏览器中
@@ -1750,6 +1760,16 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.file_system_model.setFilter(QDir.NoDot | QDir.NoDotDot |QDir.AllEntries)  # 显示所有文件和文件夹
         else:
             print("L_radioButton2 未被选中")
+
+    def show_file_visibility(self):
+        """设置左侧文件浏览器的显示"""
+        self.left_tree_file_display = not self.left_tree_file_display
+
+        if not self.left_tree_file_display:
+            self.file_system_model.setFilter(QDir.NoDot | QDir.NoDotDot | QDir.AllDirs)    # 使用QDir的过滤器,只显示文件夹  
+        else:
+            self.file_system_model.setFilter(QDir.NoDot | QDir.NoDotDot |QDir.AllEntries)  # 显示所有文件和文件夹
+
 
     def open_file_location(self, path):
         """在资源管理器中打开路径"""

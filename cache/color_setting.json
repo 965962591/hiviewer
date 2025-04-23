@@ -3,8 +3,8 @@
     "background_color_table": "rgb(127, 127, 127)",
     "font_color_default": "rgb(0, 0, 0)",
     "font_color_exif": "rgb(242, 12,  0)",
-    "exif_info": false,
-    "roi_info": false,
+    "exif_info": true,
+    "roi_info": true,
     "histogram_info": false,
     "ai_tips": false,
     "p3_color_space": false
