@@ -1131,9 +1131,10 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         default_version_path = os.path.join(os.path.dirname(__file__), "cache", "version.ini")
         # 读取本地配置文件中的版本信息
         self.version_info = version_init(default_version_path, VERSION='release-v2.3.2')
-        # 获取github中发布的最新版本信息, self.new_version_info = pre_check_update()
-        # 转移到函数self.create_splash_screen() --> self.update_splash_message --> self.pre_update() 中获取,先在此处初始化
         self.new_version_info = False 
+        # 获取github中发布的最新版本信息, pre_check_update()，
+        # 转移到函数self.create_splash_screen() --> self.update_splash_message --> self.pre_update()-->pre_check_update() 中获取,先在此处初始化
+        
         # 2 创建启动画面
         try:
             print("create_splash_screen()--创建启动画面")
@@ -1144,8 +1145,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 3 设置主界面UI
         try:
             print("setupUi()--初始化主界面UI")
-            # 默认设置是图片拖拽模式, self.setupUi(self) 中需要调用
-            self.drag_flag = True
+            self.drag_flag = True  # 默认设置是图片拖拽模式, self.setupUi(self) 中需要调用
             self.setupUi(self)
         except Exception as e:
             print(f"setupUi()--初始化主界面UI失败: {e}")
@@ -1160,6 +1160,37 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def initialize_components(self):
         """初始化所有组件"""
+
+        # 初始化相关变量及配置文件
+        self.init_variable()
+
+        # 设置主界面相关组件
+        self.set_stylesheet()
+
+        # 初始化主题，暂时移除，在load_settings() 中初始化
+        # self.apply_theme()
+
+        # 加载之前的设置    
+        self.load_settings()  
+
+        # 设置快捷键
+        self.set_shortcut()
+
+        # 设置右键菜单,连接到表格组件self.RB_QTableWidget0上
+        self.setup_context_menu()  
+
+        # 模仿按下回车
+        self.input_enter_action()  
+
+        # 完成初始化后设置标志
+        self.initialization_complete = True
+        
+        # 显示主窗口,暂时移除，在self.create_splash_screen()-->QTimer.singleShot(1000, self.show)函数中显示
+        # self.show()
+
+
+    def init_variable(self):
+        """初始化整个主界面类所需的变量"""
 
         # 设置图片&视频文件格式
         self.IMAGE_FORMATS = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tif', '.ico', '.webp')
@@ -1214,32 +1245,114 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.custom_font = SingleFontManager.get_font(12)
             # 第二种，使用字体管理器初始化方法，传入字体路径    
             font_path_jetbrains = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", "JetBrainsMapleMono_Regular.ttf")
-            self.custom_font = SingleFontManager.get_font(size=12, font_path=font_path_jetbrains)   
+            self.custom_font = SingleFontManager.get_font(size=12, font_path=font_path_jetbrains)  
+
+
+    """
+    设置动画显示区域开始线
+    ---------------------------------------------------------------------------------------------------------------------------------------------
+    """
+
+    def create_splash_screen(self):
+        """创建带渐入渐出效果的启动画面"""
+        # 加载启动画面图片
+        splash_path = os.path.join(os.path.dirname(__file__), "icons", "viewer_0.png")
+        splash_pixmap = QPixmap(splash_path)
         
-
-        # 设置主界面相关组件
-        self.set_stylesheet()
-
-        # 初始化主题，暂时移除，在load_settings() 中初始化
-        # self.apply_theme()
-
-        # 加载之前的设置    
-        self.load_settings()  
-
-        # 设置快捷键
-        self.set_shortcut()
-
-        # 设置右键菜单,连接到表格组件self.RB_QTableWidget0上
-        self.setup_context_menu()  
-
-        # 模仿按下回车
-        self.input_enter_action()  
-
-        # 完成初始化后设置标志
-        self.initialization_complete = True
+        if splash_pixmap.isNull():
+            splash_pixmap = QPixmap(400, 200)
+            splash_pixmap.fill(Qt.white)
+            
+        self.splash = QSplashScreen(splash_pixmap)
         
-        # 显示主窗口,暂时移除，在self.create_splash_screen()-->QTimer.singleShot(1000, self.show)函数中显示
-        # self.show()
+        # 获取当前屏幕并计算居中位置
+        screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
+        screen_geometry = QtWidgets.QApplication.desktop().screenGeometry(screen)
+        x = screen_geometry.x() + (screen_geometry.width() - splash_pixmap.width()) // 2
+        y = screen_geometry.y() + (screen_geometry.height() - splash_pixmap.height()) // 2
+        self.splash.move(x, y)
+        
+        # 设置半透明效果
+        self.splash.setWindowOpacity(0)
+        
+        # 创建渐入动画
+        self.fade_anim = QtCore.QPropertyAnimation(self.splash, b"windowOpacity")
+        self.fade_anim.setDuration(1000)  # 1000ms的渐入动画
+        self.fade_anim.setStartValue(0)
+        self.fade_anim.setEndValue(1)
+        self.fade_anim.start()
+        
+        # 设置启动画面的样式
+        self.splash.setStyleSheet("""
+            QSplashScreen {
+                background-color: rgba(0, 0, 0, 180);
+                color: white;
+                border-radius: 10px;
+            }
+        """)
+        
+        # 显示启动画面
+        self.splash.show()
+        
+        # 启动进度更新定时器
+        self.progress_timer = QTimer()
+        self.progress_timer.timeout.connect(self.update_splash_message)
+        self.dots_count = 0
+        self.progress_timer.start(500)  # 每500ms更新一次
+
+    def update_splash_message(self):
+        """更新启动画面的加载消息"""
+        # 更新进度点
+        self.dots_count = (self.dots_count + 1) % 4
+        dots = "." * self.dots_count
+        
+        # 使用HTML标签设置文字颜色为红色，并调整显示内容，文字颜色为配置文件（color_setting.json）中的背景颜色
+        message = f'<div style="color: {self.background_color_default};">HiViewer_{self.version_info}</div>' \
+                  f'<div style="color: {self.background_color_default};">正在启动...{dots}</div>'
+        
+        # 显示启动消息
+        self.splash.showMessage(
+            message, 
+            Qt.AlignCenter | Qt.AlignBottom,
+            Qt.white
+        )
+        
+        # 检查是否完成初始化
+        if hasattr(self, 'initialization_complete'):
+            # 创建渐出动画
+            self.fade_out = QtCore.QPropertyAnimation(self.splash, b"windowOpacity")
+            self.fade_out.setDuration(1000)  # 1000ms的渐出动画
+            self.fade_out.setStartValue(1)
+            self.fade_out.setEndValue(0)
+            self.fade_out.finished.connect(self.splash.close)
+            self.fade_out.start()
+            
+            # 停止定时器
+            self.progress_timer.stop()
+
+            # 获取当前屏幕并计算居中位置，移动到该位置
+            screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
+            screen_geometry = QtWidgets.QApplication.desktop().screenGeometry(screen)
+            x = screen_geometry.x() + (screen_geometry.width() - self.width()) // 2
+            y = screen_geometry.y() + (screen_geometry.height() - self.height()) // 2
+            self.move(x, y)
+
+            # 预检查更新
+            self.pre_update()
+
+            # 显示主窗口
+            self.show()
+
+            # 延时显示主窗口,方便启动画面渐出  pre_update
+            # QTimer.singleShot(1000, self.show)
+
+            # 延时检查更新
+            # QTimer.singleShot(3000, self.pre_update)
+
+    """
+    设置动画显示区域结束线
+    ---------------------------------------------------------------------------------------------------------------------------------------------
+    """
 
 
     """
@@ -1358,110 +1471,53 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.RB_QTableWidget0.setContextMenuPolicy(Qt.CustomContextMenu)
         self.RB_QTableWidget0.customContextMenuRequested.connect(self.show_context_menu)
 
-    def default(self):
-        """删除"""
-        show_message_box("暂未实现", "提示", 500)
 
     def show_context_menu(self, pos):
         """显示右键菜单"""
         self.context_menu.exec_(self.RB_QTableWidget0.mapToGlobal(pos))
 
-    def create_splash_screen(self):
-        """创建带渐入渐出效果的启动画面"""
-        # 加载启动画面图片
-        splash_path = os.path.join(os.path.dirname(__file__), "icons", "viewer_0.png")
-        splash_pixmap = QPixmap(splash_path)
-        
-        if splash_pixmap.isNull():
-            splash_pixmap = QPixmap(400, 200)
-            splash_pixmap.fill(Qt.white)
-            
-        self.splash = QSplashScreen(splash_pixmap)
-        
-        # 获取当前屏幕并计算居中位置
-        screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
-        screen_geometry = QtWidgets.QApplication.desktop().screenGeometry(screen)
-        x = screen_geometry.x() + (screen_geometry.width() - splash_pixmap.width()) // 2
-        y = screen_geometry.y() + (screen_geometry.height() - splash_pixmap.height()) // 2
-        self.splash.move(x, y)
-        
-        # 设置半透明效果
-        self.splash.setWindowOpacity(0)
-        
-        # 创建渐入动画
-        self.fade_anim = QtCore.QPropertyAnimation(self.splash, b"windowOpacity")
-        self.fade_anim.setDuration(1000)  # 1000ms的渐入动画
-        self.fade_anim.setStartValue(0)
-        self.fade_anim.setEndValue(1)
-        self.fade_anim.start()
-        
-        # 设置启动画面的样式
-        self.splash.setStyleSheet("""
-            QSplashScreen {
-                background-color: rgba(0, 0, 0, 180);
-                color: white;
-                border-radius: 10px;
-            }
+
+
+    def show_treeview_context_menu(self, pos):
+        """显示文件树右键菜单"""
+
+        # 设置左侧文件浏览器的右键菜单栏
+        self.treeview_context_menu = QMenu(self)
+    
+        # 设置右键菜单样式
+        self.treeview_context_menu.setStyleSheet(f"""
+            QMenu {{
+                /*background-color: #F0F0F0;   背景色 */
+
+                font-family: "{self.custom_font_jetbrains_small.family()}";
+                font-size: {self.custom_font_jetbrains_small.pointSize()}pt;    
+            }}
+            QMenu::item:selected {{
+                background-color: {self.background_color_default};   /* 选中项背景色 */
+                color: #000000;               /* 选中项字体颜色 */
+            }}
         """)
-        
-        # 显示启动画面
-        self.splash.show()
-        
-        # 启动进度更新定时器
-        self.progress_timer = QTimer()
-        self.progress_timer.timeout.connect(self.update_splash_message)
-        self.dots_count = 0
-        self.progress_timer.start(500)  # 每500ms更新一次
 
-    def update_splash_message(self):
-        """更新启动画面的加载消息"""
-        # 更新进度点
-        self.dots_count = (self.dots_count + 1) % 4
-        dots = "." * self.dots_count
+        # 添加常用操作
+        open_action = self.treeview_context_menu.addAction("打开所在位置")
+        send_path_to_aebox = self.treeview_context_menu.addAction("发送到aebox")
+        copy_path_action = self.treeview_context_menu.addAction("复制路径")
+        rename_action = self.treeview_context_menu.addAction("重命名")  # 新增重命名菜单项
         
-        # 使用HTML标签设置文字颜色为红色，并调整显示内容，文字颜色为配置文件（color_setting.json）中的背景颜色
-        message = f'<div style="color: {self.background_color_default};">HiViewer_{self.version_info}</div>' \
-                  f'<div style="color: {self.background_color_default};">正在启动...{dots}</div>'
-        
-        # 显示启动消息
-        self.splash.showMessage(
-            message, 
-            Qt.AlignCenter | Qt.AlignBottom,
-            Qt.white
-        )
-        
-        # 检查是否完成初始化
-        if hasattr(self, 'initialization_complete'):
-            # 创建渐出动画
-            self.fade_out = QtCore.QPropertyAnimation(self.splash, b"windowOpacity")
-            self.fade_out.setDuration(1000)  # 1000ms的渐出动画
-            self.fade_out.setStartValue(1)
-            self.fade_out.setEndValue(0)
-            self.fade_out.finished.connect(self.splash.close)
-            self.fade_out.start()
+
+        # 获取选中的文件信息
+        index = self.Left_QTreeView.indexAt(pos)
+        if index.isValid():
+            file_path = self.file_system_model.filePath(index)
             
-            # 停止定时器
-            self.progress_timer.stop()
+            # 连接想信号槽函数
+            open_action.triggered.connect(lambda: self.open_file_location(file_path))  
+            copy_path_action.triggered.connect(lambda: self.copy_file_path(file_path))
+            send_path_to_aebox.triggered.connect(lambda: self.send_file_path_to_aebox(file_path))
+            rename_action.triggered.connect(lambda: self.rename_file(file_path))
 
-            # 获取当前屏幕并计算居中位置，移动到该位置
-            screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
-            screen_geometry = QtWidgets.QApplication.desktop().screenGeometry(screen)
-            x = screen_geometry.x() + (screen_geometry.width() - self.width()) // 2
-            y = screen_geometry.y() + (screen_geometry.height() - self.height()) // 2
-            self.move(x, y)
-
-            # 预检查更新
-            self.pre_update()
-
-            # 显示主窗口
-            self.show()
-
-            # 延时显示主窗口,方便启动画面渐出  pre_update
-            # QTimer.singleShot(1000, self.show)
-
-            # 延时检查更新
-            # QTimer.singleShot(3000, self.pre_update)
-
+            
+            self.treeview_context_menu.exec_(self.Left_QTreeView.viewport().mapToGlobal(pos))
 
 
     
@@ -1695,48 +1751,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         else:
             print("L_radioButton2 未被选中")
 
-
-    def show_treeview_context_menu(self, pos):
-        """显示文件树右键菜单"""
-
-        # 设置左侧文件浏览器的右键菜单栏
-        self.treeview_context_menu = QMenu(self)
-    
-        # 设置右键菜单样式
-        self.treeview_context_menu.setStyleSheet(f"""
-            QMenu {{
-                /*background-color: #F0F0F0;   背景色 */
-
-                font-family: "{self.custom_font_jetbrains_small.family()}";
-                font-size: {self.custom_font_jetbrains_small.pointSize()}pt;    
-            }}
-            QMenu::item:selected {{
-                background-color: {self.background_color_default};   /* 选中项背景色 */
-                color: #000000;               /* 选中项字体颜色 */
-            }}
-        """)
-
-        # 添加常用操作
-        open_action = self.treeview_context_menu.addAction("打开所在位置")
-        send_path_to_aebox = self.treeview_context_menu.addAction("发送到aebox")
-        copy_path_action = self.treeview_context_menu.addAction("复制路径")
-        rename_action = self.treeview_context_menu.addAction("重命名")  # 新增重命名菜单项
-        
-
-        # 获取选中的文件信息
-        index = self.Left_QTreeView.indexAt(pos)
-        if index.isValid():
-            file_path = self.file_system_model.filePath(index)
-            
-            # 连接想信号槽函数
-            open_action.triggered.connect(lambda: self.open_file_location(file_path))  
-            copy_path_action.triggered.connect(lambda: self.copy_file_path(file_path))
-            send_path_to_aebox.triggered.connect(lambda: self.send_file_path_to_aebox(file_path))
-            rename_action.triggered.connect(lambda: self.rename_file(file_path))
-
-            
-            self.treeview_context_menu.exec_(self.Left_QTreeView.viewport().mapToGlobal(pos))
-
     def open_file_location(self, path):
         """在资源管理器中打开路径"""
         # QtCore.QDesktopServices.openUrl(QUrl.fromLocalFile(path))
@@ -1880,7 +1894,9 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def setting(self):
         print("setting()-设置按钮被点击--setting()")
-        # self.on_space_pressed()
+        # 暂时调用关于信息，后续添加设置界面
+        self.on_ctrl_h_pressed()
+    
 
     def update(self):
         print("setting()-版本按钮被点击--update()")

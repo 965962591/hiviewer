@@ -398,6 +398,26 @@ def load_xml_data(xml_path):
         return None
     
 
+def get_aebox_host():
+    """读取aebox连接配置"""
+    config_path = os.path.join(BasePath, "cache", "aebox_link_host.json")
+    default_host = "http://127.0.0.1:8000"
+    
+    try:
+        if os.path.exists(config_path):
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                return config.get('host', default_host)
+        else:
+            # 创建默认配置
+            os.makedirs(os.path.dirname(config_path), exist_ok=True)
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump({"host": default_host}, f, indent=4)
+            return default_host
+    except Exception as e:
+        print(f"读取aebox配置失败，使用默认值: {str(e)}")
+        return default_host  
+
 
 """
 设置全局函数区域结束线
@@ -1652,9 +1672,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         # 设置窗口标题组件和样式表
         self.set_stylesheet()
 
-        # 设置进度条 - 移到这里，确保在set_images之前创建
-        self.set_progress_bar()
-        
         # 直接初始化图片，不使用延迟加载
         self.set_images(self.images_path_list, self.index_list)
         
@@ -1822,7 +1839,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             }
         """)
 
-
         self.progress_bar.setAlignment(Qt.AlignCenter)  # 设置文字居中
 
         # 设置默认不显示
@@ -1860,38 +1876,31 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
     def set_images(self, image_paths, index_list):
         """更新图片显示"""
+        # 记录开始时间
+        start_time1 = time.time()
+        self.is_updating = True
+
+        print("开始更新图片...")
         if not image_paths:
             print("没有有效的图片路径")
             return False
-
-        print("开始更新图片...")
 
         # 更新当前显示的图片路径列表
         self.images_path_list = image_paths
         self.index_list = index_list
 
-        try:
-            select_image_url = f"http://127.0.0.1:8000/select_image/{self.index_list[0].split('/')[0]}"
-            response = get_api_data(url=select_image_url, timeout=3)
-            if not response:
-                print(f"看图界面--图片索引发送到aebox失败")   
-        except Exception as e:
-            print(f"看图界面--图片索引发送到aebox失败: {str(e)}")
+        # 调用封装后的函数,将看图界面图片索引发送到aebox中
+        self.sync_image_index_with_aebox(self.images_path_list, self.index_list)
 
-
-        # 记录开始时间
-        start_time1 = time.time()
-        self.is_updating = True
- 
-
+        # 设置进度条初始化
+        if not hasattr(self, 'progress_bar'):
+            self.set_progress_bar()
         # 设置进度条总数
         num_all = len(image_paths) + 5
-
         # 启动进度条显示
         self.progress_bar.setMaximum(num_all)
         self.progress_bar.setValue(0)
         self.progress_bar.setVisible(True)
-        
         # 强制立即重绘界面
         # self.progress_bar.repaint()
         QApplication.processEvents()  # 处理所有挂起的事件
@@ -1903,8 +1912,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             
             # 1. 预先分配数据结构
             self.progress_updated.emit(1)
-            num_images = len(image_paths)
             self.cleanup()
+            num_images = len(image_paths)
             self.graphics_views = [None] * num_images
             self.exif_texts = [None] * num_images
             self.histograms = [None] * num_images
@@ -2123,6 +2132,60 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             end_time1 = time.time()
             elapsed_time = end_time1 - start_time1
             print(f"处理图片总耗时: {elapsed_time:.2f} 秒")
+
+
+    def sync_image_index_with_aebox(self, images_path_list, index_list):
+        """同步当前图片索引到aebox应用"""
+        try:
+            # 预检查程序aebox是否启动
+            if not check_process_running("aebox.exe"):
+                print("❌ sync_image_index_with_aebox()--同步当前图片索引到aebox应用失败--aebox应用未启动")
+                return False
+
+            # 新增配置文件读取
+            host = get_aebox_host()
+            origin_image_names = [os.path.basename(path) for path in images_path_list]
+
+            # 发送初始索引
+            select_url = f"{host}/select_image/{index_list[0].split('/')[0]}"
+            if not get_api_data(url=select_url, timeout=3):
+                print("❌ sync_image_index_with_aebox()--初始索引发送失败")
+                return False
+
+            # 获取aebox当前图片信息
+            current_data = json.loads(get_api_data(
+                url=f"{host}/current_image", 
+                timeout=3) or '{}'
+            )
+            current_name = current_data.get('filename', '')
+
+            if current_name and current_name in origin_image_names:
+                print(f"✅ sync_image_index_with_aebox()--初始索引发送成功匹配: {current_name}")
+                return True
+
+            # 执行图片列表匹配
+            list_data = json.loads(get_api_data(
+                url=f"{host}/image_list",
+                timeout=3) or '{}'
+            )
+            aebox_images = list_data.get('filenames', [])
+
+            # 使用集合提高查找效率
+            origin_set = set(origin_image_names)
+            matching_indices = [i for i, name in enumerate(aebox_images) if name in origin_set]
+
+            if len(matching_indices) == 1:
+                new_index = matching_indices[0] + 1
+                if get_api_data(f"{host}/select_image/{new_index}", timeout=3):
+                    print(f"✅ sync_image_index_with_aebox()--成功同步图片到aebox: {aebox_images[matching_indices[0]]}")
+                    return True
+
+            print("❌ sync_image_index_with_aebox()--未找到唯一匹配的图片")
+            return False
+
+        except Exception as e:
+            print(f"❌ sync_image_index_with_aebox()--同步索引异常: {str(e)}")
+            return False
 
 
     def process_exif_info(self, visibility_dict, exif_info):
@@ -3163,10 +3226,10 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         """加载颜色设置"""
         try:
             # 确保cache目录存在
-            cache_dir = pathlib.Path("./cache")
-            cache_dir.mkdir(parents=True, exist_ok=True)
+            config_dir = pathlib.Path("./cache")
+            config_dir.mkdir(parents=True, exist_ok=True)
             
-            settings_file = cache_dir / "color_setting.json"
+            settings_file = config_dir / "color_setting.json"
             if settings_file.exists():
                 with open(settings_file, 'r', encoding='utf-8', errors='ignore') as f:
                     return json.load(f)
@@ -3180,8 +3243,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         """保存颜色设置"""
         try:
             # 确保cache目录存在
-            cache_dir = pathlib.Path("./cache")
-            cache_dir.mkdir(parents=True, exist_ok=True)
+            config_dir = pathlib.Path("./cache")
+            config_dir.mkdir(parents=True, exist_ok=True)
             
             settings = {
                 "background_color_default": self.background_color_default,
@@ -3196,7 +3259,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 "p3_color_space": self.checkBox_4.isChecked()
             }
             
-            settings_file = cache_dir / "color_setting.json"
+            settings_file = config_dir / "color_setting.json"
             with open(settings_file, 'w', encoding='utf-8', errors='ignore') as f:
                 json.dump(settings, f, indent=4, ensure_ascii=False)
             
@@ -3207,10 +3270,10 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         """加载EXIF信息设置"""
         try:
             # 确保cache目录存在
-            cache_dir = pathlib.Path("./cache")
-            cache_dir.mkdir(parents=True, exist_ok=True)
+            config_dir = pathlib.Path("./cache")
+            config_dir.mkdir(parents=True, exist_ok=True)
             
-            settings_file = cache_dir / "exif_setting.json"
+            settings_file = config_dir / "exif_setting.json"
             if settings_file.exists():
                 with open(settings_file, 'r', encoding='utf-8', errors='ignore') as f:
                     return json.load(f)
@@ -3224,12 +3287,12 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         """保存EXIF信息设置"""
         try:
             # 确保cache目录存在,不存在则创建
-            cache_dir = pathlib.Path("./cache")
-            cache_dir.mkdir(parents=True, exist_ok=True)
+            config_dir = pathlib.Path("./cache")
+            config_dir.mkdir(parents=True, exist_ok=True)
 
             settings = self.dict_exif_info_visibility
             
-            settings_file = cache_dir / "exif_setting.json"
+            settings_file = config_dir / "exif_setting.json"
             with open(settings_file, 'w', encoding='utf-8', errors='ignore') as f:
                 json.dump(settings, f, indent=4, ensure_ascii=False)
                 

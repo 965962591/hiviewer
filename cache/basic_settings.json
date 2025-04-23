@@ -22,13 +22,17 @@
         "D:\\Tuning\\O19\\0_pic\\0421",
         "D:/Tuning/O19/0_pic/0421/O19_GL_一供D:\\Tuning\\O19\\0_pic\\0421\\video"
     ],
-    "current_directory": "D:/Tuning/O19/0_pic/0409 O19前置国际一二供-口罩，延时摄影/0409 O19前置国际一二供-口罩，延时摄影/口罩/O19 二供",
+    "current_directory": "D:/Tuning/O19/0_pic/0409 O19前置国际一二供-口罩，延时摄影/0409 O19前置国际一二供-口罩，延时摄影/口罩/O19 一供",
     "file_type_option": "显示图片文件",
-    "combobox1_checked_items": [],
+    "combobox1_checked_items": [
+        "N12",
+        "N19",
+        "O19 二供"
+    ],
     "combobox1_all_items": [
         "N12",
         "N19",
-        "O19 一供"
+        "O19 二供"
     ],
     "sort_option": "按创建时间排序",
     "theme_option": "默认主题",

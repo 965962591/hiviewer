@@ -63,5 +63,6 @@ ui/__pycache__/
 cache/icons/
 cache/*.zip
 output/
+dist/
 downloads/
 hiviewer/cache/
