@@ -268,7 +268,7 @@ class Ui_MainWindow(object):
         self.statusbar.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         
         # 创建按钮
-        self.statusbar_button1 = QtWidgets.QPushButton("🔆设置")
+        self.statusbar_button1 = QtWidgets.QPushButton("🔆")
         self.statusbar_button2 = QtWidgets.QPushButton("🚀版本(2.3.5)")
 
         # 创建标签
@@ -284,8 +284,8 @@ class Ui_MainWindow(object):
 
 
         # 正确添加组件的方式：注意，addWidget & addPermanentWidget 的区别
-        self.statusbar.addWidget(self.statusbar_button2)           # 普通部件（左对齐）
-        self.statusbar.addWidget(self.statusbar_button1)
+        self.statusbar.addWidget(self.statusbar_button1)           # 普通部件（左对齐）
+        self.statusbar.addWidget(self.statusbar_button2)
         self.statusbar.addWidget(self.statusbar_label0)
         self.statusbar.addWidget(self.statusbar_label)
         self.statusbar.addPermanentWidget(self.statusbar_label1)  # 永久部件（右对齐）
@@ -349,17 +349,13 @@ class Ui_MainWindow(object):
         self.verticalLayout_left_2 = QtWidgets.QVBoxLayout(self.Left_QFrame)
         self.verticalLayout_left_2.setSizeConstraint(QtWidgets.QLayout.SetDefaultConstraint)
         self.verticalLayout_left_2.setObjectName("verticalLayout_left_2")
-        # 垂直layout2 里面套两个radioButton（显示文件和隐藏文件）
-        self.L_radioButton1 = QtWidgets.QRadioButton(self.Left_QFrame)
-        # self.L_radioButton1.setMinimumSize(QtCore.QSize(0, 0))
-        self.L_radioButton1.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)  # 设置为可扩展
-        self.L_radioButton1.setObjectName("L_radioButton1")
-        self.verticalLayout_left_2.addWidget(self.L_radioButton1)
-        self.L_radioButton2 = QtWidgets.QRadioButton(self.Left_QFrame)
-        # self.L_radioButton2.setMinimumSize(QtCore.QSize(0, 0))
-        self.L_radioButton2.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)  # 设置为可扩展
-        self.L_radioButton2.setObjectName("L_radioButton2")
-        self.verticalLayout_left_2.addWidget(self.L_radioButton2)
+
+        # 设置标签存放图片视频预览
+        self.preview_label = QtWidgets.QLabel("预览区域")
+        self.preview_label.setFont(QtGui.QFont("JetBrains Mono", 12))
+        self.preview_label.setStyleSheet("color: white;")
+        self.preview_label.setAlignment(Qt.AlignCenter)
+        self.verticalLayout_left_2.addWidget(self.preview_label)
 
 
         # 创建垂直分割器并添加组件，在self.Left_QTreeView和self.Left_QFrame之间添加一个垂直分割器

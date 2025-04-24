@@ -18,12 +18,8 @@ if sys.platform == "win32":
         '--mingw64',              
         '--show-memory' ,
         '--enable-plugin=pyqt5,numpy' ,
-        '--windows-disable-console' ,
         '--windows-icon-from-ico=icons/viewer_3.ico',
-        # '--windows-product-name=hiviewer',
-        # f'--windows-file-version={VERSION}',
-        # f'--windows-product-version={VERSION}',
-        '--windows-file-description="hiviewer"',
+        '--windows-disable-console',
         '--output-dir=dist',
         'hiviewer.py',
     ]

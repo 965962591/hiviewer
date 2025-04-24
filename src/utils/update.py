@@ -68,7 +68,7 @@ class Updater:
     def check_for_updates(self):
         """检查GitHub上是否有新版本"""
         try:
-            response = requests.get(self.github_url)
+            response = requests.get(self.github_url,timeout=5)
             response.raise_for_status()
             latest_release = response.json()
             self.latest_version = latest_release["tag_name"]  # 保存最新版本号

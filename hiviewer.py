@@ -1583,14 +1583,9 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         设置左侧组件显示风格，背景颜色为淡蓝色，四角为圆形; 下面显示左侧组件name 
         self.Left_QTreeView | self.Left_QFrame
         self.verticalLayout_left_2
-
-        self.L_radioButton1 | self.L_radioButton2 | self.L_pushButton1 | self.L_pushButton2
-        modify by diamond_cz 20250403 移除按钮self.L_pushButton1 | self.L_pushButton2
+        modify by diamond_cz 20250403 移除self.L_radioButton1 | self.L_radioButton2 | self.L_pushButton1 | self.L_pushButton2
         """  
-        # 设置左侧按钮和复选框组件
-        self.L_radioButton1.setChecked(True)  # 默认选择第一个单选按钮
-        self.L_radioButton1.setText("隐藏文件")  # 设置按钮文本
-        self.L_radioButton2.setText("显示文件")  # 设置按钮文本
+
 
         # self.Left_QTreeView
         self.file_system_model = QFileSystemModel(self)
@@ -1613,6 +1608,9 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.RT_QComboBox0 | self.RT_QComboBox1 | self.RT_QComboBox2 | self.RT_QComboBox3 | self.RT_QPushButton5 | self.RT_QPushbutton6
         self.RB_QTableWidget0 
         """
+
+        self.RT_QPushButton3.setText("清除")
+        self.RT_QPushButton5.setText("对比")
 
         # 设置当前目录到地址栏，并将地址栏的文件夹定位到左侧文件浏览器中
         current_directory = os.path.dirname(os.path.abspath(__file__).capitalize())
@@ -1725,8 +1723,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         """2. 槽函数连接事件"""
         # 连接左侧按钮槽函数
         self.Left_QTreeView.clicked.connect(self.update_combobox)        # 点击左侧文件浏览器时的连接事件
-        self.L_radioButton1.toggled.connect(self.radio_button_file_off)  # 隐藏文件，只显示文件夹
-        self.L_radioButton2.toggled.connect(self.radio_button_file_on)   # 显示所有文件
         
         # 连接右侧按钮槽函数
         self.RT_QComboBox.lineEdit().returnPressed.connect(self.input_enter_action) # 用户在地址栏输入文件路径后按下回车的动作反馈
@@ -1749,21 +1745,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
     """
     左侧信号槽函数
     """
-    def radio_button_file_off(self, checked):
-        if checked:
-            # 设置过滤器，只显示文件夹
-            self.file_system_model.setFilter(QDir.NoDot | QDir.NoDotDot | QDir.AllDirs)  # 使用QDir的过滤器,隐藏文件,只显示文件夹
-            print("L_radioButton1 被选中")
-        else:
-            print("L_radioButton1 未被选中")
-
-    def radio_button_file_on(self, checked):
-        if checked:
-            print("L_radioButton2 被选中")
-            self.file_system_model.setFilter(QDir.NoDot | QDir.NoDotDot |QDir.AllEntries)  # 显示所有文件和文件夹
-        else:
-            print("L_radioButton2 未被选中")
-
     def show_file_visibility(self):
         """设置左侧文件浏览器的显示"""
         self.left_tree_file_display = not self.left_tree_file_display
@@ -1930,11 +1911,14 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # 获取self.new_version_info最新版本信息
         self.new_version_info = pre_check_update()
+        self.statusbar_button1.setToolTip("设置")
         if self.new_version_info:
-            self.statusbar_button2.setToolTip(f"🚀有新版本可用: {self.version_info}-->{self.new_version_info}")
+            self.statusbar_button2.setText(f"🚀有新版本可用")  
+            self.statusbar_button2.setToolTip(f"🚀新版本: {self.version_info}-->{self.new_version_info}")
             self.apply_theme() # 更新样式表
         else:
-            self.statusbar_button2.setToolTip("当前已是最新版本")
+            self.statusbar_button2.setToolTip("已是最新版本")
+            
         
 
 
@@ -2557,14 +2541,10 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
             preview_label = QLabel("预览区域")
             preview_label.setFont(self.custom_font_jetbrains)
+            preview_label.setStyleSheet("color: white;")
             preview_label.setAlignment(Qt.AlignCenter)
             self.verticalLayout_left_2.addWidget(preview_label)
-            # 重新显示radioButton，不需要重新显示
-            # self.verticalLayout_left_2.addWidget(self.L_radioButton1)
-            # self.verticalLayout_left_2.addWidget(self.L_radioButton2)
-            # self.L_radioButton1.setChecked(True)  # 默认选择第一个单选按钮
-            # self.L_radioButton1.setText("隐藏文件")  # 设置按钮文本
-            # self.L_radioButton2.setText("显示文件")  # 设置按钮文本
+
 
 
         # 获取左侧文件浏览器中当前点击的文件夹路径，并显示在地址栏
@@ -3319,16 +3299,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             }}
         """
 
-        # 设置单选按钮样式
-        radio_button_style = f"""   
-            QRadioButton {{
-                text-align: left;
-                color: {FONTCOLOR};
-                font-family: "{self.custom_font.family()}";
-                font-size: {self.custom_font.pointSize()}pt;
-            }}
-        """
-
         # 左侧文件浏览区域样式
         left_area_style = f"""
             QTreeView#Left_QTreeView {{
@@ -3408,23 +3378,32 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             }}
 
         """
-        # background-color: {WHITE}; border-radius: 10px;
-        statusbar_label_style = f"""
-            border: none;
-            color: {"rgb(255,255,255)"};
-            font-family: {self.custom_font_jetbrains_small.family()};
-            font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
-        
-        """
 
-        statusbar_button_style = f"""
-            QPushButton {{
-                background-color: {WHITE};
-                color: {FONTCOLOR};
+        # 标签的样式表
+        statusbar_label_style = f"""
+            QLabel {{
+                border: none;
+                color: {"rgb(255,255,255)"};
                 text-align: center;
                 font-family: "{self.custom_font_jetbrains_small.family()}";
                 font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
-                border-radius: 10px;
+            }}
+            /* 添加悬浮效果 
+            QLabel:hover {{
+                border: 1px solid {BACKCOLOR};
+                background-color: {BACKCOLOR};
+                color: {FONTCOLOR};
+            }}*/
+        """
+
+        # 普通按钮样式表
+        statusbar_button_style = f"""
+            QPushButton {{
+                border: none;
+                color: {"rgb(255,255,255)"};
+                text-align: center;
+                font-family: "{self.custom_font_jetbrains_small.family()}";
+                font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
             }}
             QPushButton:hover {{
                 border: 1px solid {BACKCOLOR};
@@ -3433,18 +3412,19 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             }}
         """
 
+        # 检查到新版本的按钮样式表
         statusbar_button_style_version = f"""
             QPushButton {{
-                background-color: {"rgb(245,108,108)"};
-                color: {FONTCOLOR};
+                border: none;
+                color: {"rgb(255,0,0)"};/* 检测到新版本设置字体颜色为红色 */
                 text-align: center;
+                background-color: {BACKCOLOR};
                 font-family: "{self.custom_font_jetbrains_small.family()}";
                 font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
-                border-radius: 10px;
             }}
             QPushButton:hover {{
                 border: 1px solid {BACKCOLOR};
-                background-color: {"rgb(245,108,108)"};
+                background-color: {BACKCOLOR};
                 color: {FONTCOLOR};
             }}
         """        
@@ -3461,24 +3441,17 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # 设置左上侧文件浏览区域样式
         self.Left_QTreeView.setStyleSheet(left_area_style)
-
         # 设置左下角侧框架样式
         self.Left_QFrame.setStyleSheet(left_qframe_style)
-        self.L_radioButton1.setStyleSheet(radio_button_style)  # 设置左对齐
-        self.L_radioButton2.setStyleSheet(radio_button_style)  # 设置左对齐
-
 
         # 设置右侧顶部按钮下拉框样式
         self.RT_QPushButton3.setStyleSheet(button_style)
         self.RT_QPushButton5.setStyleSheet(button_style)
-
         self.RT_QComboBox.setStyleSheet(combobox_style2)
         self.RT_QComboBox1.setStyleSheet(combobox_style2)
-
         self.RT_QComboBox0.setStyleSheet(combobox_style)
         self.RT_QComboBox2.setStyleSheet(combobox_style)
         self.RT_QComboBox3.setStyleSheet(combobox_style)
-
         # 设置右侧中间表格区域样式
         self.RB_QTableWidget0.setStyleSheet(table_style)
 
@@ -3600,16 +3573,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 QPushButton:hover {{
                     border: 1px solid {BACKCOLOR};
                     background-color: {BACKCOLOR};
-                }}
-            """
-
-            # 设置单选按钮样式
-            radio_button_style = f"""   
-                QRadioButton {{
-                    text-align: left;
-                    color: {WHITE};
-                    font-family: "{self.custom_font.family()}";
-                    font-size: {self.custom_font.pointSize()}pt;
                 }}
             """
 
@@ -3778,8 +3741,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
             # 设置左下角侧框架样式
             self.Left_QFrame.setStyleSheet(left_qframe_style)
-            self.L_radioButton1.setStyleSheet(radio_button_style)  # 设置左对齐
-            self.L_radioButton2.setStyleSheet(radio_button_style)  # 设置左对齐
 
 
             # 设置右侧顶部按钮下拉框样式
@@ -3799,7 +3760,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             # 设置底部状态栏区域样式 self.statusbar --> self.statusbar_widget --> self.statusbar_QHBoxLayout --> self.statusbar_button1 self.statusbar_button2
             self.statusbar.setStyleSheet(statusbar_style)
             self.statusbar_button1.setStyleSheet(statusbar_button_style)
-            # self.statusbar_button2.setStyleSheet(statusbar_button_style)
             # 设置版本按钮更新样式
             if self.new_version_info:
                 self.statusbar_button2.setStyleSheet(statusbar_button_style_version)

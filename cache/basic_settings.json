@@ -28,7 +28,10 @@
     ],
     "current_directory": "D:/Tuning/O19/0_pic/0423/N12",
     "file_type_option": "显示图片文件",
-    "combobox1_checked_items": [],
+    "combobox1_checked_items": [
+        "N19",
+        "O19"
+    ],
     "combobox1_all_items": [
         "22222",
         "N19",
