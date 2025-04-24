@@ -1834,7 +1834,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.label_bottom.setFixedHeight(35)
 
         # 更新颜色样式表
-        # self.update_ui_styles()
+        self.update_ui_styles()
 
 
 
