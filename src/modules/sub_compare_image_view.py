@@ -1606,9 +1606,9 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         # 初始化roi亮度等信息统计框
         self.roi_selection_active = False
 
-        # 初始化图像显示色彩空间标志位
+        # 初始化图像显示色彩空间标志位，默认设置srgb显示空间
         self.p3_color_space = False
-        self.srgb_color_space = False
+        self.srgb_color_space = True
         self.gray_color_space = False
 
         # 初始化全屏标志位
@@ -1764,7 +1764,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.progress_updated.connect(self.update_progress)
 
         
-
     def set_stylesheet(self):
         """设置窗口标题组件和样式表"""
         """窗口组件概览
@@ -1791,26 +1790,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.label_0.setText("提示:鼠标左键拖动所有图像,滚轮控制放大/缩小;按住Ctrl+滚轮或者鼠标右键操作单独图像")
         # self.label_0.setFont(self.custom_font)，移除之前的设置，使用新的字体管理器
         self.label_0.setFont(self.font_manager_jetbrains)
-
-        # 设置下拉框选项,会自动进入槽函数on_comboBox_1_changed
-        # self.comboBox_1.clear()  # 清除已有项
-        # self.comboBox_1.addItems(["导入配置", "一键重置", "背景色-铅白", "背景色-月白", "背景色-茶白", "背景色-鸭卵青", 
-        #                           "背景色-水色", "背景色-漆黑", "背景色-石榴红", "背景色-茶色", "背景色-石青", 
-        #                           "背景色-表格填充-18度灰","背景色-表格填充-铅白","背景色-表格填充-月白",
-        #                           "背景色-表格填充-茶白","背景色-表格填充-鸭卵青","背景色-表格填充-水色",
-        #                           "背景色-表格填充-漆黑","背景色-表格填充-石榴红","背景色-表格填充-茶色",
-        #                           "背景色-表格填充-石青"])
-        # self.comboBox_1.setFont(self.custom_font)
-
-        # 设置下拉框选项,会自动进入槽函数on_comboBox_2_changed
-        # self.comboBox_2.clear()  # 清除已有项
-        # self.comboBox_2.addItems(["导入配置", "一键重置", "字体颜色-铅白", "字体颜色-月白", "字体颜色-茶白", "字体颜色-鸭卵青", 
-        #                           "字体颜色-水色", "字体颜色-漆黑", "字体颜色-石榴红", "字体颜色-茶色", "字体颜色-石青", 
-        #                           "字体颜色-exif-铅白","字体颜色-exif-月白","字体颜色-exif-茶白","字体颜色-exif-鸭卵青",
-        #                           "字体颜色-exif-水色","字体颜色-exif-煤黑","字体颜色-exif-石榴红","字体颜色-exif-茶色",
-        #                           "字体颜色-exif-大眼睛绿"])
-        # self.comboBox_2.setFont(self.custom_font)        
-
 
         # 设置下拉框选项,会自动进入槽函数self.show_menu_combox1-->on_comboBox_1_changed
         self.comboBox_1.clear()  # 清除已有项
@@ -2255,7 +2234,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         # 计算表格中单个单元格的宽度和高度
         sigle_table_w = (self.table_width_heigth_default[0]-18)/num_images
         sigle_table_h = self.table_width_heigth_default[1]-55
-        
 
         if avg_aspect_ratio > 1: #横向图片
             # 以当前的最大宽度为基准
@@ -2395,14 +2373,69 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         """图像色彩显示空间下拉框self.comboBox_2内容改变时触发事件
         ["✅sRGB色域", "✅灰度图色域", "✅p3色域"]
         """
-        if index == 0:   # sRGB色域
-            print(f"{self.comboBox_2.itemText(index)}")     
-        elif index == 1: # 灰度图色域
-            print(f"{self.comboBox_2.itemText(index)}")
-        elif index == 2: # p3色域
-            print(f"{self.comboBox_2.itemText(index)}")   
-        
+        # 更新所有图形视图的场景视图
+        for i, view in enumerate(self.graphics_views):
+            if view and view.scene() and self.original_pixmaps[i]:
+                try:
+                    original_pixmap = self.original_pixmaps[i]
+                    current_rotation = view.pixmap_items[0].rotation() if view.pixmap_items else 0
+                    
+                    # 根据选择的色彩空间转换图像
+                    if index == 0:  # sRGB色域
+                        # 设置当前启用的图像色彩显示空间
+                        self.srgb_color_space = False
+                        self.gray_color_space = True
+                        self.p3_color_space = False
+                        converted_pixmap = original_pixmap
+                    elif index == 1:  # 灰度图色域
+                        # 设置当前启用的图像色彩显示空间
+                        self.srgb_color_space = False
+                        self.gray_color_space = True
+                        self.p3_color_space = False
+                        # 保持原有灰度转换逻辑
+                        qimage = original_pixmap.toImage()
+                        width = qimage.width()
+                        height = qimage.height()
+                        ptr = qimage.bits()
+                        ptr.setsize(qimage.byteCount())
+                        arr = np.array(ptr).reshape(height, width, 4)  # RGBA格式
+                        gray_img = cv2.cvtColor(arr[:, :, :3], cv2.COLOR_RGB2GRAY)
+                        gray_qimage = QImage(gray_img.data, width, height, 
+                                           gray_img.strides[0], QImage.Format_Grayscale8)
+                        converted_pixmap = QPixmap.fromImage(gray_qimage)
+                    elif index == 2:  # p3色域
+                        # 设置当前启用的图像色彩显示空间
+                        self.srgb_color_space = False
+                        self.gray_color_space = False
+                        self.p3_color_space = True
+                        # 修正的PIL图像转换方式
+                        qimage = original_pixmap.toImage()
+                        buffer = qimage.bits().asstring(qimage.byteCount())
+                        pil_image = Image.frombuffer(
+                            "RGBA",
+                            (qimage.width(), qimage.height()),
+                            buffer,
+                            "raw",
+                            "RGBA",
+                            0,
+                            1
+                        ).convert("RGB")
+                        converted_pixmap = convert_to_dci_p3(original_pixmap, pil_image)
 
+                    # 更新视图显示
+                    view.pixmap_items[0].setPixmap(converted_pixmap)
+                    view.pixmap_items[0].setRotation(current_rotation)
+                    view.centerOn(view.mapToScene(view.viewport().rect().center()))
+                    
+                    # 更新场景背景色
+                    qcolor = rgb_str_to_qcolor(self.background_color_table)
+                    view.scene().setBackgroundBrush(QtGui.QBrush(qcolor))
+                    
+                except Exception as e:
+                    print(f"色彩空间转换失败: {str(e)}")
+
+        self.update()
+        QApplication.processEvents()
 
     def update_ui_styles(self):
         """更新所有UI组件的样式"""
