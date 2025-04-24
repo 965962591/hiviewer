@@ -1581,10 +1581,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
     def __init__(self, images_path_list, index_list=None, parent=None):
         super(SubMainWindow, self).__init__(parent)
-        
         # 初始化UI
         self.setupUi(self) 
-
         # 获取主窗口
         self.parent_window = parent
 
@@ -1605,9 +1603,13 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.stats_visible = False  
         # 初始化ai提示标注位为False
         self.ai_tips_flag = False
-
         # 初始化roi亮度等信息统计框
         self.roi_selection_active = False
+
+        # 初始化图像显示色彩空间标志位
+        self.p3_color_space = False
+        self.srgb_color_space = False
+        self.gray_color_space = False
 
         # 初始化全屏标志位
         self.is_fullscreen = False
@@ -1617,7 +1619,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         
         # 导入自定义字体，设置字体大小为12
         self.custom_font = SingleFontManager.get_font(12)
-
         # 初始化字体管理器，标签组件使用
         font_path_jetbrains = os.path.join(BasePath, "fonts", "JetBrainsMapleMono_Regular.ttf")
         self.font_manager_jetbrains = SingleFontManager.get_font(size=11, font_path=font_path_jetbrains)   

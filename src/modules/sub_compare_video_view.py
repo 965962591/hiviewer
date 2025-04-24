@@ -260,8 +260,12 @@ class FrameReader(QThread):
             # 控制帧发送频率，根据视频帧率和播放速度调整
             current_time = time.time()
             elapsed = current_time - self.last_emit_time
-            target_frame_time = (1.0 / self.fps) / self.playback_speed if self.fps > 0 else 0.033 / self.playback_speed  # 秒
-            
+            target_frame_time = (
+                (1.0 / self.fps) / self.playback_speed
+                if self.fps > 0
+                else 0.033 / self.playback_speed
+            )  # 秒
+
             if elapsed < target_frame_time:
                 # 等待直到达到正确的时间间隔再发送下一帧
                 sleep_time = target_frame_time - elapsed
@@ -271,14 +275,18 @@ class FrameReader(QThread):
             with self.lock:
                 ret, frame = self.cap.read()
                 if ret:
-                    self.current_frame_number = int(self.cap.get(cv2.CAP_PROP_POS_FRAMES))
+                    self.current_frame_number = int(
+                        self.cap.get(cv2.CAP_PROP_POS_FRAMES)
+                    )
                     self.current_time_ms = int(self.cap.get(cv2.CAP_PROP_POS_MSEC))
                     
                     # 记录发送时间
                     self.last_emit_time = time.time()
                     
                     # 发送信号
-                    self.frame_ready.emit(self.current_frame_number, frame.copy(), self.current_time_ms)
+                    self.frame_ready.emit(
+                        self.current_frame_number, frame.copy(), self.current_time_ms
+                    )
                 else:
                     # 视频结束时重置到开始
                     print(f"视频 {self.video_path} 播放完毕，重置到开始")
@@ -333,7 +341,9 @@ class VideoPlayer(QWidget):
             temp_cap = cv2.VideoCapture(video_path)
             self.total_frames = int(temp_cap.get(cv2.CAP_PROP_FRAME_COUNT))
             self.fps = temp_cap.get(cv2.CAP_PROP_FPS)
-            self.duration_ms = int(self.total_frames * (1000 / self.fps))  # 视频总时长(毫秒)
+            self.duration_ms = int(
+                self.total_frames * (1000 / self.fps)
+            )  # 视频总时长(毫秒)
             temp_cap.release()
             
             # 初始化相关组件
@@ -348,6 +358,17 @@ class VideoPlayer(QWidget):
             self.current_time = 0  # 当前播放时间(毫秒)
             self.last_update_time = time.time()  # 上次更新帧的时间
             
+            # 添加缩放比例属性
+            self.scale_factor = 1.0
+            # 添加缩放后的帧缓存
+            self.scaled_frame_cache = None
+            self.last_scale_factor = 1.0
+            # 控制缩放质量的阈值
+            self.high_quality_threshold = 2.0
+            # 添加节流变量，用于控制缩放频率
+            self.last_scale_time = 0
+            self.scale_throttle_ms = 100  # 缩放操作间隔(毫秒)
+
             # 添加缓冲最新帧
             self.latest_frame = None
             self.latest_frame_number = -1
@@ -401,7 +422,10 @@ class VideoPlayer(QWidget):
             # 应用旋转
             if self.rotation_angle != 0:
                 frame = self.rotate_image(frame, self.rotation_angle)
-                
+
+            # 清除缩放缓存，因为有新帧
+            self.scaled_frame_cache = None
+            
             # 显示帧
             self.display_frame(frame)
                 
@@ -667,7 +691,7 @@ class VideoPlayer(QWidget):
 
         main_layout = QVBoxLayout()
         main_layout.addWidget(self.filename_label)
-        main_layout.addWidget(self.video_label, stretch=8)
+        main_layout.addWidget(self.video_label, stretch=1)
         main_layout.addLayout(bottom_layout)
 
         self.setLayout(main_layout)
@@ -703,26 +727,77 @@ class VideoPlayer(QWidget):
             # 获取视频标签的当前大小
             label_size = self.video_label.size()
             frame_height, frame_width = frame.shape[:2]
+
+            # 检查是否需要重新缩放
+            # 1. 如果缩放因子改变
+            # 2. 如果缓存为空
+            # 3. 如果标签大小改变（这里省略该检查以简化）
+            needs_rescale = (self.scaled_frame_cache is None or 
+                            abs(self.last_scale_factor - self.scale_factor) > 0.01)
             
-            # 计算缩放比例
-            scale = min(label_size.width() / frame_width, label_size.height() / frame_height)
+            if needs_rescale:
+                # 计算基础缩放比例，再乘以用户设置的缩放因子
+                base_scale = min(
+                    label_size.width() / frame_width, label_size.height() / frame_height
+                )
+                scale = base_scale * self.scale_factor
+                
+                # 记录当前使用的缩放因子
+                self.last_scale_factor = self.scale_factor
+                
+                # 优化大尺寸图像的缩放方式
+                if self.scale_factor > self.high_quality_threshold:
+                    # 对于高缩放率，使用分步缩放减轻CPU负担
+                    # 先降采样到中间大小，再放大到目标大小
+                    intermediate_scale = min(1.0, scale / 2)
+                    if intermediate_scale < 1.0:
+                        intermediate_width = int(frame_width * intermediate_scale)
+                        intermediate_height = int(frame_height * intermediate_scale)
+                        intermediate = cv2.resize(
+                            frame, (intermediate_width, intermediate_height), 
+                            interpolation=cv2.INTER_AREA
+                        )
+                        
+                        final_width = int(frame_width * scale)
+                        final_height = int(frame_height * scale)
+                        self.scaled_frame_cache = cv2.resize(
+                            intermediate, (final_width, final_height),
+                            interpolation=cv2.INTER_LINEAR
+                        )
+                    else:
+                        # 直接放大
+                        new_width = int(frame_width * scale)
+                        new_height = int(frame_height * scale)
+                        self.scaled_frame_cache = cv2.resize(
+                            frame, (new_width, new_height),
+                            interpolation=cv2.INTER_LINEAR
+                        )
+                else:
+                    # 正常缩放
+                    new_width = int(frame_width * scale)
+                    new_height = int(frame_height * scale)
+                    self.scaled_frame_cache = cv2.resize(
+                        frame, (new_width, new_height),
+                        interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR
+                    )
             
-            # 只有当需要缩小时才进行缩放
-            if scale < 1:
-                new_width = int(frame_width * scale)
-                new_height = int(frame_height * scale)
-                frame = cv2.resize(frame, (new_width, new_height), interpolation=cv2.INTER_AREA)
+            # 使用缓存的缩放帧
+            display_frame = self.scaled_frame_cache
             
             # 使用 RGB 格式处理图像
-            if len(frame.shape) == 3:
-                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            if len(display_frame.shape) == 3:
+                rgb_frame = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
                 height, width, channel = rgb_frame.shape
                 bytes_per_line = 3 * width
-                q_img = QImage(rgb_frame.data, width, height, bytes_per_line, QImage.Format_RGB888)
+                q_img = QImage(
+                    rgb_frame.data, width, height, bytes_per_line, QImage.Format_RGB888
+                )
             else:
-                height, width = frame.shape
-                q_img = QImage(frame.data, width, height, width, QImage.Format_Grayscale8)
-            
+                height, width = display_frame.shape
+                q_img = QImage(
+                    display_frame.data, width, height, width, QImage.Format_Grayscale8
+                )
+
             pixmap = QPixmap.fromImage(q_img)
             self.video_label.setPixmap(pixmap)
         except Exception as e:
@@ -884,6 +959,49 @@ class VideoPlayer(QWidget):
         self.rotation_angle = (self.rotation_angle + 90) % 360
         self.update_ui()
 
+    # 添加鼠标滚轮事件处理函数
+    def wheelEvent(self, event):
+        # 获取当前时间，用于节流
+        current_time = time.time() * 1000  # 转换为毫秒
+        
+        # 如果自上次缩放后没有经过足够的时间，则忽略此次滚轮事件
+        if current_time - self.last_scale_time < self.scale_throttle_ms:
+            event.accept()
+            return
+            
+        # 更新上次缩放时间
+        self.last_scale_time = current_time
+        
+        # 获取滚轮滚动的角度，正值为向上滚动（放大），负值为向下滚动（缩小）
+        delta = event.angleDelta().y()
+        
+        # 根据滚动方向调整缩放因子
+        old_scale_factor = self.scale_factor
+        if delta > 0:
+            # 向上滚动，放大 - 减小增量以使大比例变化更平滑
+            increment = 0.1 if self.scale_factor < 3.0 else 0.05
+            self.scale_factor = min(4.0, self.scale_factor + increment)  # 限制最大缩放为5倍
+        else:
+            # 向下滚动，缩小
+            self.scale_factor = max(0.5, self.scale_factor - 0.1)
+        
+        # 如果缩放因子变化不大，不更新显示
+        if abs(old_scale_factor - self.scale_factor) < 0.01:
+            return
+            
+        # 如果有最新帧，重新显示应用缩放效果
+        if self.latest_frame is not None:
+            if self.rotation_angle != 0:
+                rotated_frame = self.rotate_image(self.latest_frame, self.rotation_angle)
+                self.display_frame(rotated_frame)
+            else:
+                self.display_frame(self.latest_frame)
+        
+        # 将事件传递给父组件，以便VideoWall可以处理所有视频的缩放
+        if self.video_wall:
+            self.video_wall.scale_all_videos(self.scale_factor)
+
+
 class VideoWall(QWidget):
     """多视频播放程序"""
     # 定义关闭信号
@@ -895,8 +1013,14 @@ class VideoWall(QWidget):
         icon_path = os.path.join(BasePath, "icons", "video_icon.ico")
         self.setWindowIcon(QIcon(icon_path))
         self.setAcceptDrops(True)
-        self.players = []
 
+        self.players = []
+        # 添加全局缩放因子
+        self.global_scale_factor = 1.0
+        # 添加节流变量，防止频繁缩放
+        self.last_scale_time = 0
+        self.scale_throttle_ms = 100  # 缩放操作间隔(毫秒)
+		
         # 初始化相关组件
         self.init_ui()
 
@@ -923,22 +1047,6 @@ class VideoWall(QWidget):
         # 设置窗口最大化
         self.showMaximized()
 
-    def init_ui(self):
-        self.scroll_area = QScrollArea(self)
-        self.scroll_area.setWidgetResizable(True)  # 允许滚动区域内容自动调整大小
-
-        self.scroll_widget = QWidget()
-        self.grid_layout = QGridLayout(self.scroll_widget)
-        self.grid_layout.setContentsMargins(0, 0, 0, 0)  # 将边距设为0
-        self.grid_layout.setSpacing(2)  # 将间距设为1
-
-        self.scroll_widget.setLayout(self.grid_layout)
-        self.scroll_area.setWidget(self.scroll_widget)
-
-        main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(0, 0, 0, 0)  # 将主布局边距也设为0
-        main_layout.addWidget(self.scroll_area)
-        self.setLayout(main_layout)
         self.resize(1800, 1200)
 
     def shortcut(self):
@@ -983,6 +1091,71 @@ class VideoWall(QWidget):
         exit_shortcut = QShortcut(QKeySequence('Esc'), self)
         exit_shortcut.activated.connect(self.close)
         
+    # 添加鼠标滚轮事件处理函数
+    def wheelEvent(self, event):
+        # 获取当前时间，用于节流
+        current_time = time.time() * 1000  # 转换为毫秒
+        
+        # 如果自上次缩放后没有经过足够的时间，则忽略此次滚轮事件
+        if current_time - self.last_scale_time < self.scale_throttle_ms:
+            event.accept()
+            return
+            
+        # 更新上次缩放时间
+        self.last_scale_time = current_time
+        
+        # 获取滚轮滚动的角度
+        delta = event.angleDelta().y()
+        
+        # 根据滚动方向调整全局缩放因子
+        old_scale_factor = self.global_scale_factor
+        if delta > 0:
+            # 向上滚动，放大 - 减小增量以使大比例变化更平滑
+            increment = 0.1 if self.global_scale_factor < 3.0 else 0.05
+            self.global_scale_factor = min(4.0, self.global_scale_factor + increment)  # 限制最大缩放为5倍
+        else:
+            # 向下滚动，缩小
+            self.global_scale_factor = max(0.5, self.global_scale_factor - 0.1)
+            
+        # 如果缩放因子变化不大，不更新显示
+        if abs(old_scale_factor - self.global_scale_factor) < 0.01:
+            return
+        
+        # 对所有视频应用相同的缩放
+        self.scale_all_videos(self.global_scale_factor)
+        
+    # 添加缩放所有视频的方法
+    def scale_all_videos(self, scale_factor):
+        # 更新所有播放器的缩放因子
+        for player in self.players:
+            if abs(player.scale_factor - scale_factor) > 0.01:
+                player.scale_factor = scale_factor
+                
+                # 重新显示当前帧以应用新的缩放
+                if player.latest_frame is not None:
+                    if player.rotation_angle != 0:
+                        rotated_frame = player.rotate_image(player.latest_frame, player.rotation_angle)
+                        player.display_frame(rotated_frame)
+                    else:
+                        player.display_frame(player.latest_frame)
+
+    def init_ui(self):
+        self.scroll_area = QScrollArea(self)
+        self.scroll_area.setWidgetResizable(True)  # 允许滚动区域内容自动调整大小
+
+        self.scroll_widget = QWidget()
+        self.grid_layout = QGridLayout(self.scroll_widget)
+        self.grid_layout.setContentsMargins(0, 0, 0, 0)  # 将边距设为0
+        self.grid_layout.setSpacing(3)  # 将间距设为0
+
+        self.scroll_widget.setLayout(self.grid_layout)
+        self.scroll_area.setWidget(self.scroll_widget)
+
+
+        main_layout = QVBoxLayout()
+        main_layout.addWidget(self.scroll_area)
+        self.setLayout(main_layout)
+        self.resize(1800, 1200)
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -1062,8 +1235,6 @@ class VideoWall(QWidget):
             # 清空播放器列表
             self.players.clear()
             
-            # 显示提示标签
-            self.hint_label.show()
             
             # 刷新布局
             self.refresh_layout()
