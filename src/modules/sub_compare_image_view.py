@@ -1636,6 +1636,27 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.font_color_default = self.color_checkbox_settings.get("font_color_default", "rgb(0, 0, 0)")         # 默认字体颜色_纯黑色
         self.font_color_exif = self.color_checkbox_settings.get("font_color_exif", "rgb(255, 255, 255)")        # Exif字体颜色_纯白色
 
+        # 设置rgb颜色值
+        self.color_rgb_settings = {
+            "18度灰": "rgb(127,127,127)",
+            "石榴红": "rgb(242,12,0)",
+            "乌漆嘛黑": "rgb(22, 24, 35)",
+            "铅白": "rgb(240,240,244)", 
+            "水色": "rgb(136,173,166)",   
+            "石青": "rgb(123,207,166)",           
+            "茶色": "rgb(242,12,0)",
+            "天际": "rgb(236,237,236)",   
+            "晴空": "rgb(234,243,244)",  
+            "苍穹": "rgb(220,230,247)", 
+            "湖光": "rgb(74,116,171)", 
+            "曜石": "rgb(84, 99,125)", 
+            "天际黑": "rgb(8,8,6)",   
+            "晴空黑": "rgb(45,53,60)",  
+            "苍穹黑": "rgb(47,51,68)", 
+            "湖光黑": "rgb(49,69,96)", 
+            "曜石黑": "rgb(57,63,78)", 
+        }
+
         # 初始化exif信息可见性字典，支持用户在json配置文件中调整顺序以及是否显示该项
         if self.exif_settings:
             self.dict_exif_info_visibility = self.exif_settings
@@ -1731,11 +1752,12 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.checkBox_1.stateChanged.connect(self.toggle_exif_info)       # 新增EXIF信息显示
         self.checkBox_2.stateChanged.connect(self.toggle_histogram_info)  # 新增直方图显示
         self.checkBox_3.stateChanged.connect(self.ai_tips_info)           # 新增AI提示看图
-        self.checkBox_4.stateChanged.connect(self.update_tablewidget)     # 重新加载图像
+        self.checkBox_4.stateChanged.connect(self.update_tablewidget)     # 重新加载图像，P3色域显示
         self.checkBox_5.stateChanged.connect(self.roi_stats_checkbox)     # 新增ROI信息
         # 连接下拉列表信号到槽函数
-        self.comboBox_1.currentIndexChanged.connect(self.on_comboBox_1_changed)
+        self.comboBox_1.activated.connect(self.show_menu_combox1) # 连接 QComboBox 的点击事件到显示菜单，self.on_comboBox_1_changed
         self.comboBox_2.currentIndexChanged.connect(self.on_comboBox_2_changed)
+
         # 连接AI响应信号到槽函数
         self.ai_response_signal.connect(self.update_ai_response)
         # 连接进度条更新信号到槽函数
@@ -1771,23 +1793,36 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.label_0.setFont(self.font_manager_jetbrains)
 
         # 设置下拉框选项,会自动进入槽函数on_comboBox_1_changed
+        # self.comboBox_1.clear()  # 清除已有项
+        # self.comboBox_1.addItems(["导入配置", "一键重置", "背景色-铅白", "背景色-月白", "背景色-茶白", "背景色-鸭卵青", 
+        #                           "背景色-水色", "背景色-漆黑", "背景色-石榴红", "背景色-茶色", "背景色-石青", 
+        #                           "背景色-表格填充-18度灰","背景色-表格填充-铅白","背景色-表格填充-月白",
+        #                           "背景色-表格填充-茶白","背景色-表格填充-鸭卵青","背景色-表格填充-水色",
+        #                           "背景色-表格填充-漆黑","背景色-表格填充-石榴红","背景色-表格填充-茶色",
+        #                           "背景色-表格填充-石青"])
+        # self.comboBox_1.setFont(self.custom_font)
+
+        # 设置下拉框选项,会自动进入槽函数on_comboBox_2_changed
+        # self.comboBox_2.clear()  # 清除已有项
+        # self.comboBox_2.addItems(["导入配置", "一键重置", "字体颜色-铅白", "字体颜色-月白", "字体颜色-茶白", "字体颜色-鸭卵青", 
+        #                           "字体颜色-水色", "字体颜色-漆黑", "字体颜色-石榴红", "字体颜色-茶色", "字体颜色-石青", 
+        #                           "字体颜色-exif-铅白","字体颜色-exif-月白","字体颜色-exif-茶白","字体颜色-exif-鸭卵青",
+        #                           "字体颜色-exif-水色","字体颜色-exif-煤黑","字体颜色-exif-石榴红","字体颜色-exif-茶色",
+        #                           "字体颜色-exif-大眼睛绿"])
+        # self.comboBox_2.setFont(self.custom_font)        
+
+
+        # 设置下拉框选项,会自动进入槽函数self.show_menu_combox1-->on_comboBox_1_changed
         self.comboBox_1.clear()  # 清除已有项
-        self.comboBox_1.addItems(["导入配置", "一键重置", "背景色-铅白", "背景色-月白", "背景色-茶白", "背景色-鸭卵青", 
-                                  "背景色-水色", "背景色-漆黑", "背景色-石榴红", "背景色-茶色", "背景色-石青", 
-                                  "背景色-表格填充-18度灰","背景色-表格填充-铅白","背景色-表格填充-月白",
-                                  "背景色-表格填充-茶白","背景色-表格填充-鸭卵青","背景色-表格填充-水色",
-                                  "背景色-表格填充-漆黑","背景色-表格填充-石榴红","背景色-表格填充-茶色",
-                                  "背景色-表格填充-石青"])
+        self.comboBox_1.addItems(["✅颜色设置", "⭕一键重置", "🔽背景颜色>>", "🔽表格填充颜色>>", "🔽字体颜色>>", "🔽exif字体颜色>>"])  # 添加主选项
+        self.comboBox_1.setEditable(False)  # 设置 QComboBox 不可编辑
+        self.comboBox_1.setCurrentIndex(0)  # 设置默认显示索引为0
         self.comboBox_1.setFont(self.custom_font)
-        
         # 设置下拉框选项,会自动进入槽函数on_comboBox_2_changed
         self.comboBox_2.clear()  # 清除已有项
-        self.comboBox_2.addItems(["导入配置", "一键重置", "字体颜色-铅白", "字体颜色-月白", "字体颜色-茶白", "字体颜色-鸭卵青", 
-                                  "字体颜色-水色", "字体颜色-漆黑", "字体颜色-石榴红", "字体颜色-茶色", "字体颜色-石青", 
-                                  "字体颜色-exif-铅白","字体颜色-exif-月白","字体颜色-exif-茶白","字体颜色-exif-鸭卵青",
-                                  "字体颜色-exif-水色","字体颜色-exif-煤黑","字体颜色-exif-石榴红","字体颜色-exif-茶色",
-                                  "字体颜色-exif-大眼睛绿"])
+        self.comboBox_2.addItems(["✅sRGB色域", "✅灰度图空间色域", "✅p3色域"])
         self.comboBox_2.setFont(self.custom_font)
+
 
         # 设置复选框
         for checkbox in [self.checkBox_1, self.checkBox_5, self.checkBox_2, self.checkBox_3, self.checkBox_4]:
@@ -1821,6 +1856,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
         # 更新颜色样式表
         # self.update_ui_styles()
+
+
 
     def set_progress_bar(self):
         """设置进度条"""
@@ -2264,120 +2301,107 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             self.base_scales.clear()
             self._scales_min.clear()
 
-
             # 强制垃圾回收
             gc.collect()
             
         except Exception as e:
             print(f"清理资源时发生错误: {e}")
 
-    def on_comboBox_1_changed(self, index):
-        """背景色下拉列表改变时触发"""
-        if index == 0: # 背景色-默认_好蓝
-            self.background_color_default = self.color_checkbox_settings.get("background_color_default", "rgb(173,216,230)") 
-            self.background_color_table = self.color_checkbox_settings.get("background_color_table", "rgb(127, 127, 127)")  
-        elif index == 1: # 背景色-重置
-            self.background_color_default = "rgb(173,216,230)"     # 背景默认色_好蓝
-            self.background_color_table = "rgb(127,127,127)"     # 表格填充背景色_18度灰
-            self.font_color_default = "rgb(0, 0, 0)"          # 字体默认颜色_纯黑色
-            self.font_color_exif = "rgb(255,255,255)"         # exif字体默认颜色_纯白色
-        elif index == 2: # 背景色-铅白
-            self.background_color_default = "rgb(240,240,244)"    
-        elif index == 3: # 背景色-月白
-            self.background_color_default = "rgb(214,236,240)"    
-        elif index == 4: # 背景色-茶白
-            self.background_color_default = "rgb(243,249,241)"    
-        elif index == 5: # 背景色-鸭卵青
-            self.background_color_default = "rgb(224,238,232)"    
-        elif index == 6: # 背景色-水色
-            self.background_color_default = "rgb(136,173,166)" 
-        elif index == 7: # 背景色-漆黑
-            self.background_color_default = "rgb( 22, 24, 35)" 
-        elif index == 8: # 背景色-石榴红
-            self.background_color_default = "rgb(242, 12,  0)" 
-        elif index == 9: # 背景色-茶色
-            self.background_color_default = "rgb(179, 92, 68)" 
-        elif index == 10: # 背景色-石青
-            self.background_color_default = "rgb(123,207,166)" 
-        elif index == 11: # 背景色-表格填充-18度灰
-            self.background_color_table = "rgb(127, 127, 127)" 
-        elif index == 12: # 背景色-表格填充-铅白
-            self.background_color_table = "rgb(240,240,244)" 
-        elif index == 13: # 背景色-表格填充-月白
-            self.background_color_table = "rgb(214,236,240)" 
-        elif index == 14: # 背景色-表格填充-茶白
-            self.background_color_table = "rgb(243,249,241)" 
-        elif index == 15: # 背景色-表格填充-鸭卵青
-            self.background_color_table = "rgb(224,238,232)" 
-        elif index == 16: # 背景色-表格填充-水色
-            self.background_color_table = "rgb(136,173,166)" 
-        elif index == 17: # 背景色-表格填充-漆黑
-            self.background_color_table = "rgb( 22, 24, 35)" 
-        elif index == 18: # 背景色-表格填充-石榴红
-            self.background_color_table = "rgb(242, 12,  0)" 
-        elif index == 19: # 背景色-表格填充-茶色
-            self.background_color_table = "rgb(179, 92, 68)" 
-        elif index == 20: # 背景色-表格填充-石青  
-            self.background_color_table = "rgb(123,207,166)" 
-        else:
-            self.background_color_default = "rgb(173,216,230)"     # 背景默认色_好蓝
-            self.background_color_table = "rgb(127, 127, 127)"     # 表格填充背景色_18度灰
 
-        # 只更新样式，不重新加载图片
-        self.update_ui_styles()
+    def show_menu_combox1(self, index):
+        """下拉框self.comboBox_1中显示多级菜单项
+        下拉框1的主选项如下:
+            ["📌颜色设置", "🔁一键重置", "🔽背景颜色", "🔽表格填充颜色", "🔽字体颜色", "🔽exif字体颜色"]
+        """
+        try:
+            if not index:     # index == 0 颜色设置
+                pass 
+            elif index == 1:  # index == 1 一键重置
+                self.background_color_default = "rgb(173,216,230)" # 背景默认色_好蓝
+                self.background_color_table = "rgb(127,127,127)"   # 表格填充背景色_18度灰
+                self.font_color_default = "rgb(0, 0, 0)"           # 字体默认颜色_纯黑色
+                self.font_color_exif = "rgb(255,255,255)"          # exif字体默认颜色_纯白色
+                self.comboBox_1.setCurrentIndex(0)                 # 设置默认显示索引为0
+                # 更新样式表
+                self.update_ui_styles()
+            else: 
+                # 创建菜单
+                self.menu_1 = QtWidgets.QMenu(self)
+                # 定义颜色选项 从self.color_rgb_settings中获取
+                # color_options = ['18度灰', '石榴红', '乌漆嘛黑', '铅白', '水色', '石青', '茶色', '天际', '晴空', '苍穹', '湖光', '曜石', '天际黑', '晴空黑', '苍穹黑', '湖光黑', '曜石黑']
+                color_options = list(self.color_rgb_settings.keys())
+
+                # 添加颜色选项到菜单
+                for color in color_options:
+                    action = QtWidgets.QAction(color, self)
+                    # 传递 color 和 index
+                    action.triggered.connect(lambda checked, color=color, index=index: self.on_comboBox_1_changed(color, index))  
+                    self.menu_1.addAction(action)
+                self.menu_1.setFont(self.custom_font)
+
+                # 获取 QComboBox 顶部的矩形区域
+                rect = self.comboBox_1.rect()
+                global_pos = self.comboBox_1.mapToGlobal(rect.bottomLeft())
+
+                # 弹出 QMenu
+                self.menu_1.exec_(global_pos)
+        except Exception as e:
+            print(f"self.comboBox_1()--处理下拉框选项时发生未知错误: {e}")
+        
+
+
+    def on_comboBox_1_changed(self, color, index):
+        """颜色设置二级菜单触发事件"""
+        """优化方案说明：
+        1. 使用字典映射替代多个if-elif分支，提高可维护性
+        2. 使用海象运算符(walrus operator)合并条件判断使用setattr动态设置属性，避免重复代码
+        4. 将关联操作集中到单个条件判断中，逻辑更紧凑保持原有功能不变，但代码行数减少50%
+        6. 更易于扩展新的颜色配置项，只需更新index_map字典即可
+        """
+        if True: # 优化方案
+            # 使用字典映射索引与属性名的关系
+            index_map = {
+                2: 'background_color_default',
+                3: 'background_color_table', 
+                4: 'font_color_default',
+                5: 'font_color_exif'
+            }
+            
+            if color_rgb := self.color_rgb_settings.get(color):
+                if prop_name := index_map.get(index):
+                    setattr(self, prop_name, color_rgb)
+                    self.update_ui_styles()
+                    self.comboBox_1.setCurrentIndex(0)
+        if False:  # 原始方案
+            # 根据选择的color颜色从color_rgb_settings中获取rgb
+            color_rgb = self.color_rgb_settings.get(color, "")
+            if color_rgb:
+                if index==2:
+                    self.background_color_default = color_rgb
+                elif index ==3:
+                    self.background_color_table = color_rgb
+                elif index ==4:
+                    self.font_color_default = color_rgb
+                elif index ==5:
+                    self.font_color_exif = color_rgb
+            # 更新样式表
+            self.update_ui_styles()
+            # 设置默认显示索引为0
+            self.comboBox_1.setCurrentIndex(0)                 
+            # print(f"Selected color: {color}, Index: {index}")
+        
 
     def on_comboBox_2_changed(self, index):
-        """字体颜色下拉列表改变时触发"""
-        if index == 0: # 字体颜色-默认_纯黑色
-            self.font_color_default = self.color_checkbox_settings.get("font_color_default", "rgb(0, 0, 0)")   
-            self.font_color_exif = self.color_checkbox_settings.get("font_color_exif", "rgb(255,255,255)")     
-        elif index == 1: # 字体颜色-重置
-            self.font_color_default = "rgb(0, 0, 0)"          # 字体默认颜色_纯黑色
-            self.font_color_exif = "rgb(255,255,255)"         # exif字体默认颜色_纯白色
-            self.background_color_default = "rgb(173,216,230)"     # 背景默认色_好蓝
-            self.background_color_table = "rgb(127,127,127)"     # 表格填充背景色_18度灰
-        elif index == 2: # 字体颜色-铅白
-            self.font_color_default = "rgb(240,240,244)"    
-        elif index == 3: # 字体颜色-月白  
-            self.font_color_default = "rgb(214,236,240)"    
-        elif index == 4: # 字体颜色-茶白
-            self.font_color_default = "rgb(243,249,241)"    
-        elif index == 5: # 字体颜色-鸭卵青
-            self.font_color_default = "rgb(224,238,232)"    
-        elif index == 6: # 字体颜色-水色
-            self.font_color_default = "rgb(136,173,166)"      
-        elif index == 7: # 字体颜色-漆黑
-            self.font_color_default = "rgb( 22, 24, 35)"      
-        elif index == 8: # 字体颜色-石榴红
-            self.font_color_default = "rgb(242, 12,  0)"      
-        elif index == 9: # 字体颜色-茶色
-            self.font_color_default = "rgb(179, 92, 68)"      
-        elif index == 10: # 字体颜色-石青
-            self.font_color_default = "rgb(123,207,166)" 
-        elif index == 11: # 字体颜色-exif-铅白  
-            self.font_color_exif = "rgb(240,240,244)" 
-        elif index == 12: # 字体颜色-exif-月白
-            self.font_color_exif = "rgb(214,236,240)" 
-        elif index == 13: # 字体颜色-exif-茶白
-            self.font_color_exif = "rgb(243,249,241)" 
-        elif index == 14: # 字体颜色-exif-鸭卵青
-            self.font_color_exif = "rgb(224,238,232)" 
-        elif index == 15: # 字体颜色-exif-水色
-            self.font_color_exif = "rgb(136,173,166)" 
-        elif index == 16: # 字体颜色-exif-漆黑
-            self.font_color_exif = "rgb( 22, 24, 35)" 
-        elif index == 17: # 字体颜色-exif-石榴红
-            self.font_color_exif = "rgb(242, 12,  0)" 
-        elif index == 18: # 字体颜色-exif-石青
-            self.font_color_exif = "rgb(123,207,166)" 
-        elif index == 19: # 字体颜色-exif-大眼睛绿
-            self.font_color_exif = "rgb(0,255,0)" 
-        else:
-            self.font_color_default = "rgb(0, 0, 0)"          # 字体默认颜色_纯黑色
-            self.font_color_exif = "rgb(255,255,255)"         # exif字体默认颜色_纯白色
+        """图像色彩显示空间下拉框self.comboBox_2内容改变时触发事件
+        ["✅sRGB色域", "✅灰度图色域", "✅p3色域"]
+        """
+        if index == 0:   # sRGB色域
+            print(f"{self.comboBox_2.itemText(index)}")     
+        elif index == 1: # 灰度图色域
+            print(f"{self.comboBox_2.itemText(index)}")
+        elif index == 2: # p3色域
+            print(f"{self.comboBox_2.itemText(index)}")   
         
-        # 只更新样式，不重新加载图片
-        self.update_ui_styles()
 
 
     def update_ui_styles(self):
