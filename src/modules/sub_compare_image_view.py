@@ -1749,11 +1749,11 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
         """2. 连接复选框信号到槽函数"""
         # 连接复选框信号到槽函数
-        self.checkBox_1.stateChanged.connect(self.toggle_exif_info)       # 新增EXIF信息显示
-        self.checkBox_2.stateChanged.connect(self.toggle_histogram_info)  # 新增直方图显示
-        self.checkBox_3.stateChanged.connect(self.ai_tips_info)           # 新增AI提示看图
-        self.checkBox_4.stateChanged.connect(self.update_tablewidget)     # 重新加载图像，P3色域显示
-        self.checkBox_5.stateChanged.connect(self.roi_stats_checkbox)     # 新增ROI信息
+        self.checkBox_1.stateChanged.connect(self.toggle_histogram_info)  # 新增直方图显示
+        self.checkBox_2.stateChanged.connect(self.toggle_exif_info)       # 新增EXIF信息显示
+        self.checkBox_3.stateChanged.connect(self.roi_stats_checkbox)     # 新增ROI信息
+        self.checkBox_4.stateChanged.connect(self.ai_tips_info)           # 新增AI提示看图
+        
         # 连接下拉列表信号到槽函数
         self.comboBox_1.activated.connect(self.show_menu_combox1) # 连接 QComboBox 的点击事件到显示菜单，self.on_comboBox_1_changed
         self.comboBox_2.currentIndexChanged.connect(self.on_comboBox_2_changed)
@@ -1804,20 +1804,19 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
 
         # 设置复选框
-        for checkbox in [self.checkBox_1, self.checkBox_5, self.checkBox_2, self.checkBox_3, self.checkBox_4]:
+        for checkbox in [self.checkBox_1, self.checkBox_2, self.checkBox_3, self.checkBox_4]:
             checkbox.setFont(self.custom_font)
-        self.checkBox_1.setText("EXIF信息")
-        self.checkBox_5.setText("ROI信息")
-        self.checkBox_2.setText("直方图信息")
-        self.checkBox_3.setText("AI提示看图")
-        self.checkBox_4.setText("P3色域")
+        self.checkBox_1.setText("直方图")
+        self.checkBox_2.setText("EXIF信息")
+        self.checkBox_3.setText("ROI信息")
+        self.checkBox_4.setText("AI提示看图")   
 
         # 根据self.color_checkbox_settings设置复选框状态--> 配置在函数save_color_and_checkbox_settings()
-        self.checkBox_1.setChecked(self.color_checkbox_settings.get("exif_info", False))
-        self.checkBox_5.setChecked(self.color_checkbox_settings.get("roi_info", False))
-        self.checkBox_2.setChecked(self.color_checkbox_settings.get("histogram_info", False))
-        self.checkBox_3.setChecked(self.color_checkbox_settings.get("ai_tips", False))
-        self.checkBox_4.setChecked(self.color_checkbox_settings.get("p3_color_space", False))
+        self.checkBox_1.setChecked(self.color_checkbox_settings.get("histogram_info", False))
+        self.checkBox_2.setChecked(self.color_checkbox_settings.get("exif_info", False))
+        self.checkBox_3.setChecked(self.color_checkbox_settings.get("roi_info", False))
+        self.checkBox_4.setChecked(self.color_checkbox_settings.get("ai_tips", False))
+        
 
         # 设置表格列和行自动调整
         header = self.tableWidget_medium.horizontalHeader()
@@ -1998,11 +1997,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     # 移除LAB显示，替换为R/G和B/G
                     stats_text = f"亮度: {stats['avg_brightness']}\n对比度(L值标准差): {stats['contrast']}\nLAB: {stats['avg_lab']}\nRGB: {stats['avg_rgb']}\nR/G: {stats['R_G']}  B/G: {stats['B_G']}"
 
-                    # 将原图转换为dci-p3色域
-                    if self.checkBox_4.isChecked():
-                        pixmap = convert_to_dci_p3(pixmap, image)
-
-
                     # 记录结束时间并计算耗时
                     end_time = time.time()
                     elapsed_time = end_time - start_time
@@ -2106,8 +2100,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     
                     
                     # 设置EXIF和直方图
-                    view.set_exif_visibility(self.checkBox_1.isChecked(), self.font_color_exif)
-                    view.set_histogram_visibility(self.checkBox_2.isChecked())
+                    view.set_histogram_visibility(self.checkBox_1.isChecked())
+                    view.set_exif_visibility(self.checkBox_2.isChecked(), self.font_color_exif)
                     if data['histogram']:
                         view.set_histogram_data(data['histogram'])    
                     view.set_stats_visibility(self.stats_visible) # add by diamond_cz 20250217 添加亮度统计信息的显示设置
@@ -2292,7 +2286,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             ["📌颜色设置", "🔁一键重置", "🔽背景颜色", "🔽表格填充颜色", "🔽字体颜色", "🔽exif字体颜色"]
         """
         try:
-            if not index:     # index == 0 颜色设置
+            if not index:     # index == 0 颜色设置，不做任何操作
                 pass 
             elif index == 1:  # index == 1 一键重置
                 self.background_color_default = "rgb(173,216,230)" # 背景默认色_好蓝
@@ -2371,7 +2365,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
     def on_comboBox_2_changed(self, index):
         """图像色彩显示空间下拉框self.comboBox_2内容改变时触发事件
-        ["✅sRGB色域", "✅灰度图色域", "✅p3色域"]
+        ["✅sRGB色域", "✅灰度图色域", "❌p3色域"]
         """
         # 更新所有图形视图的场景视图
         for i, view in enumerate(self.graphics_views):
@@ -2450,7 +2444,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             color: {self.font_color_default};
             font-weight: bold;
         }}"""
-        for checkbox in [self.checkBox_1, self.checkBox_5, self.checkBox_2, self.checkBox_3, self.checkBox_4]:
+        for checkbox in [self.checkBox_1, self.checkBox_2, self.checkBox_3, self.checkBox_4]:
             checkbox.setStyleSheet(checkbox_style)
 
         # 更新下拉列表样式
@@ -3311,10 +3305,9 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 "font_color_exif": self.font_color_exif,
 
                 "exif_info": self.checkBox_1.isChecked(),
-                "roi_info": self.checkBox_5.isChecked(),
                 "histogram_info": self.checkBox_2.isChecked(),
-                "ai_tips": self.checkBox_3.isChecked(),
-                "p3_color_space": self.checkBox_4.isChecked()
+                "roi_info": self.checkBox_3.isChecked(),
+                "ai_tips": self.checkBox_4.isChecked()
             }
             
             settings_file = config_dir / "color_setting.json"

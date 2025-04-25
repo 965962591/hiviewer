@@ -6,6 +6,5 @@
     "exif_info": true,
     "roi_info": true,
     "histogram_info": false,
-    "ai_tips": false,
-    "p3_color_space": false
+    "ai_tips": false
 }
