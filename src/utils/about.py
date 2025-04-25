@@ -38,7 +38,7 @@ if False: # 暂时禁用，不支持单独运行该模块
 # 全局函数，版本号初始化
 def version_init(VERSION=str):
     # 设置保存版本号的文件
-    default_version_path = os.path.join(BasePath, "cache", "version.ini")
+    default_version_path = os.path.join(BasePath, "config", "version.ini")
     try:
         # 检查文件是否存在，如果不存在则创建并写入默认版本号
         if not os.path.exists(default_version_path):

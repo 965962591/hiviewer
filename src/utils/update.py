@@ -28,7 +28,7 @@ class Updater:
         self.download_path = os.path.join(BasePath, "downloads")
         self.install_path = "."
         self.update_success = False
-        self.version_file = os.path.join(BasePath, "cache", "version.ini")  # 添加版本文件路径
+        self.version_file = os.path.join(BasePath, "config", "version.ini")  # 添加版本文件路径
         self.current_version = self._read_version()  # 从文件读取当前版本
         self.main_executable = "hiviewer.exe"  # 添加主程序可执行文件名
         # 检查文件是否存在，如果不存在则创建并写入默认版本号
@@ -284,34 +284,34 @@ def download_with_progress(zip_path, response, total_size, progress_dialog):
         return "error"
 
 
-def start_program_subprocess(program_path=None, work_path=None, args=None):
-    """启动主程序
+def start_program_subprocess(program_path=None, args=None):
+    """启动installer.exe程序解压安装新版本
     Args:
         program_path (str): 要启动的程序路径
-        work_path (str): 工作目录
-        args (list): 要传递给主程序的参数列表
+        args (str): 要传递给主程序的参数字符串
     """
     try:
         if not program_path or not os.path.exists(program_path):
             print(f"程序文件不存在: {program_path}")
             return False
-            
-        # 构建命令列表
-        command = [program_path]
+        
+        print(f"正在启动打包程序: {program_path} 参数: {args}")
+
+        # 构建命令字符串
+        command = program_path
         if args:
             # 确保args是列表类型，并正确处理字符串参数
             if isinstance(args, str):
                 args = args.split()
-            command.extend(args)
+            command = f"{command} {' '.join(args)}"
         
-        # 添加工作目录和shell参数
-        process = subprocess.Popen(
-            command,
-            cwd=work_path,  # 设置工作目录
-            shell=True  # 使用shell执行
+        process = subprocess.run(
+            f'start /wait cmd /c {command}',  # /wait 等待新窗口关闭
+            shell=True,
+            text=True  # 将输出解码为字符串
         )
 
-        print(f"已启动程序: {program_path} 参数: {args}")
+        
         return process  # 返回进程对象以便后续控制
     except Exception as e:
         print(f"启动程序失败: {e}")
@@ -409,11 +409,10 @@ def check_update(parent_window=None):
                 os.startfile(program_path_main)
                 return True
             else:
-                # 适用于多平台的运行方法
+                # 适用当前目录下没有installer.exe的情况
                 program_path = os.path.join(BasePath, "tools", "installer.exe")
-                work_path = BasePath
                 # zip_path = os.path.join(base_path, "downloads", "latest.zip")
-                start_program_subprocess(program_path, work_path, f"-z {zip_path} -c 1")
+                start_program_subprocess(program_path, f"-z {zip_path} -c 1")
             
         else:
             return False

@@ -100,20 +100,23 @@ def show_message_box(text, title="提示", timeout=None):
     msg_box.exec_() # 使用 exec_ 显示模态对话框
 
 
-def version_init(default_version_path, VERSION=str):
-    """ 全局函数，版本号初始化 """
-    # 检查文件是否存在，如果不存在则创建并写入默认版本号
+def version_init(VERSION=str):
+    # 设置保存版本号的文件
+    default_version_path = os.path.join(os.path.dirname(__file__), "config", "version.ini")
     try:
+        # 检查文件是否存在，如果不存在则创建并写入默认版本号
         if not os.path.exists(default_version_path):
-            with open(default_version_path, 'w') as f:
-                f.write(VERSION) 
+            # 确保cache目录存在
+            os.makedirs(os.path.dirname(default_version_path), exist_ok=True)
+            with open(default_version_path, 'w', encoding='utf-8') as f:
+                f.write(VERSION)
             return VERSION
         else:
             with open(default_version_path, 'r', encoding='utf-8') as f:
                 return f.read().strip()
     except Exception as e:
-        print(f"version_init()--版本号初始化失败: {e}")
-        return VERSION
+        print(f"版本号初始化失败: {str(e)}")
+        return VERSION  # 返回默认版本号
 
 def load_color_settings():
     """加载颜色设置"""
@@ -342,14 +345,15 @@ class CommandThread(QThread):
 
     def run(self):
         try:
-            # result = subprocess.run(
-            #     self.command, 
-            #     check=True, 
-            #     stdout=subprocess.PIPE, 
-            #     stderr=subprocess.PIPE, 
-            #     text=True, 
-            #     encoding='utf-8')
-            # self.finished.emit(result.returncode == 0, result.stderr, self.images_path)  # 发射信号，传递结果
+            if False:
+                result = subprocess.run(
+                    self.command, 
+                    check=True, 
+                    stdout=subprocess.PIPE, 
+                    stderr=subprocess.PIPE, 
+                    text=True, 
+                    encoding='utf-8')
+                self.finished.emit(result.returncode == 0, result.stderr, self.images_path)  # 发射信号，传递结果
             
             # 使用 /c 参数，命令执行完成后关闭窗口，直接独立线程
             result = subprocess.run(
@@ -1128,10 +1132,8 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self, parent=None):
         super(HiviewerMainwindow, self).__init__(parent)
 
-        # 1 设置版本信息
-        default_version_path = os.path.join(os.path.dirname(__file__), "cache", "version.ini")
-        # 读取本地配置文件中的版本信息
-        self.version_info = version_init(default_version_path, VERSION='release-v2.3.2')
+        # 1 设置版本信息,读取本地配置文件./config/version.ini中的版本信息,没有则默认为release-v2.3.2
+        self.version_info = version_init(VERSION='release-v2.3.2')
         self.new_version_info = False 
         # 获取github中发布的最新版本信息, pre_check_update()，
         # 转移到函数self.create_splash_screen() --> self.update_splash_message --> self.pre_update()-->pre_check_update() 中获取,先在此处初始化
@@ -3056,16 +3058,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             print(f"getSiblingFolders()--获取同级文件夹列表失败: {e}")
             return []
 
-    # def handle_table_selection(self):
-    #     """处理表格选中事件"""
-    #     selected = self.RB_QTableWidget0.selectedItems()
-    #     if selected:
-    #         # 示例：更新状态栏显示选中数量
-    #         # count = len({item.row() for item in selected})  # 获取不重复的行数
-    #         self.statusbar_label.setText(f"[{len(selected)}]已选择")
-            
-    #         # 可以在这里添加更多选中后的处理逻辑 self.Left_QFrame，self.verticalLayout_left_2
-    #         # 例如：显示选中文件的预览、获取文件详细信息等
+
     def handle_table_selection(self):
         """处理表格选中事件（新增预览功能）"""
         selected = self.RB_QTableWidget0.selectedItems()
@@ -3074,26 +3067,20 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             file_paths = self.copy_selected_file_path(flag=0)  # 复用已有路径获取逻辑
             if not file_paths:
                 return
-
             # 只预览第一个选中的文件
             preview_path = file_paths[0]
-            
             # 清空旧预览内容
             self.clear_preview_layout()
-
             # 根据文件类型创建预览
             if preview_path.lower().endswith(tuple(self.IMAGE_FORMATS)):
                 self.create_image_preview(preview_path)
             elif preview_path.lower().endswith(tuple(self.VIDEO_FORMATS)):
                 self.create_video_preview(preview_path)
-
             # 更新状态栏显示选中数量
             self.statusbar_label.setText(f"[{len(selected)}]已选择")
 
-
     def clear_preview_layout(self):
         """清空预览区域"""
-        # ... existing code ...
         while self.verticalLayout_left_2.count():
             item = self.verticalLayout_left_2.takeAt(0)
             widget = item.widget()
@@ -3105,16 +3092,12 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         try:
             # 清空旧预览内容
             self.clear_preview_layout()
-
             # 创建 ImageViewer 实例
             self.image_viewer = ImageViewer(self.Left_QFrame)
-
             # 加载图片
             self.image_viewer.load_image(path)
-
             # 添加 ImageViewer 到 layout
             self.verticalLayout_left_2.addWidget(self.image_viewer)
-
             # 调整 self.Left_QFrame 的尺寸策略
             self.Left_QFrame.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
 

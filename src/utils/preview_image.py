@@ -9,7 +9,7 @@ class ImageViewer(QGraphicsView):
         self.setScene(self.scene)
         self.pixmap_item = QGraphicsPixmapItem()
         self.scene.addItem(self.pixmap_item)
-        self.setBackgroundBrush(QColor(120, 120, 120)) 
+        self.setBackgroundBrush(QColor(127,127,127)) 
         self.setDragMode(QGraphicsView.ScrollHandDrag)  # 设置鼠标左键按住可以移动视图
 
     def load_image(self, path):
