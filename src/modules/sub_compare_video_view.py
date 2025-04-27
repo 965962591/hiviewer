@@ -17,7 +17,7 @@ from PyQt5.QtWidgets import (
     QSpinBox, QScrollArea, QSizePolicy, QDoubleSpinBox, QGridLayout, QMessageBox)
 
 """导入自定义模块"""
-from src.utils.font_class import SingleFontManager # 字体管理器
+from src.utils.FontManager import SingleFontManager # 字体管理器
 
 """设置本项目的入口路径,全局变量BasePath"""
 # 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块

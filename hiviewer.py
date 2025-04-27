@@ -50,11 +50,14 @@ from src.modules.sub_bat_view import LogVerboseMaskApp          # 导入批量�
 from src.utils.about import AboutDialog                         # 导入关于对话框类,显示帮助信息
 from src.utils.hisnot import WScreenshot                        # 导入截图工具类
 from src.utils.raw2jpg import Mipi2RawConverterApp              # 导入MIPI RAW文件转换为JPG文件的类
-from src.utils.dialog_qualcom_aebox import Qualcom_Dialog               # 导入自定义对话框的类
-from src.utils.font_class import SingleFontManager, MultiFontManager  # 字体管理器
-from src.utils.update import check_update,pre_check_update            # 导入自动更新检查程序
-from src.utils.aebox_link import check_process_running,urlencode_folder_path,get_api_data
-from src.utils.preview_image import ImageViewer  # 导入自定义图片预览组件
+from src.utils.DialogLinkQualcomAebox import Qualcom_Dialog               # 导入自定义对话框的类
+from src.utils.FontManager import SingleFontManager, MultiFontManager     # 字体管理器
+from src.utils.update import check_update,pre_check_update                # 导入自动更新检查程序
+from src.utils.AeboxLink import check_process_running,urlencode_folder_path,get_api_data
+# 导入自定义图片预览组件
+from src.utils.ImagePreview import ImageViewer      
+# 导入自定义json配置文件
+from src.utils.setting import load_color_settings   
 
 
 """python项目多文件夹路径说明
@@ -75,6 +78,8 @@ from src.utils.preview_image import ImageViewer  # 导入自定义图片预览�
 
 # 预编译正则表达式，提高效率（针对实现类似widow的文件排名）
 _natural_sort_re = re.compile('([0-9]+)')
+
+
 
 def natural_sort_key(s):
     """将字符串转换为自然排序的键值（优化版）"""
@@ -117,38 +122,6 @@ def version_init(VERSION=str):
     except Exception as e:
         print(f"版本号初始化失败: {str(e)}")
         return VERSION  # 返回默认版本号
-
-def load_color_settings():
-    """加载颜色设置"""
-    try:
-        # 确保cache目录存在
-        cache_dir = pathlib.Path("./cache")
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        
-        settings_file = cache_dir / "color_setting.json"
-        if settings_file.exists():
-            with open(settings_file, 'r', encoding='utf-8', errors='ignore') as f:
-                return json.load(f)
-        else: #设置默认颜色设置
-            try:
-                print(f"颜色设置文件不存在: {settings_file}, 设置默认颜色设置")
-                
-                settings = {
-                    "background_color_default": "rgb(173,216,230)",  # 深色背景色_好蓝
-                    "background_color_table": "rgb(127, 127, 127)",   # 表格背景色_18度灰
-                    "font_color_default": "rgb(0, 0, 0)",         # 默认字体颜色_纯黑色
-                    "font_color_exif": "rgb(255, 255, 255)"        # Exif字体颜色_纯白色
-                }
-                
-                with open(settings_file, 'w', encoding='utf-8', errors='ignore') as f:
-                    json.dump(settings, f, indent=4, ensure_ascii=False)
-                
-            except Exception as e:
-                print(f"默认颜色设置失败: {e}")
-
-    except Exception as e:
-        print(f"加载颜色设置失败: {e}")
-    return {}
 
 def rgb_str_to_qcolor(rgb_str):
     """将 'rgb(r,g,b)' 格式的字符串转换为 QColor"""
@@ -987,8 +960,12 @@ class CheckBoxDelegate(QStyledItemDelegate):
         is_hovered = option.state & QStyle.State_MouseOver  # 检查鼠标是否悬停
         if is_hovered:
             # 设置鼠标悬停的颜色为加载的配置文件中的背景颜色，字体颜色为黑色
-            background_color = load_color_settings()['background_color_default'] if load_color_settings()['background_color_default'] else "rgb(173, 216, 230)"
-            background_color = rgb_str_to_qcolor(background_color) # 将字符串转换为QColor
+            basic_color_settings = COLORSETTING.get('basic_color_settings')
+            background_color = (
+                basic_color_settings.get('background_color_default', "rgb(173, 216, 230)")
+                if basic_color_settings else "rgb(173, 216, 230)"
+            )
+            background_color = rgb_str_to_qcolor(background_color)  # 将字符串转换为QColor
             painter.fillRect(option.rect, background_color)  # 鼠标悬停时的颜色
             # painter.setPen(QPen(Qt.black))  # 设置字体颜色为黑色
 
@@ -1170,15 +1147,13 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 设置主界面相关组件
         self.set_stylesheet()
 
+        # 加载之前的设置    
+        self.load_settings()  
         # 初始化主题，暂时移除，在load_settings() 中初始化
         # self.apply_theme()
 
-        # 加载之前的设置    
-        self.load_settings()  
-
         # 设置快捷键
         self.set_shortcut()
-
         # 设置左侧文件浏览器和右侧表格区域的右键菜单
         self.setup_context_menu()  
         self.setup_treeview_context_menu()
@@ -1230,11 +1205,12 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.compress_worker = None
 
         """加载颜色相关设置""" # 设置背景色和字体颜色，使用保存的设置或默认值
-        self.color_settings = load_color_settings()
-        self.background_color_default = self.color_settings.get("background_color_default", "rgb(173,216,230)")  # 深色背景色_好蓝
-        self.background_color_table = self.color_settings.get("background_color_table", "rgb(127, 127, 127)")    # 表格背景色_18度灰
-        self.font_color_default = self.color_settings.get("font_color_default", "rgb(0, 0, 0)")                  # 默认字体颜色_纯黑色
-        self.font_color_exif = self.color_settings.get("font_color_exif", "rgb(255, 255, 255)")                  # Exif字体颜色_纯白色
+        self.color_settings = COLORSETTING
+        basic_color_settings = self.color_settings.get('basic_color_settings',{})
+        self.background_color_default = basic_color_settings.get("background_color_default", "rgb(173,216,230)")  # 深色背景色_好蓝
+        self.background_color_table = basic_color_settings.get("background_color_table", "rgb(127, 127, 127)")    # 表格背景色_18度灰
+        self.font_color_default = basic_color_settings.get("font_color_default", "rgb(0, 0, 0)")                  # 默认字体颜色_纯黑色
+        self.font_color_exif = basic_color_settings.get("font_color_exif", "rgb(255, 255, 255)")                  # Exif字体颜色_纯白色
 
         """加载字体相关设置""" # 初始化字体管理器,并获取字体，设置默认字体 self.custom_font
         font_paths = [
@@ -3832,7 +3808,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         """从JSON文件加载设置"""
         print("load_settings()--从JSON文件加载之前的设置")
         try:
-            settings_path = os.path.join(os.path.dirname(__file__), "cache", "basic_settings.json")
+            settings_path = os.path.join(os.path.dirname(__file__), "config", "basic_settings.json")
             if os.path.exists(settings_path):
                 with open(settings_path, "r", encoding='utf-8', errors='ignore') as f:
                     settings = json.load(f)
@@ -3901,7 +3877,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def save_settings(self):
         """保存当前设置到JSON文件"""
         try:
-            settings_path = os.path.join(os.path.dirname(__file__), "cache", "basic_settings.json")
+            settings_path = os.path.join(os.path.dirname(__file__), "config", "basic_settings.json")
             
             # 确保cache目录存在
             cache_dir = os.path.dirname(settings_path)
@@ -4489,38 +4465,40 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 show_message_box("不支持的文件格式", "提示", 1000)
 
         except Exception as e:
-            print(f"on_space_pressed()-error--处理空格键时发生错误: {e}")
+            print(f"on_space_pressed()-主界面--处理空格键时发生错误: {e}")
             return
 
     def create_compare_window(self, selected_file_paths, image_indexs):
         """创建看图子窗口的统一方法"""
-        
-        # 暂停预加载
-        # self.pause_preloading() # modify by diamond_cz 20250217 不暂停预加载，看图时默认后台加载图标
-        
-        # 在主界面加载并显示进度条
-        self.set_progress_bar(len(selected_file_paths))
+        try:
+            # 暂停预加载
+            # self.pause_preloading() # modify by diamond_cz 20250217 不暂停预加载，看图时默认后台加载图标
+            
+            # 在主界面加载并显示进度条
+            self.set_progress_bar(len(selected_file_paths))
 
-        if not self.compare_window:
-            self.compare_window = SubMainWindow(selected_file_paths, image_indexs, self)
-        else:  
-            self.compare_window.set_images(selected_file_paths, image_indexs)
-            print("看图子界面已存在进入窗口！")
+            if not self.compare_window:
+                self.compare_window = SubMainWindow(selected_file_paths, image_indexs, self)
+            else:  
+                self.compare_window.set_images(selected_file_paths, image_indexs)
+                print("看图子界面已存在进入窗口！")
 
-        # 延时100ms后关闭进度条显示
-        QTimer.singleShot(100, self.on_progress_complete)
+            # 延时100ms后关闭进度条显示
+            QTimer.singleShot(100, self.on_progress_complete)
 
-        # 设置看图界面标题
-        self.compare_window.setWindowTitle("图片对比界面")
-        # self.compare_window.setWindowFlags(Qt.Window)
-        # 设置窗口图标
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "viewer.ico")
-        self.compare_window.setWindowIcon(QIcon(icon_path))
-        self.compare_window.closed.connect(self.on_compare_window_closed)
-        self.compare_window.show()
+            # 设置看图界面标题
+            self.compare_window.setWindowTitle("图片对比界面")
+            # self.compare_window.setWindowFlags(Qt.Window)
+            # 设置窗口图标
+            icon_path = os.path.join(os.path.dirname(__file__), "icons", "viewer.ico")
+            self.compare_window.setWindowIcon(QIcon(icon_path))
+            self.compare_window.closed.connect(self.on_compare_window_closed)
+            self.compare_window.show()
 
-        # self.hide()  # modify by diamond_cz 20250217 不隐藏主界面
-        
+            # self.hide()  # modify by diamond_cz 20250217 不隐藏主界面
+        except Exception as e:
+            print(f"create_compare_window()-主界面--创建看图子窗口时发生错误: {e}")
+            return
 
     def on_compare_window_closed(self):
         """处理子窗口关闭事件"""
@@ -4744,9 +4722,10 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def closeEvent(self, event):
         """重写关闭事件以保存设置和清理资源"""
-        print("主界面关闭事件")
-        self.cleanup()
-        self.save_settings()
+        print("closeEvent()-主界面--关闭事件")
+        self.save_settings()  # 保存关闭时基础设置
+        self.cleanup()        # 清除内存
+        print("接受主界面关闭事件, 保存关闭前的配置并清理内存")
         event.accept()
 
 """
@@ -4860,6 +4839,9 @@ if __name__ == '__main__':
 
     # 初始化日志文件
     # setup_logging()  
+
+    # 读取全局颜色配置
+    COLORSETTING = load_color_settings()
 
     # 设置主程序app
     app = QtWidgets.QApplication(sys.argv)

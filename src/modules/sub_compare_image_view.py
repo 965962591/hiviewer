@@ -31,10 +31,13 @@ from PyQt5.QtWidgets import (
 
 """导入自定义模块"""
 from src.ui.sub_ui import Ui_MainWindow               # 看图子界面，导入界面UI
-from src.utils.ai_tips import CustomLLM_Siliconflow   # 看图子界面，AI提示看图复选框功能模块
-from src.utils.font_class import SingleFontManager    # 看图子界面，导入字体管理器
+from src.utils.AiTips import CustomLLM_Siliconflow    # 看图子界面，AI提示看图复选框功能模块
+from src.utils.FontManager import SingleFontManager   # 看图子界面，导入字体管理器
 from src.utils.hisnot import WScreenshot              # 看图子界面，导入自定义截图的类
-from src.utils.aebox_link import check_process_running,urlencode_folder_path,get_api_data
+from src.utils.AeboxLink import check_process_running,urlencode_folder_path,get_api_data
+# 导入自定义json配置文件
+from src.utils.setting import load_exif_settings,load_color_settings    
+
 
 """设置本项目的入口路径,全局变量BasePath"""
 # 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
@@ -1583,7 +1586,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         super(SubMainWindow, self).__init__(parent)
         # 初始化UI
         self.setupUi(self) 
-        # 获取主窗口
+        
+        # 获取主窗口的self,可以使用主窗口的变量
         self.parent_window = parent
 
         # 初始化基本属性
@@ -1606,11 +1610,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         # 初始化roi亮度等信息统计框
         self.roi_selection_active = False
 
-        # 初始化图像显示色彩空间标志位，默认设置srgb显示空间
-        self.p3_color_space = False
-        self.srgb_color_space = True
-        self.gray_color_space = False
-
         # 初始化全屏标志位
         self.is_fullscreen = False
 
@@ -1624,69 +1623,21 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.font_manager_jetbrains = SingleFontManager.get_font(size=11, font_path=font_path_jetbrains)   
         
 
-        # 加载保存的颜色设置
-        self.color_checkbox_settings = self.load_color_and_checkbox_settings()
 
-        # 加载保存的EXIF信息设置
-        self.exif_settings = self.load_exif_settings()
-        
-        # 设置背景色和字体颜色，使用保存的设置或默认值
-        self.background_color_default = self.color_checkbox_settings.get("background_color_default", "rgb(173,216,230)")  # 深色背景色_好蓝
-        self.background_color_table = self.color_checkbox_settings.get("background_color_table", "rgb(127, 127, 127)")   # 表格背景色_18度灰
-        self.font_color_default = self.color_checkbox_settings.get("font_color_default", "rgb(0, 0, 0)")         # 默认字体颜色_纯黑色
-        self.font_color_exif = self.color_checkbox_settings.get("font_color_exif", "rgb(255, 255, 255)")        # Exif字体颜色_纯白色
-
+        """初始化一些读取json配置的变量"""
+        # 初始化图像显示色彩空间标志位，默认设置srgb显示空间
+        self.srgb_color_space = True  
+        self.p3_color_space = False   
+        self.gray_color_space = False
         # 设置rgb颜色值
-        self.color_rgb_settings = {
-            "18度灰": "rgb(127,127,127)",
-            "石榴红": "rgb(242,12,0)",
-            "乌漆嘛黑": "rgb(22, 24, 35)",
-            "铅白": "rgb(240,240,244)", 
-            "水色": "rgb(136,173,166)",   
-            "石青": "rgb(123,207,166)",           
-            "茶色": "rgb(242,12,0)",
-            "天际": "rgb(236,237,236)",   
-            "晴空": "rgb(234,243,244)",  
-            "苍穹": "rgb(220,230,247)", 
-            "湖光": "rgb(74,116,171)", 
-            "曜石": "rgb(84, 99,125)", 
-            "天际黑": "rgb(8,8,6)",   
-            "晴空黑": "rgb(45,53,60)",  
-            "苍穹黑": "rgb(47,51,68)", 
-            "湖光黑": "rgb(49,69,96)", 
-            "曜石黑": "rgb(57,63,78)", 
-        }
-
+        self.color_rgb_settings = {}         
         # 初始化exif信息可见性字典，支持用户在json配置文件中调整顺序以及是否显示该项
-        if self.exif_settings:
-            self.dict_exif_info_visibility = self.exif_settings
-        else:    
-            self.dict_exif_info_visibility = {
-                '品牌' : self.exif_settings.get("品牌", True),
-                '型号' : self.exif_settings.get("型号", True),
-                '曝光时间' : self.exif_settings.get("曝光时间", True),
-                '光圈值' : self.exif_settings.get("光圈值", True),
-                'ISO值' : self.exif_settings.get("ISO值", True),
-                '原始时间' : self.exif_settings.get("原始时间", True),
-                '测光模式' : self.exif_settings.get("测光模式", True),
-                '图片名称' : self.exif_settings.get("图片名称", False),
-                '图片大小' : self.exif_settings.get("图片大小", True),
-                '图片尺寸' : self.exif_settings.get("图片尺寸", True),
-                '图片张数' : self.exif_settings.get("图片张数", True),
-                'HDR' : self.exif_settings.get("HDR", True),
-                'Zoom' : self.exif_settings.get("Zoom", True),
-                'Lux' : self.exif_settings.get("Lux", True),
-                'CCT' : self.exif_settings.get("CCT", True),
-                'FaceSA' : self.exif_settings.get("FaceSA", True),
-                'DRCgain' : self.exif_settings.get("DRCgain", True),
-                'Awb_sa' : self.exif_settings.get("Awb_sa", True),
-                'Triangle_index' : self.exif_settings.get("Triangle_index", True),
-                'R_gain' : self.exif_settings.get("R_gain", True),
-                'B_gain' : self.exif_settings.get("B_gain", True),
-                'Safe_gain' : self.exif_settings.get("Safe_gain", True),
-                'Short_gain' : self.exif_settings.get("Short_gain", True),
-                'Long_gain' : self.exif_settings.get("Long_gain", True)
-            }
+        self.dict_exif_info_visibility = {} 
+        self.dict_label_info_visibility = {} 
+
+
+        # 加载之前的配置
+        self.load_settings()
 
         # 设置快捷键和槽函数
         self.set_shortcut()
@@ -1811,11 +1762,11 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.checkBox_3.setText("ROI信息")
         self.checkBox_4.setText("AI提示看图")   
 
-        # 根据self.color_checkbox_settings设置复选框状态--> 配置在函数save_color_and_checkbox_settings()
-        self.checkBox_1.setChecked(self.color_checkbox_settings.get("histogram_info", False))
-        self.checkBox_2.setChecked(self.color_checkbox_settings.get("exif_info", False))
-        self.checkBox_3.setChecked(self.color_checkbox_settings.get("roi_info", False))
-        self.checkBox_4.setChecked(self.color_checkbox_settings.get("ai_tips", False))
+        # 根据self.color_settings设置复选框状态--> 配置在函数save_color_settings()
+        self.checkBox_1.setChecked(self.dict_label_info_visibility.get("histogram_info", False))
+        self.checkBox_2.setChecked(self.dict_label_info_visibility.get("exif_info", False))
+        self.checkBox_3.setChecked(self.dict_label_info_visibility.get("roi_info", False))
+        self.checkBox_4.setChecked(self.dict_label_info_visibility.get("ai_tips", False))
         
 
         # 设置表格列和行自动调整
@@ -3222,23 +3173,20 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
     def closeEvent(self, event):
         """重写关闭事件处理"""
         # 检查是否应该忽略关闭事件
-        print("子窗口关闭事件:")
+        print("closeEvent()-看图子界面--子窗口关闭事件:")
         if self.is_updating:
-            print("正在更新图片，忽略关闭事件")
+            print("看图子界面正在更新图片，忽略关闭事件")
             event.ignore()
             return
 
         try:
-            # 保存颜色and复选框状态设置
-            self.save_color_and_checkbox_settings()
-            # 保存EXIF信息设置
-            self.save_exif_settings()
-            self.cleanup()  # 清理资源
-            self.closed.emit()  # 发送关闭信号
+            self.save_settings()  # 保存颜色以及EXIF信息设置
+            self.cleanup()        # 清理资源
+            self.closed.emit()    # 发送关闭信号
             event.accept()
-            print("子窗口关闭事件,接受")
+            print("接受看图子界面关闭事件, 并保存颜色以及EXIF信息设置")
         except Exception as e:
-            print(f"关闭窗口时发生错误: {e}")
+            print(f"closeEvent()-看图子界面--关闭窗口时发生错误: {e}")
             event.accept()
 
         """# 修复关闭事件, 可以正常关闭, modify by diamond_cz 2025-01-14
@@ -3265,8 +3213,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             
         try:
             # 保存颜色设置
-            self.save_color_and_checkbox_settings()
-            self.save_exif_settings()
+            self.save_settings()
             self.cleanup()  # 清理资源
             self.closed.emit()  # 发送关闭信号
             super().close()  # 调用父类的close方法
@@ -3274,81 +3221,132 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             print(f"关闭窗口时发生错误: {e}")
             super().close()
 
-    def load_color_and_checkbox_settings(self):
-        """加载颜色设置"""
-        try:
-            # 确保cache目录存在
-            config_dir = pathlib.Path("./cache")
-            config_dir.mkdir(parents=True, exist_ok=True)
-            
-            settings_file = config_dir / "color_setting.json"
-            if settings_file.exists():
-                with open(settings_file, 'r', encoding='utf-8', errors='ignore') as f:
-                    return json.load(f)
-            else:
-                return {}
-        except Exception as e:
-            print(f"加载颜色设置失败: {e}")
-        return {}
 
-    def save_color_and_checkbox_settings(self):
+    def load_settings(self):
+        """加载颜色、exif等设置"""
+        try:
+            pass
+            # 加载保存的颜色设置 basic_color_settings、basic_color_settings
+            ColorSettings = load_color_settings()
+            color_settings = ColorSettings.get("basic_color_settings",{})
+            rgb_settings = ColorSettings.get("rgb_color_settings",{})
+            # 加载保存的EXIF信息设置
+            ExifSettings = load_exif_settings()
+            label_visable = ExifSettings.get("label_visable_settings",{})
+            exif_visable = ExifSettings.get("exif_visable_setting",{})
+
+
+            # 从颜色配置中读取基础颜色
+            self.font_color_default = color_settings.get("font_color_default", "rgb(0, 0, 0)")                  # 默认字体颜色_纯黑色
+            self.font_color_exif = color_settings.get("font_color_exif", "rgb(255, 255, 255)")                  # Exif字体颜色_纯白色
+            self.background_color_default = color_settings.get("background_color_default", "rgb(173,216,230)")  # 深色背景色_好蓝
+            self.background_color_table = color_settings.get("background_color_table", "rgb(127, 127, 127)")    # 表格背景色_18度灰
+
+            # 读取rgb颜色配置
+            self.color_rgb_settings = rgb_settings
+
+            # 初始化exif信息可见性字典，支持用户在json配置文件中调整顺序以及是否显示该项
+            self.dict_exif_info_visibility = exif_visable
+
+            # 初始化label显示变量
+            self.dict_label_info_visibility = label_visable
+
+        except Exception as e:
+            print(f"self.load_settings()--加载设置失败: {e}")
+        
+
+
+    def save_settings(self):
         """保存颜色设置"""
         try:
-            # 确保cache目录存在
-            config_dir = pathlib.Path("./cache")
+            # 确保config目录存在
+            config_dir = pathlib.Path("./config")
             config_dir.mkdir(parents=True, exist_ok=True)
-            
-            settings = {
+
+            # 1. 保存颜色配置文件
+            settings_color_file = config_dir / "color_setting.json"
+            basic_color_settings ={
                 "background_color_default": self.background_color_default,
                 "background_color_table": self.background_color_table,
                 "font_color_default": self.font_color_default,
                 "font_color_exif": self.font_color_exif,
-
-                "exif_info": self.checkBox_1.isChecked(),
-                "histogram_info": self.checkBox_2.isChecked(),
-                "roi_info": self.checkBox_3.isChecked(),
-                "ai_tips": self.checkBox_4.isChecked()
             }
-            
-            settings_file = config_dir / "color_setting.json"
-            with open(settings_file, 'w', encoding='utf-8', errors='ignore') as f:
-                json.dump(settings, f, indent=4, ensure_ascii=False)
-            
-        except Exception as e:
-            print(f"保存颜色设置失败: {e}")
+            rgb_color_settings = {
+                "18度灰": "rgb(127,127,127)",
+                "石榴红": "rgb(242,12,0)",
+                "乌漆嘛黑": "rgb(22, 24, 35)",
+                "铅白": "rgb(240,240,244)", 
+                "水色": "rgb(136,173,166)",   
+                "石青": "rgb(123,207,166)",           
+                "茶色": "rgb(242,12,0)",
+                "天际": "rgb(236,237,236)",   
+                "晴空": "rgb(234,243,244)",  
+                "苍穹": "rgb(220,230,247)", 
+                "湖光": "rgb(74,116,171)", 
+                "曜石": "rgb(84, 99,125)", 
+                "天际黑": "rgb(8,8,6)",   
+                "晴空黑": "rgb(45,53,60)",  
+                "苍穹黑": "rgb(47,51,68)", 
+                "湖光黑": "rgb(49,69,96)", 
+                "曜石黑": "rgb(57,63,78)", 
+            }
+            setting = {
+                "basic_color_settings": basic_color_settings,
+                "rgb_color_settings": rgb_color_settings
+            }
+            # 保存setting到配置文件config_dir / "color_setting.json"
+            with open(settings_color_file, 'w', encoding='utf-8', errors='ignore') as f:
+                json.dump(setting, f, indent=4, ensure_ascii=False)
 
-    def load_exif_settings(self):
-        """加载EXIF信息设置"""
-        try:
-            # 确保cache目录存在
-            config_dir = pathlib.Path("./cache")
-            config_dir.mkdir(parents=True, exist_ok=True)
-            
-            settings_file = config_dir / "exif_setting.json"
-            if settings_file.exists():
-                with open(settings_file, 'r', encoding='utf-8', errors='ignore') as f:
-                    return json.load(f)
-            else:
-                return {}
-        except Exception as e:
-            print(f"加载EXIF信息设置失败: {e}")
-            return {}
+            # 2. 保存exif配置文件
+            settings_exif_file = config_dir / "exif_setting.json"
+            label_visable_settings = {
+                "histogram_info": self.checkBox_1.isChecked(),
+                "exif_info": self.checkBox_2.isChecked(),
+                "roi_info": self.checkBox_3.isChecked(),
+                "ai_tips": self.checkBox_4.isChecked(),
+                "srgb_color_space":self.srgb_color_space,
+                "p3_color_space":self.p3_color_space,
+                "gray_color_space":self.gray_color_space,
+            }
+            exif_visable_setting = {
+                '品牌' : True,
+                '型号' : True,
+                '曝光时间' : True,
+                '光圈值' : True,
+                'ISO值' : True,
+                '原始时间' : True,
+                '测光模式' : True,
+                '图片名称' : True,
+                '图片大小' : True,
+                '图片尺寸' : True,
+                '图片张数' : True,
+                'HDR' : True,
+                'Zoom' : True,
+                'Lux' : True,
+                'CCT' : True,
+                'FaceSA' : True,
+                'DRCgain' : True,
+                'Awb_sa' : True,
+                'Triangle_index' : True,
+                'R_gain' : True,
+                'B_gain' : True,
+                'Safe_gain' : True,
+                'Short_gain' : True,
+                'Long_gain' : True
+            }
+            setting = {
+                "label_visable_settings": label_visable_settings,
+                "exif_visable_setting": exif_visable_setting
+            }
+            # 保存setting到配置文件config_dir / "exif_setting.json"
+            with open(settings_exif_file, 'w', encoding='utf-8', errors='ignore') as f:
+                json.dump(setting, f, indent=4, ensure_ascii=False)
 
-    def save_exif_settings(self):
-        """保存EXIF信息设置"""
-        try:
-            # 确保cache目录存在,不存在则创建
-            config_dir = pathlib.Path("./cache")
-            config_dir.mkdir(parents=True, exist_ok=True)
-
-            settings = self.dict_exif_info_visibility
-            
-            settings_file = config_dir / "exif_setting.json"
-            with open(settings_file, 'w', encoding='utf-8', errors='ignore') as f:
-                json.dump(settings, f, indent=4, ensure_ascii=False)
-                
         except Exception as e:
-            print(f"保存EXIF信息设置失败: {e}")
+            print(f"save_settings()-看图子界面--保存设置失败: {e}")
+
+
 
     def update_ai_response(self, response):
         """更新AI响应结果"""
