@@ -1,20 +1,19 @@
 {
     "combobox_history": [
         "D:\\image_process\\hiviewer",
-        "D:/Tuning/O19/0_pic/0421/O19_GL_一供"
+        "D:/Tuning/O19/0_pic/0423/N19",
+        "D:/Tuning/O19/0_pic/0423/O19"
     ],
-    "current_directory": "D:/Tuning/O19/0_pic/0421/O19_GL_一供",
+    "current_directory": "D:/Tuning/O19/0_pic/0423/O19",
     "file_type_option": "显示图片文件",
     "combobox1_checked_items": [
-        "O19_GL_二供",
-        "N19",
-        "N12"
+        "N12",
+        "N19"
     ],
     "combobox1_all_items": [
+        "22222",
         "N12",
-        "N19",
-        "O19_GL_二供",
-        "video"
+        "N19"
     ],
     "sort_option": "按创建时间排序",
     "theme_option": "默认主题",

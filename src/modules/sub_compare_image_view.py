@@ -1623,11 +1623,10 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self._scales_min = []
 
         # 初始化一些显示相关的标志位
-        self.is_updating = False           # 设置更新状态标志位
-        self.stats_visible = False         # 设置亮度统计信息的标志位
-        self.ai_tips_flag = False          # 初始化ai提示标注位为False
-        self.roi_selection_active = False  # 初始化roi亮度等信息统计框
+        self.roi_selection_active = False  # 初始化roi亮度等信息统计框的显示标志位
         self.is_fullscreen = False         # 初始化全屏标志位
+        self.is_updating = False           # 设置更新状态标志位
+        
 
         # 设置表格的宽高初始大小
         self.table_width_heigth_default = [2534,1376]
@@ -2100,12 +2099,12 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     # 设置视图的缩放
                     view.scale(base_scale, base_scale)
                     
-                    # 设置EXIF和直方图
+                    # 设置直方图、EXIF、亮度统计信息
                     view.set_histogram_visibility(self.checkBox_1.isChecked())
-                    view.set_exif_visibility(self.checkBox_2.isChecked(), self.font_color_exif)
                     if data['histogram']:
-                        view.set_histogram_data(data['histogram'])    
-                    view.set_stats_visibility(self.stats_visible) # add by diamond_cz 20250217 添加亮度统计信息的显示设置
+                        view.set_histogram_data(data['histogram'])  
+                    view.set_exif_visibility(self.checkBox_2.isChecked(), self.font_color_exif)
+                    view.set_stats_visibility(self.checkBox_1.isChecked()) 
 
                     # 设置原始OpenCV图像
                     view.set_original_image(data['cv_img'])
@@ -3308,6 +3307,9 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             self.p3_color_space = self.dict_label_info_visibility.get("p3_color_space", False)     
             self.gray_color_space = self.dict_label_info_visibility.get("gray_color_space", False) 
             self.srgb_color_space = self.dict_label_info_visibility.get("srgb_color_space", True) 
+            # 设置亮度统计信息的标志位；初始化ai提示标注位为False 
+            self.stats_visible = self.dict_label_info_visibility.get("roi_info", True)         
+            self.ai_tips_flag = self.dict_label_info_visibility.get("ai_tips", False)          
 
         except Exception as e:
             print(f"self.load_settings()--加载设置失败: {e}")
@@ -3328,28 +3330,28 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 "font_color_default": self.font_color_default,
                 "font_color_exif": self.font_color_exif,
             }
-            rgb_color_settings = {
-                "18度灰": "rgb(127,127,127)",
-                "石榴红": "rgb(242,12,0)",
-                "乌漆嘛黑": "rgb(22, 24, 35)",
-                "铅白": "rgb(240,240,244)", 
-                "水色": "rgb(136,173,166)",   
-                "石青": "rgb(123,207,166)",           
-                "茶色": "rgb(242,12,0)",
-                "天际": "rgb(236,237,236)",   
-                "晴空": "rgb(234,243,244)",  
-                "苍穹": "rgb(220,230,247)", 
-                "湖光": "rgb(74,116,171)", 
-                "曜石": "rgb(84, 99,125)", 
-                "天际黑": "rgb(8,8,6)",   
-                "晴空黑": "rgb(45,53,60)",  
-                "苍穹黑": "rgb(47,51,68)", 
-                "湖光黑": "rgb(49,69,96)", 
-                "曜石黑": "rgb(57,63,78)", 
-            }
+            # rgb_color_settings = {
+            #     "18度灰": "rgb(127,127,127)",
+            #     "石榴红": "rgb(242,12,0)",
+            #     "乌漆嘛黑": "rgb(22, 24, 35)",
+            #     "铅白": "rgb(240,240,244)", 
+            #     "水色": "rgb(136,173,166)",   
+            #     "石青": "rgb(123,207,166)",           
+            #     "茶色": "rgb(242,12,0)",
+            #     "天际": "rgb(236,237,236)",   
+            #     "晴空": "rgb(234,243,244)",  
+            #     "苍穹": "rgb(220,230,247)", 
+            #     "湖光": "rgb(74,116,171)", 
+            #     "曜石": "rgb(84, 99,125)", 
+            #     "天际黑": "rgb(8,8,6)",   
+            #     "晴空黑": "rgb(45,53,60)",  
+            #     "苍穹黑": "rgb(47,51,68)", 
+            #     "湖光黑": "rgb(49,69,96)", 
+            #     "曜石黑": "rgb(57,63,78)", 
+            # }
             setting = {
                 "basic_color_settings": basic_color_settings,
-                "rgb_color_settings": rgb_color_settings
+                "rgb_color_settings": self.color_rgb_settings   # 默认使用配置中读取的配置
             }
             # 保存setting到配置文件config_dir / "color_setting.json"
             with open(settings_color_file, 'w', encoding='utf-8', errors='ignore') as f:
@@ -3366,35 +3368,35 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 "p3_color_space":self.p3_color_space,
                 "gray_color_space":self.gray_color_space,
             }
-            exif_visable_setting = {
-                '品牌' : True,
-                '型号' : True,
-                '曝光时间' : True,
-                '光圈值' : True,
-                'ISO值' : True,
-                '原始时间' : True,
-                '测光模式' : True,
-                '图片名称' : True,
-                '图片大小' : True,
-                '图片尺寸' : True,
-                '图片张数' : True,
-                'HDR' : True,
-                'Zoom' : True,
-                'Lux' : True,
-                'CCT' : True,
-                'FaceSA' : True,
-                'DRCgain' : True,
-                'Awb_sa' : True,
-                'Triangle_index' : True,
-                'R_gain' : True,
-                'B_gain' : True,
-                'Safe_gain' : True,
-                'Short_gain' : True,
-                'Long_gain' : True
-            }
+            # exif_visable_setting = {
+            #     '图片名称' : True,
+            #     '品牌' : True,
+            #     '型号' : True,
+            #     '图片大小' : True,
+            #     '图片尺寸' : True,
+            #     '图片张数' : True,
+            #     '曝光时间' : True,
+            #     '光圈值' : True,
+            #     'ISO值' : True,
+            #     '原始时间' : True,
+            #     '测光模式' : True,
+            #     'HDR' : True,
+            #     'Zoom' : True,
+            #     'Lux' : True,
+            #     'CCT' : True,
+            #     'FaceSA' : True,
+            #     'DRCgain' : True,
+            #     'Awb_sa' : True,
+            #     'Triangle_index' : True,
+            #     'R_gain' : True,
+            #     'B_gain' : True,
+            #     'Safe_gain' : True,
+            #     'Short_gain' : True,
+            #     'Long_gain' : True
+            # }
             setting = {
                 "label_visable_settings": label_visable_settings,
-                "exif_visable_setting": exif_visable_setting
+                "exif_visable_setting": self.dict_exif_info_visibility  # 默认使用配置中读取的配置
             }
             # 保存setting到配置文件config_dir / "exif_setting.json"
             with open(settings_exif_file, 'w', encoding='utf-8', errors='ignore') as f:

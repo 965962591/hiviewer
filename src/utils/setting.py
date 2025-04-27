@@ -7,6 +7,7 @@ import json
 import pathlib
 
 
+
 def load_exif_settings():
         """加载EXIF信息配置"""
         try:
@@ -25,7 +26,10 @@ def load_exif_settings():
                     "histogram_info": bool(1),
                     "exif_info": bool(1),
                     "roi_info": bool(1),
-                    "ai_tips": bool(0)
+                    "ai_tips": bool(0),
+                    "p3_color_space": bool(0),
+                    "gray_color_space": bool(0),
+                    "srgb_color_space": bool(1),
                 }
 
                 exif_visable_setting = {
