@@ -200,11 +200,12 @@ def calculate_image_stats(image_input, resize_factor=1):
         return None
 
 
-def convert_to_dci_p3(pixmap, source_img=None):
+def convert_to_dci_p3(cv_img, source_img, original_pixmap):
     """将QPixmap转换为DCI-P3色域
     Args:
-        pixmap: QPixmap对象
-        assume_srgb: 是否假设输入为sRGB色彩空间（默认True）
+        cv_img: Opencv图像
+        source_img: PIL图像
+        original_pixmap: pixmap原图
     Returns:
         转换后的QPixmap对象
     """
@@ -235,25 +236,37 @@ def convert_to_dci_p3(pixmap, source_img=None):
                     [0.0000, 0.0451, 1.0439]
                 ])
 
-        # DCI-P3转换矩阵
-        dci_p3_matrix = matrix
+        if True:  # 识别设备进行转换
+            # DCI-P3转换矩阵
+            dci_p3_matrix = matrix
 
-        # 将QPixmap转换为QImage
-        qimage = pixmap.toImage()
-        
-        # 转换为OpenCV格式
-        ptr = qimage.bits()
-        ptr.setsize(qimage.byteCount())
-        arr = np.array(ptr).reshape(qimage.height(), qimage.width(), 4)  # RGBA
-        
-        # 提取RGB通道并转换颜色顺序（OpenCV使用BGR）
-        # rgb_img = cv2.cvtColor(arr[:, :, :3], cv2.COLOR_RGBA2RGB)
-        rgb_img = arr
-        
+            # 确保cv_img是3通道的RGB图像
+            if cv_img.shape[2] == 4:  # 如果是4通道（RGBA）
+                rgb_img = cv2.cvtColor(cv_img, cv2.COLOR_RGBA2RGB)
+            elif cv_img.shape[2] == 1:  # 如果是单通道（灰度）
+                rgb_img = cv2.cvtColor(cv_img, cv2.COLOR_GRAY2RGB)
+            else:  # 假设已经是3通道（RGB）
+                rgb_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
+            
+            # 应用矩阵变换并限制数值范围
+            dci_p3_img = cv2.transform(rgb_img, dci_p3_matrix)
+            dci_p3_img = np.clip(dci_p3_img, 0, 255).astype(np.uint8)
 
-        # 应用矩阵变换并限制数值范围
-        dci_p3_img = cv2.transform(rgb_img, dci_p3_matrix)
-        dci_p3_img = np.clip(dci_p3_img, 0, 255).astype(np.uint8)
+        if False and cv_img is not None:  # 强制转换,效果不佳，待研究
+ 
+            # 定义 XYZ 到 P3 的转换矩阵
+            xyz_to_p3 = np.array([
+                [1.2249044, -0.2246222, 0.0158858],
+                [-0.0420464, 1.1472752, -0.1052288],
+                [-0.0134924, -0.0346351, 1.0481275]
+            ])
+
+            # 将 sRGB 转换为 XYZ
+            image_xyz = cv2.cvtColor(cv_img, cv2.COLOR_BGR2XYZ)
+
+            # 将 XYZ 转换为 P3
+            dci_p3_img = np.dot(image_xyz, xyz_to_p3.T)
+
         
         # 转换回QImage
         height, width, _ = dci_p3_img.shape
@@ -265,11 +278,14 @@ def convert_to_dci_p3(pixmap, source_img=None):
             bytes_per_line,
             QImage.Format_RGB888
         )
-        return QPixmap.fromImage(converted_qimage)
+
+        pixmap = QPixmap.fromImage(converted_qimage)
+
+        return pixmap
     
     except Exception as e:
-        print(f"DCI-P3转换失败: {str(e)}")
-        return pixmap
+        print(f"convert_to_dci_p3()-DCI-P3转换失败: {str(e)}")
+        return original_pixmap
     
 def get_color_profile(img):
     """增强版色彩空间检测，适配移动设备"""
@@ -331,7 +347,7 @@ def get_color_profile(img):
         return "sRGB (assumed)", False
 
     except Exception as e:
-        print(f"色彩检测异常: {str(e)}")
+        print(f"get_color_profile()-色彩检测异常: {str(e)}")
         return "Unknown", False
     
 def close_excel():
@@ -1590,27 +1606,34 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         # 获取主窗口的self,可以使用主窗口的变量
         self.parent_window = parent
 
-        # 初始化基本属性
+        # 初始化传入的图像路径列表和当前索引
         self.images_path_list = images_path_list
         self.index_list = index_list
+
+        # 初始化图像显示属性
         self.exif_texts = []
         self.histograms = []
         self.original_rotation = []
         self.graphics_views = []
         self.original_pixmaps = []
         self.gray_pixmaps = []
+        self.cv_imgs = []
+        self.pil_imgs = []
         self.base_scales = []
         self._scales_min = []
+
+        # 初始化一些显示相关的标志位
         self.is_updating = False           # 设置更新状态标志位
         self.stats_visible = False         # 设置亮度统计信息的标志位
         self.ai_tips_flag = False          # 初始化ai提示标注位为False
         self.roi_selection_active = False  # 初始化roi亮度等信息统计框
         self.is_fullscreen = False         # 初始化全屏标志位
+
         # 设置表格的宽高初始大小
         self.table_width_heigth_default = [2534,1376]
-        # 导入自定义字体，设置字体大小为12
+        
+        # 初始化字体管理
         self.custom_font = SingleFontManager.get_font(12)
-        # 初始化字体管理器，标签组件使用
         font_path_jetbrains = os.path.join(BasePath, "fonts", "JetBrainsMapleMono_Regular.ttf")
         self.font_manager_jetbrains = SingleFontManager.get_font(size=11, font_path=font_path_jetbrains)   
 
@@ -1900,6 +1923,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             self.graphics_views = [None] * num_images
             self.original_pixmaps = [None] * num_images  
             self.gray_pixmaps = [None] * num_images  
+            self.cv_imgs = [None] * num_images 
+            self.pil_imgs = [None] * num_images 
             self.base_scales = [None] * num_images
             self._scales_min = [None] * num_images
 
@@ -2041,7 +2066,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
                     # 这是原始的彩色图pixmap
                     pixmap = data['pixmap']
-
                     # 跟根据下拉框2判断是否获取灰度图gray_pixmap
                     if self.comboBox_2.currentIndex() == 1:
                         pixmap = data['gray_pixmap']
@@ -2076,7 +2100,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     # 设置视图的缩放
                     view.scale(base_scale, base_scale)
                     
-                    
                     # 设置EXIF和直方图
                     view.set_histogram_visibility(self.checkBox_1.isChecked())
                     view.set_exif_visibility(self.checkBox_2.isChecked(), self.font_color_exif)
@@ -2094,6 +2117,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     self.original_rotation[index] = pixmap_item.rotation()
                     self.exif_texts[index] = data['exif_info']
                     self.histograms[index] = data['histogram']
+                    self.cv_imgs[index] = data['cv_img']
+                    self.pil_imgs[index] = data['pil_image']
                     # 保存基准缩放比例
                     self.base_scales[index] = base_scale
                     # 设置缩放的最大最小基准
@@ -2267,7 +2292,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         """
         try:
             if not index:     # index == 0 颜色设置，不做任何操作
-                pass 
+                print("show_menu_combox1()-看图子界面--点击了颜色配置选项")
+                # pass 
             elif index == 1:  # index == 1 一键重置
                 self.background_color_default = "rgb(173,216,230)" # 背景默认色_好蓝
                 self.background_color_table = "rgb(127,127,127)"   # 表格填充背景色_18度灰
@@ -2300,7 +2326,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             print(f"self.comboBox_1()--处理下拉框选项时发生未知错误: {e}")
         
-
 
     def on_comboBox_1_changed(self, color, index):
         """颜色设置二级菜单触发事件"""
@@ -2385,31 +2410,20 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                         self.srgb_color_space = True
                         self.update_comboBox2()
                         converted_pixmap = original_pixmap
-                    elif index == 1 and self.gray_pixmaps[i]:  # 灰度图色域
+                    elif index == 1 and self.gray_pixmaps[i] is not None:  # 灰度图色域
                         # 设置当前启用的图像色彩显示空间
                         self.clean_color_space()
                         self.gray_color_space = True
                         self.update_comboBox2()
                         # 调用列表self.gray_pixmaps[i]中存储的灰度图pixmap
                         converted_pixmap = self.gray_pixmaps[i]
-                    elif index == 2:  # p3色域
+                    elif index == 2 and self.pil_imgs[i] is not None and self.cv_imgs[i] is not None:  # p3色域
                         # 设置当前启用的图像色彩显示空间
                         self.clean_color_space()
                         self.p3_color_space = True
                         self.update_comboBox2()
-                        # 修正的PIL图像转换方式
-                        qimage = original_pixmap.toImage()
-                        buffer = qimage.bits().asstring(qimage.byteCount())
-                        pil_image = Image.frombuffer(
-                            "RGBA",
-                            (qimage.width(), qimage.height()),
-                            buffer,
-                            "raw",
-                            "RGBA",
-                            0,
-                            1
-                        ).convert("RGB")
-                        converted_pixmap = convert_to_dci_p3(original_pixmap, pil_image)
+                        # 调用PIL图像转P3色域图像的方法
+                        converted_pixmap = convert_to_dci_p3(self.cv_imgs[i], self.pil_imgs[i],self.original_pixmaps[i])
 
                     # 更新视图显示
                     view.pixmap_items[0].setPixmap(converted_pixmap)
@@ -2421,7 +2435,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     view.scene().setBackgroundBrush(QtGui.QBrush(qcolor))
                     
                 except Exception as e:
-                    print(f"色彩空间转换失败: {str(e)}")
+                    print(f"on_comboBox_2_changed()-色彩空间转换失败: {str(e)}")
 
         self.update()
         QApplication.processEvents()
