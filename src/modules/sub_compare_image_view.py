@@ -1593,54 +1593,41 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         # 初始化基本属性
         self.images_path_list = images_path_list
         self.index_list = index_list
-        self.graphics_views = []
         self.exif_texts = []
         self.histograms = []
-        self.original_pixmaps = []
         self.original_rotation = []
+        self.graphics_views = []
+        self.original_pixmaps = []
+        self.gray_pixmaps = []
         self.base_scales = []
         self._scales_min = []
-
-        # 设置更新状态标志位
-        self.is_updating = False
-        # 设置亮度统计信息的标志位
-        self.stats_visible = False  
-        # 初始化ai提示标注位为False
-        self.ai_tips_flag = False
-        # 初始化roi亮度等信息统计框
-        self.roi_selection_active = False
-
-        # 初始化全屏标志位
-        self.is_fullscreen = False
-
+        self.is_updating = False           # 设置更新状态标志位
+        self.stats_visible = False         # 设置亮度统计信息的标志位
+        self.ai_tips_flag = False          # 初始化ai提示标注位为False
+        self.roi_selection_active = False  # 初始化roi亮度等信息统计框
+        self.is_fullscreen = False         # 初始化全屏标志位
         # 设置表格的宽高初始大小
         self.table_width_heigth_default = [2534,1376]
-        
         # 导入自定义字体，设置字体大小为12
         self.custom_font = SingleFontManager.get_font(12)
         # 初始化字体管理器，标签组件使用
         font_path_jetbrains = os.path.join(BasePath, "fonts", "JetBrainsMapleMono_Regular.ttf")
         self.font_manager_jetbrains = SingleFontManager.get_font(size=11, font_path=font_path_jetbrains)   
-        
 
 
-        """初始化一些读取json配置的变量"""
-        # 初始化图像显示色彩空间标志位，默认设置srgb显示空间
+        """self.load_settings()中读取关闭界面前的配置并初始化相关变量
+        # 设置rgb颜色值
+        self.color_rgb_settings = {}         
+        # 初始化exif信息可见性字典,支持用户在json配置文件中调整顺序以及是否显示该项
+        self.dict_exif_info_visibility = {} 
+        # 初始化图像显示色彩空间变量,默认设置srgb显示空间,在load_settings()中初始化
+        self.dict_label_info_visibility = {}
         self.srgb_color_space = True  
         self.p3_color_space = False   
         self.gray_color_space = False
-        # 设置rgb颜色值
-        self.color_rgb_settings = {}         
-        # 初始化exif信息可见性字典，支持用户在json配置文件中调整顺序以及是否显示该项
-        self.dict_exif_info_visibility = {} 
-        self.dict_label_info_visibility = {} 
-
-
+        """
         # 加载之前的配置
         self.load_settings()
-
-        # 设置快捷键和槽函数
-        self.set_shortcut()
 
         # 设置窗口标题组件和样式表
         self.set_stylesheet()
@@ -1648,6 +1635,9 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         # 直接初始化图片，不使用延迟加载
         self.set_images(self.images_path_list, self.index_list)
         
+        # 设置快捷键和槽函数
+        self.set_shortcut()
+
         # 显示窗口
         self.showMaximized()
         # self.showMinimized()
@@ -1707,7 +1697,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         
         # 连接下拉列表信号到槽函数
         self.comboBox_1.activated.connect(self.show_menu_combox1) # 连接 QComboBox 的点击事件到显示菜单，self.on_comboBox_1_changed
-        self.comboBox_2.currentIndexChanged.connect(self.on_comboBox_2_changed)
+        # self.comboBox_2.currentIndexChanged.connect(self.on_comboBox_2_changed)  # 当用户选择不同选项的时候触发
+        self.comboBox_2.activated.connect(self.on_comboBox_2_changed)            # 当用户选择任何选项的时候都会触发 
 
         # 连接AI响应信号到槽函数
         self.ai_response_signal.connect(self.update_ai_response)
@@ -1748,11 +1739,33 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.comboBox_1.setEditable(False)  # 设置 QComboBox 不可编辑
         self.comboBox_1.setCurrentIndex(0)  # 设置默认显示索引为0
         self.comboBox_1.setFont(self.custom_font)
-        # 设置下拉框选项,会自动进入槽函数on_comboBox_2_changed
-        self.comboBox_2.clear()  # 清除已有项
-        self.comboBox_2.addItems(["✅sRGB色域", "✅灰度图空间色域", "✅p3色域"])
-        self.comboBox_2.setFont(self.custom_font)
 
+        """设置下拉框self.comboBox_2"""
+        if False: # 旧版本方案
+            # 设置下拉框选项,会自动进入槽函数on_comboBox_2_changed
+            color_space_list = [self.srgb_color_space, self.gray_color_space, self.p3_color_space]  # 列表中存放三个颜色空间显示标志位
+            _front = {
+                True:"✅",
+                False:"" }
+            _text = [f"{_front.get(color_space_list[0])}sRGB色域", 
+                f"{_front.get(color_space_list[1])}灰度图空间色域", 
+                f"{_front.get(color_space_list[2])}p3色域"]
+            self.comboBox_2.clear()  # 清除已有项
+            self.comboBox_2.addItems([_text[0], _text[1], _text[2]])
+            # 设置默认显示索引为三个颜色空间中为TRUE的那个
+            self.comboBox_2.setCurrentIndex(color_space_list.index(True))  
+            self.comboBox_2.setFont(self.custom_font)
+        
+        # 设置下拉框选项（优化版）
+        color_space_list = [self.srgb_color_space, self.gray_color_space, self.p3_color_space]  # 列表中存放三个颜色空间显示标志位
+        # 使用列表推导生成选项文本
+        options = [f"{'✅' if state else ''}{name}" for state, name in zip(color_space_list, ["sRGB色域", "灰度图空间色域", "p3色域"])]
+        # 清除并添加选项
+        self.comboBox_2.clear(); self.comboBox_2.addItems(options)
+        # 设置默认显示索引为当前激活的颜色空间
+        self.ComBox2Curindex = next(i for i, state in enumerate(color_space_list) if state)
+        self.comboBox_2.setCurrentIndex(self.ComBox2Curindex)
+        self.comboBox_2.setFont(self.custom_font)
 
         # 设置复选框
         for checkbox in [self.checkBox_1, self.checkBox_2, self.checkBox_3, self.checkBox_4]:
@@ -1762,7 +1775,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.checkBox_3.setText("ROI信息")
         self.checkBox_4.setText("AI提示看图")   
 
-        # 根据self.color_settings设置复选框状态--> 配置在函数save_color_settings()
+        # 根据self.dict_label_info_visibility设置复选框状态--> 配置在函数load_settings()
         self.checkBox_1.setChecked(self.dict_label_info_visibility.get("histogram_info", False))
         self.checkBox_2.setChecked(self.dict_label_info_visibility.get("exif_info", False))
         self.checkBox_3.setChecked(self.dict_label_info_visibility.get("roi_info", False))
@@ -1881,11 +1894,12 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             self.progress_updated.emit(1)
             self.cleanup()
             num_images = len(image_paths)
-            self.graphics_views = [None] * num_images
             self.exif_texts = [None] * num_images
             self.histograms = [None] * num_images
-            self.original_pixmaps = [None] * num_images
             self.original_rotation = [None] * num_images
+            self.graphics_views = [None] * num_images
+            self.original_pixmaps = [None] * num_images  
+            self.gray_pixmaps = [None] * num_images  
             self.base_scales = [None] * num_images
             self._scales_min = [None] * num_images
 
@@ -1907,8 +1921,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                         return index, None
                         
                     # 获取isinstance(image_input, Image.Image)格式图像
-                    image = Image.open(path)
-                    iamge_format = image.format
+                    pil_image = Image.open(path)
+                    iamge_format = pil_image.format
 
                     # 获取cv图像，方案一：转换PIL图像到OpenCV格式
                     if False:
@@ -1918,10 +1932,18 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     if True:   # 效率更高的方案
                         with open(path, "rb") as f:
                             image_data = np.asarray(bytearray(f.read()), dtype=np.uint8)
+                        # 读取彩色图像
                         cv_img = cv2.imdecode(image_data, cv2.IMREAD_COLOR)
+                        # 转换为灰度图
+                        gray_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
+                        # 将灰度图转换为QImage
+                        height, width = gray_img.shape
+                        gray_qimage = QImage(gray_img.data, width, height, width, QImage.Format_Grayscale8)
+                        # 将QImage转换为QPixmap
+                        gray_pixmap = QPixmap.fromImage(gray_qimage)
 
                     # 1. 处理图片旋转、基础exif信息获取（PIL）、图片文件格式信息获取
-                    pixmap, basic_info = ImageTransform.auto_rotate_image(path, index_list[index], image)
+                    pixmap, basic_info = ImageTransform.auto_rotate_image(path, index_list[index], pil_image)
 
                     # 2. piexf解析曝光时间光圈值ISO等复杂的EXIF信息
                     exif_info_temp = self.get_exif_info(path, iamge_format)
@@ -1941,7 +1963,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     exif_info = self.process_exif_info(self.dict_exif_info_visibility, exif_info)
 
                     # 3. 解析直方图信息
-                    histogram = self.calculate_brightness_histogram(image) 
+                    histogram = self.calculate_brightness_histogram(pil_image) 
 
                     # 4. 计算亮度等统计信息
                     stats = calculate_image_stats(path, resize_factor=0.1)
@@ -1953,14 +1975,14 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     elapsed_time = end_time - start_time
                     print(f"处理图片{index}_{os.path.basename(path)} 耗时: {elapsed_time:.2f} 秒")
                 
-
                     return index, {
-                        'pixmap': pixmap,
-                        'exif_info': exif_info,
-                        'histogram': histogram,
-                        'size': (pixmap.width(), pixmap.height()),  # 添加尺寸信息
-                        'stats': stats_text, # 添加亮度/RGB/LAB等信息
-                        'cv_img':cv_img
+                        'pixmap': pixmap,            # 原始pixmap格式图
+                        'gray_pixmap':gray_pixmap,   # pixmap格式灰度图
+                        'exif_info': exif_info,      # exif信息
+                        'histogram': histogram,      # 直方图信息
+                        'stats': stats_text,         # 添加亮度/RGB/LAB等信息
+                        'pil_image':pil_image,       # PIL图像
+                        'cv_img':cv_img              # OpenCV图像
                     }
                 except Exception as e:
                     print(f"处理图片失败 {path}: {e}")
@@ -1976,12 +1998,11 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             # 4. 计算目标尺寸
             self.progress_updated.emit(3)
             # 使用生成器表达式提高效率
-            valid_sizes = (result[1]['size'] for result in futures if result and result[1])
+            valid_sizes = ((result[1]['pixmap'].width(), result[1]['pixmap'].height()) for result in futures if result and result[1])
             # 计算多张图片中的最大宽（max_width）和高（max_height）
             widths, heights = zip(*valid_sizes)
             max_width, max_height = max(widths), max(heights)
-            # 计算多张图片的最小高度和宽度
-            # min_width, min_height = min(widths), min(heights) 
+
 
             # 计算加权平均宽高比（根据图片面积加权）
             total_area = sum(w * h for w, h in zip(widths, heights))      
@@ -2017,7 +2038,13 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             for index, result in enumerate(futures):
                 if result and result[1]:
                     data = result[1]
+
+                    # 这是原始的彩色图pixmap
                     pixmap = data['pixmap']
+
+                    # 跟根据下拉框2判断是否获取灰度图gray_pixmap
+                    if self.comboBox_2.currentIndex() == 1:
+                        pixmap = data['gray_pixmap']
                     
                     # 创建和设置场景
                     qcolor = rgb_str_to_qcolor(self.background_color_table) # 将背景色转换为QColor
@@ -2035,7 +2062,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     view.pixmap_items = [pixmap_item]
                     
                     # 计算缩放比例
-                    current_width, current_height = data['size']
+                    current_width, current_height = (pixmap.width(), pixmap.height())
                     scale_x = target_width / current_width
                     scale_y = target_height / current_height
 
@@ -2062,7 +2089,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
                     # 保存数据
                     self.graphics_views[index] = view
-                    self.original_pixmaps[index] = pixmap
+                    self.original_pixmaps[index] = data['pixmap']
+                    self.gray_pixmaps[index] = data['gray_pixmap']
                     self.original_rotation[index] = pixmap_item.rotation()
                     self.exif_texts[index] = data['exif_info']
                     self.histograms[index] = data['histogram']
@@ -2079,12 +2107,13 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 self.progress_updated.emit(index  + 7)
 
 
-            return True
+            # 根据下拉框2的状态self.ComBox2Curindex，更新下拉框2的颜色空间显示
+            # self.on_comboBox_2_changed(self.comboBox_2.currentIndex())
 
+            return True
         except Exception as e:
             print(f"更新图片时发生错误: {e}")
             return False
-            
         finally:
             # 完成后恢复确定模式
             self.progress_bar.setVisible(False)  # 隐藏进度条
@@ -2314,45 +2343,60 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             # print(f"Selected color: {color}, Index: {index}")
         
 
+    def update_comboBox2(self):
+        """更新下拉框self.comboBox_2的显示"""
+        # 定义颜色空间状态列表
+        color_spaces = [
+            (self.srgb_color_space, "sRGB色域"),
+            (self.gray_color_space, "灰度图空间色域"), 
+            (self.p3_color_space, "p3色域")
+        ]
+        
+        # 使用列表推导生成选项文本
+        options = [f"{'✅' if state else ''}{label}" for state, label in color_spaces]
+        
+        # 批量更新下拉框选项
+        for i, text in enumerate(options):
+            self.comboBox_2.setItemText(i, text)
+    
+
+    def clean_color_space(self,):
+        """清除颜色空间的显示标志位"""
+        self.srgb_color_space = False
+        self.gray_color_space = False
+        self.p3_color_space = False
+
+
     def on_comboBox_2_changed(self, index):
         """图像色彩显示空间下拉框self.comboBox_2内容改变时触发事件
-        ["✅sRGB色域", "✅灰度图色域", "❌p3色域"]
+        ["✅sRGB色域", "✅灰度图色域", "✅p3色域"]
         """
         # 更新所有图形视图的场景视图
         for i, view in enumerate(self.graphics_views):
-            if view and view.scene() and self.original_pixmaps[i]:
+            if view and view.scene() :
                 try:
                     original_pixmap = self.original_pixmaps[i]
                     current_rotation = view.pixmap_items[0].rotation() if view.pixmap_items else 0
                     
                     # 根据选择的色彩空间转换图像
-                    if index == 0:  # sRGB色域
+                    if index == 0 :  # sRGB色域
                         # 设置当前启用的图像色彩显示空间
-                        self.srgb_color_space = False
-                        self.gray_color_space = True
-                        self.p3_color_space = False
+                        self.clean_color_space()
+                        self.srgb_color_space = True
+                        self.update_comboBox2()
                         converted_pixmap = original_pixmap
-                    elif index == 1:  # 灰度图色域
+                    elif index == 1 and self.gray_pixmaps[i]:  # 灰度图色域
                         # 设置当前启用的图像色彩显示空间
-                        self.srgb_color_space = False
+                        self.clean_color_space()
                         self.gray_color_space = True
-                        self.p3_color_space = False
-                        # 保持原有灰度转换逻辑
-                        qimage = original_pixmap.toImage()
-                        width = qimage.width()
-                        height = qimage.height()
-                        ptr = qimage.bits()
-                        ptr.setsize(qimage.byteCount())
-                        arr = np.array(ptr).reshape(height, width, 4)  # RGBA格式
-                        gray_img = cv2.cvtColor(arr[:, :, :3], cv2.COLOR_RGB2GRAY)
-                        gray_qimage = QImage(gray_img.data, width, height, 
-                                           gray_img.strides[0], QImage.Format_Grayscale8)
-                        converted_pixmap = QPixmap.fromImage(gray_qimage)
+                        self.update_comboBox2()
+                        # 调用列表self.gray_pixmaps[i]中存储的灰度图pixmap
+                        converted_pixmap = self.gray_pixmaps[i]
                     elif index == 2:  # p3色域
                         # 设置当前启用的图像色彩显示空间
-                        self.srgb_color_space = False
-                        self.gray_color_space = False
+                        self.clean_color_space()
                         self.p3_color_space = True
+                        self.update_comboBox2()
                         # 修正的PIL图像转换方式
                         qimage = original_pixmap.toImage()
                         buffer = qimage.bits().asstring(qimage.byteCount())
@@ -2491,16 +2535,11 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             return None
     """ 
     
-    def update_tablewidget(self):
-        """更新表格显示"""
-        self.set_images(self.images_path_list, self.index_list)
-
-
     def calculate_brightness_histogram(self, img):
-        """使用OpenCV读取图像并转换为灰度图, 优化计算效率"""
+        """传入PIL图像img,将其转换为灰度图, 输出直方图"""
         try:
-
-            if isinstance(img, Image.Image):  # 处理PIL图像对象
+            # 处理PIL图像对象
+            if isinstance(img, Image.Image):  
                 # 转换PIL图像到OpenCV格式
                 pass
             else:
@@ -3224,6 +3263,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
     def load_settings(self):
         """加载颜色、exif等设置"""
+        # json文件的具体格式，可到函数load_color_settings()和load_exif_settings()中查看
         try:
             pass
             # 加载保存的颜色设置 basic_color_settings、basic_color_settings
@@ -3232,8 +3272,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             rgb_settings = ColorSettings.get("rgb_color_settings",{})
             # 加载保存的EXIF信息设置
             ExifSettings = load_exif_settings()
-            label_visable = ExifSettings.get("label_visable_settings",{})
-            exif_visable = ExifSettings.get("exif_visable_setting",{})
+            label_visable = ExifSettings.get("label_visable_settings",{})   # label具体项显示的标志位
+            exif_visable = ExifSettings.get("exif_visable_setting",{})      # exif具体项显示的标志位
 
 
             # 从颜色配置中读取基础颜色
@@ -3250,11 +3290,14 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
             # 初始化label显示变量
             self.dict_label_info_visibility = label_visable
+            # 读取图像颜色空间显示设置
+            self.p3_color_space = self.dict_label_info_visibility.get("p3_color_space", False)     
+            self.gray_color_space = self.dict_label_info_visibility.get("gray_color_space", False) 
+            self.srgb_color_space = self.dict_label_info_visibility.get("srgb_color_space", True) 
 
         except Exception as e:
             print(f"self.load_settings()--加载设置失败: {e}")
         
-
 
     def save_settings(self):
         """保存颜色设置"""
