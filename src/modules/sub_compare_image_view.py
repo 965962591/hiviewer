@@ -2104,7 +2104,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     if data['histogram']:
                         view.set_histogram_data(data['histogram'])  
                     view.set_exif_visibility(self.checkBox_2.isChecked(), self.font_color_exif)
-                    view.set_stats_visibility(self.checkBox_1.isChecked()) 
+                    # view.set_stats_visibility(self.checkBox_3.isChecked())
+                    view.set_stats_visibility(self.stats_visible) 
 
                     # 设置原始OpenCV图像
                     view.set_original_image(data['cv_img'])
@@ -3064,7 +3065,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             QTimer.singleShot(1000, lambda: setattr(self, 'is_updating', False))
 
 
-    def on_p_pressed(self):  ## 会导致窗口闪退，暂时注释，待优化。。。
+    def on_p_pressed(self):  ## 会导致窗口闪退，当前策略是使用标志位self.is_updating锁定界面不退出
         """处理P键事件"""
         self.is_updating = True
         
@@ -3119,11 +3120,13 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             except Exception as e:
                 print(f"显示图片统计信息时发生错误: {e}")
             finally:
-                # 延时1秒后更新is_updating为False
-                QTimer.singleShot(1000, lambda: setattr(self, 'is_updating', False))
+                # 延时0.01秒后更新is_updating为False
+                QTimer.singleShot(10, lambda: setattr(self, 'is_updating', False))
         else:
             # 没有标志位的情况下按 P键不显示
             show_message_box("请勾选 ROI信息复选框 或者 AI提示看图复选框后, \n按P键发出相应请求!", "提示",1500)
+            # 延时0.01秒后更新is_updating为False
+            QTimer.singleShot(10, lambda: setattr(self, 'is_updating', False))
             pass
 
     def on_space_pressed(self):
@@ -3308,7 +3311,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             self.gray_color_space = self.dict_label_info_visibility.get("gray_color_space", False) 
             self.srgb_color_space = self.dict_label_info_visibility.get("srgb_color_space", True) 
             # 设置亮度统计信息的标志位；初始化ai提示标注位为False 
-            self.stats_visible = self.dict_label_info_visibility.get("roi_info", True)         
+            self.stats_visible = self.dict_label_info_visibility.get("roi_info", False)         
             self.ai_tips_flag = self.dict_label_info_visibility.get("ai_tips", False)          
 
         except Exception as e:
