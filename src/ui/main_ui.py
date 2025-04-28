@@ -581,14 +581,10 @@ class Ui_MainWindow(object):
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
-        self.Left_QGroupBox.setTitle(_translate("MainWindow", "磁盘显示"))
-        self.L_radioButton1.setText(_translate("MainWindow", "  显示图片"))
-        self.L_radioButton2.setText(_translate("MainWindow", "  显示视频"))
-        
+        self.Left_QGroupBox.setTitle(_translate("MainWindow", "磁盘显示"))        
         self.Right_Top_QGroupBox.setTitle(_translate("MainWindow", "控制界面"))
         self.RT_QPushButton3.setText(_translate("MainWindow", "清除"))
         self.RT_QPushButton5.setText(_translate("MainWindow", "对比"))
-
         # self.Right_Bottom_QGroupBox.setTitle(_translate("MainWindow", "显示界面")) # 移除组显示文字
 
 

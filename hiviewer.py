@@ -79,8 +79,6 @@ from src.utils.setting import load_color_settings
 # 预编译正则表达式，提高效率（针对实现类似widow的文件排名）
 _natural_sort_re = re.compile('([0-9]+)')
 
-
-
 def natural_sort_key(s):
     """将字符串转换为自然排序的键值（优化版）"""
     return [int(text) if text.isdigit() else text.lower() for text in _natural_sort_re.split(s)]
@@ -107,6 +105,7 @@ def show_message_box(text, title="提示", timeout=None):
 
 def version_init(VERSION=str):
     # 设置保存版本号的文件
+    print("version_init()--版本号初始化")
     default_version_path = os.path.join(os.path.dirname(__file__), "config", "version.ini")
     try:
         # 检查文件是否存在，如果不存在则创建并写入默认版本号
@@ -1108,12 +1107,10 @@ class SingleFileRenameDialog(QDialog):
 class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self, parent=None):
         super(HiviewerMainwindow, self).__init__(parent)
-
+        """self.update_splash_message()函数中初始化UI界面和变量"""
         # 1 设置版本信息,读取本地配置文件./config/version.ini中的版本信息,没有则默认为release-v2.3.2
+        self.new_version_info = False # self.pre_update()
         self.version_info = version_init(VERSION='release-v2.3.2')
-        self.new_version_info = False 
-        # 获取github中发布的最新版本信息, pre_check_update()，
-        # 转移到函数self.create_splash_screen() --> self.update_splash_message --> self.pre_update()-->pre_check_update() 中获取,先在此处初始化
         
         # 2 创建启动画面
         try:
@@ -1123,19 +1120,19 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             print(f"create_splash_screen()--创建启动画面失败: {e}")
 
         # 3 设置主界面UI
-        try:
-            print("setupUi()--初始化主界面UI")
-            self.drag_flag = True  # 默认设置是图片拖拽模式, self.setupUi(self) 中需要调用
-            self.setupUi(self)
-        except Exception as e:
-            print(f"setupUi()--初始化主界面UI失败: {e}")
+        # try:
+        #     print("setupUi()--初始化主界面UI")
+        #     # self.drag_flag = True  # 默认设置是图片拖拽模式, self.setupUi(self) 中需要调用
+        #     # self.setupUi(self)
+        # except Exception as e:
+        #     print(f"setupUi()--初始化主界面UI失败: {e}")
         
         # 4 初始化其它所有组件
-        try:
-            print("initialize_components()--初始化其它组件")
-            self.initialize_components()
-        except Exception as e:
-            print(f"initialize_components()--初始化其它组件失败: {e}")
+        # try:
+        #     print("initialize_components()--初始化其它组件")
+        #     self.initialize_components()
+        # except Exception as e:
+        #     print(f"initialize_components()--初始化其它组件失败: {e}")
 
 
     def initialize_components(self):
@@ -1161,10 +1158,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 模仿按下回车
         self.input_enter_action()  
 
-        # 完成初始化后设置标志
-        self.initialization_complete = True
-        
-        # 显示主窗口,暂时移除，在self.create_splash_screen()-->QTimer.singleShot(1000, self.show)函数中显示
+        # 显示主窗口,暂时移除，在self.update_splash_message()函数中显示
         # self.show()
 
 
@@ -1205,8 +1199,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.compress_worker = None
 
         """加载颜色相关设置""" # 设置背景色和字体颜色，使用保存的设置或默认值
-        self.color_settings = COLORSETTING
-        basic_color_settings = self.color_settings.get('basic_color_settings',{})
+        basic_color_settings = COLORSETTING.get('basic_color_settings',{})
         self.background_color_default = basic_color_settings.get("background_color_default", "rgb(173,216,230)")  # 深色背景色_好蓝
         self.background_color_table = basic_color_settings.get("background_color_table", "rgb(127, 127, 127)")    # 表格背景色_18度灰
         self.font_color_default = basic_color_settings.get("font_color_default", "rgb(0, 0, 0)")                  # 默认字体颜色_纯黑色
@@ -1276,32 +1269,45 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         
         # 显示启动画面
         self.splash.show()
+        print("--开始显示启动动画")
+
+        # 记录结束时间并计算耗时
+        print(f"耗时: {(time.time()-start_time):.2f} 秒")
         
         # 启动进度更新定时器
-        self.progress_timer = QTimer()
-        self.progress_timer.timeout.connect(self.update_splash_message)
+        self.fla = 0
+        self.splash_progress_timer = QTimer()
+        self.splash_progress_timer.timeout.connect(self.update_splash_message)
         self.dots_count = 0
-        self.progress_timer.start(500)  # 每500ms更新一次
+        self.splash_progress_timer.start(10)  # 每10ms更新一次
 
     def update_splash_message(self):
-        """更新启动画面的加载消息"""
+        """更新启动画面的加载消息,并在这部分初始化UI界面以及相关变量"""
         # 更新进度点
         self.dots_count = (self.dots_count + 1) % 4
         dots = "." * self.dots_count
         
         # 使用HTML标签设置文字颜色为红色，并调整显示内容，文字颜色为配置文件（color_setting.json）中的背景颜色
-        message = f'<div style="color: {self.background_color_default};">HiViewer_{self.version_info}</div>' \
-                  f'<div style="color: {self.background_color_default};">正在启动...{dots}</div>'
-        
+        message = f'<div style="color: {"rgb(173,216,230)"};">HiViewer</div>' \
+                  f'<div style="color: {"rgb(173,216,230)"};">正在启动...{dots}</div>'
+
         # 显示启动消息
         self.splash.showMessage(
             message, 
             Qt.AlignCenter | Qt.AlignBottom,
             Qt.white
         )
-        
-        # 检查是否完成初始化
-        if hasattr(self, 'initialization_complete'):
+        self.fla = self.fla + 1
+        print(f"-------第{self.fla}次进入函数update_splash_message()-------")
+        print(f"耗时: {(time.time()-start_time):.2f} 秒")
+
+        # 检查是否完成初始化, 第三次进入
+        if not hasattr(self, 'initialize_three') and hasattr(self, 'initialize_two'):
+            
+            # 初始化完成标志位
+            self.initialize_three = True
+            
+    
             # 创建渐出动画
             self.fade_out = QtCore.QPropertyAnimation(self.splash, b"windowOpacity")
             self.fade_out.setDuration(1000)  # 1000ms的渐出动画
@@ -1309,9 +1315,9 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.fade_out.setEndValue(0)
             self.fade_out.finished.connect(self.splash.close)
             self.fade_out.start()
-            
+
             # 停止定时器
-            self.progress_timer.stop()
+            self.splash_progress_timer.stop()
 
             # 获取当前屏幕并计算居中位置，移动到该位置
             screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
@@ -1320,17 +1326,45 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             y = screen_geometry.y() + (screen_geometry.height() - self.height()) // 2
             self.move(x, y)
 
-            # 预检查更新
-            self.pre_update()
 
             # 显示主窗口
-            self.show()
+            # self.show()
 
-            # 延时显示主窗口,方便启动画面渐出  pre_update
-            # QTimer.singleShot(1000, self.show)
+            # 记录结束时间并计算耗时
+            self.preview_label.setText(f"⏰启动耗时: {(time.time()-start_time):.2f} 秒")
+            print(f"hiviewer启动耗时: {(time.time()-start_time):.2f} 秒, 已关闭启动动画，显示主界面")
+
+            # 延时显示主窗口,方便启动画面渐出
+            QTimer.singleShot(1000, self.show)
 
             # 延时检查更新
             # QTimer.singleShot(3000, self.pre_update)
+
+
+        # 初始化其余相关变量, 第二次进入
+        if not hasattr(self, 'initialize_two') and hasattr(self, 'drag_flag'):
+            try:
+                print("initialize_components()--初始化其它组件")
+                self.initialize_two = True
+                self.initialize_components()
+                self.pre_update()
+            except Exception as e:
+                print(f"initialize_components()--初始化其它组件失败: {e}")
+
+        # 初始化界面UI, 第一次进入
+        if not hasattr(self, 'drag_flag'):
+            try:
+                print("setupUi()--初始化主界面UI")
+                self.drag_flag = True  # 默认设置是图片拖拽模式, self.setupUi(self) 中需要调用
+                self.setupUi(self)
+            except Exception as e:
+                print(f"setupUi()--初始化主界面UI失败: {e}")
+
+
+
+
+
+
 
     """
     设置动画显示区域结束线
@@ -3012,7 +3046,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def handleComboBoxPressed(self, index):
         """处理复选框选项被按下时的事件。"""
-        print("handleComboBoxPressed()--更新复选框状态")
+        print("handleComboBoxPressed()-ComboBox1--<1>更新复选框状态")
         try:
             if not index.isValid():
                 print("handleComboBoxPressed()--下拉复选框点击无效")
@@ -3023,14 +3057,12 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def handleComboBox0Pressed(self):
         """处理（显示图片视频所有文件）下拉框选项被按下时的事件。"""
-        print("handleComboBox0Pressed()--更新（显示图片视频所有文件）下拉框状态")
-        # self.locate_in_tree_view() # 定位到左侧文件浏览器中
-        # self.RT_QComboBox1_init() # 将同级文件夹添加到 RT_QComboBox1 中
+        print("handleComboBox0Pressed()-ComboBox0--更新（显示图片视频所有文件）下拉框状态")
         self.update_RB_QTableWidget0() # 更新右侧RB_QTableWidget0表格
 
     def updateComboBox1Text(self):
         """更新 RT_QComboBox1 的显示文本。"""    
-        print("updateComboBox1Text()--更新显示文本")
+        print("updateComboBox1Text()-ComboBox1--<2>更新显示文本")
         try:
             selected_folders = self.model.getCheckedItems()  # 获取选中的文件夹
             current_text = '; '.join(selected_folders) if selected_folders else "(请选择)"
@@ -4856,11 +4888,14 @@ def setup_logging():
 if __name__ == '__main__':
     print("main()--主界面程序启动")
 
-    # 初始化日志文件
-    # setup_logging()  
+    # 记录程序启动的开始时间
+    start_time = time.time()
 
     # 读取全局颜色配置
     COLORSETTING = load_color_settings()
+
+    # 初始化日志文件
+    # setup_logging()  
 
     # 设置主程序app
     app = QtWidgets.QApplication(sys.argv)

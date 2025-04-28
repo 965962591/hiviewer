@@ -75,6 +75,7 @@ def load_exif_settings():
 
 def load_color_settings():
     """加载颜色设置"""
+    print("load_color_settings()--加载颜色设置")
     try:
         # 确保cache目录存在
         config_dir = pathlib.Path("./config")

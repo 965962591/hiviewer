@@ -73,7 +73,7 @@ class MultiFontManager:
                     font_id = font_db.addApplicationFont(font_path)
                     if font_id != -1:
                         font_family = font_db.applicationFontFamilies(font_id)[0]
-                        print(f"字体管理类FontManager中: {font_family} 字体加载成功")
+                        # print(f"字体管理类FontManager中: {font_family} 字体加载成功")
                         cls._fonts[font_family] = {}
                         cls._default_font_paths.append(font_path)
                         cls._initialized[font_path] = True
@@ -82,6 +82,7 @@ class MultiFontManager:
                 except Exception as e:
                     print(f"字体初始化错误: {e}")
                     cls._initialized[font_path] = True
+        print("MultiFontManager类-initialize()--初始化成功")
 
     @classmethod
     def get_font(cls, font_family, size=12):
