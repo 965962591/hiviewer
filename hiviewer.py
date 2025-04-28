@@ -2737,6 +2737,25 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             selected_folders_path = [os.path.join(parent_directory, path) for path in selected_folders]
             selected_folders_path.insert(0, current_directory)  # 将当前选中的文件夹路径插入到列表的最前面
             
+            # 检测当前文件夹路径是否包含文件，没有则剔除该文件夹，修复多级空文件夹显示错乱的bug
+            selected_option = self.RT_QComboBox0.currentText()
+            if selected_option == "显示图片文件":
+                selected_folders_path = [folder for folder in selected_folders_path 
+                                    if os.path.exists(folder) and any(
+                                        entry.name.lower().endswith(self.IMAGE_FORMATS) 
+                                        for entry in os.scandir(folder) if entry.is_file()
+                                    )]
+            elif selected_option == "显示视频文件":
+                selected_folders_path = [folder for folder in selected_folders_path 
+                                    if os.path.exists(folder) and any(
+                                        entry.name.lower().endswith(self.VIDEO_FORMATS) 
+                                        for entry in os.scandir(folder) if entry.is_file()
+                                    )]
+            else: # 显示所有文件
+                selected_folders_path = [folder for folder in selected_folders_path 
+                                    if os.path.exists(folder) and any(os.scandir(folder))]
+
+
             # 获取文件夹名列表
             dir_name_list = [os.path.basename(dir_name) for dir_name in selected_folders_path]
             
@@ -3011,7 +3030,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def updateComboBox1Text(self):
         """更新 RT_QComboBox1 的显示文本。"""    
-        print("updateComboBox1Text()--下拉框中的复选框被选中了，更新显示文本")
+        print("updateComboBox1Text()--更新显示文本")
         try:
             selected_folders = self.model.getCheckedItems()  # 获取选中的文件夹
             current_text = '; '.join(selected_folders) if selected_folders else "(请选择)"
