@@ -4,6 +4,7 @@
 """
 """导入python内置模块"""
 import json
+import time
 import pathlib
 
 
@@ -75,7 +76,9 @@ def load_exif_settings():
 
 def load_color_settings():
     """加载颜色设置"""
-    print("load_color_settings()--加载颜色设置")
+    # 设置初始时间锚点
+    _start_time = time.time()
+    
     try:
         # 确保cache目录存在
         config_dir = pathlib.Path("./config")
@@ -130,6 +133,8 @@ def load_color_settings():
                 
             except Exception as e:
                 print(f"默认颜色设置失败: {e}")
+
+        print(f"load_color_settings()--加载颜色设置, 耗时: {(time.time()-_start_time):.2f} 秒")
 
     except Exception as e:
         print(f"./utils/setting.py--加载颜色设置失败: {e}, 使用默认颜色配置")

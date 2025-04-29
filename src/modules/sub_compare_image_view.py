@@ -1736,9 +1736,9 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         第三排, self.label_bottom
         """
         # 设置主界面图标以及标题
-        icon_path = os.path.join(BasePath, "images", "viewer.ico")
+        icon_path = os.path.join(BasePath, "icons", "viewer.ico")
         self.setWindowIcon(QIcon(icon_path))
-        self.setWindowTitle("看图界面")
+        self.setWindowTitle("图片对比界面")
 
         # 获取鼠标所在屏幕，并根据当前屏幕计算界面大小与居中位置，调整大小并移动到该位置
         screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
@@ -1857,7 +1857,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
 
     def update_progress(self, value):
-        """更新进度条数值"""
+        """更新进度条数值""" 
         self.progress_bar.setValue(value)
         QApplication.processEvents()
 
@@ -1905,7 +1905,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.progress_bar.setVisible(True)
         # 强制立即重绘界面
         # self.progress_bar.repaint()
-        QApplication.processEvents()  # 处理所有挂起的事件
+        # QApplication.processEvents()  # 处理所有挂起的事件
         
         try:
             # 确保表格可见
@@ -2131,9 +2131,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 # 更新进度条
                 self.progress_updated.emit(index  + 7)
 
-
-            # 根据下拉框2的状态self.ComBox2Curindex，更新下拉框2的颜色空间显示
-            # self.on_comboBox_2_changed(self.comboBox_2.currentIndex())
 
             return True
         except Exception as e:

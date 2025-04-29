@@ -104,8 +104,8 @@ def show_message_box(text, title="提示", timeout=None):
 
 
 def version_init(VERSION=str):
-    # 设置保存版本号的文件
-    print("version_init()--版本号初始化")
+    """从配置文件中读取当前软件版本号"""
+    _start_time = time.time()
     default_version_path = os.path.join(os.path.dirname(__file__), "config", "version.ini")
     try:
         # 检查文件是否存在，如果不存在则创建并写入默认版本号
@@ -114,10 +114,13 @@ def version_init(VERSION=str):
             os.makedirs(os.path.dirname(default_version_path), exist_ok=True)
             with open(default_version_path, 'w', encoding='utf-8') as f:
                 f.write(VERSION)
+            print(f"load_color_settings()--加载颜色设置, 耗时: {(time.time()-_start_time):.2f} 秒")
             return VERSION
         else:
             with open(default_version_path, 'r', encoding='utf-8') as f:
+                print(f"load_color_settings()--加载颜色设置, 耗时: {(time.time()-_start_time):.2f} 秒")
                 return f.read().strip()
+                
     except Exception as e:
         print(f"版本号初始化失败: {str(e)}")
         return VERSION  # 返回默认版本号
@@ -1107,32 +1110,22 @@ class SingleFileRenameDialog(QDialog):
 class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self, parent=None):
         super(HiviewerMainwindow, self).__init__(parent)
-        """self.update_splash_message()函数中初始化UI界面和变量"""
-        # 1 设置版本信息,读取本地配置文件./config/version.ini中的版本信息,没有则默认为release-v2.3.2
-        self.new_version_info = False # self.pre_update()
-        self.version_info = version_init(VERSION='release-v2.3.2')
+        """self.update_splash_message()函数中初始化UI界面self.setupUi(self)和变量初始化函数self.initialize_components()"""
+        # 设置版本信息,读取本地配置文件./config/version.ini中的版本信息,没有则默认为release-v2.3.2
+        self.new_version_info = False # self.pre_update()函数中获取
+        self.version_info = VERSION
         
-        # 2 创建启动画面
+        # 创建启动画面
         try:
-            print("create_splash_screen()--创建启动画面")
+            _start_time = time.time()
             self.create_splash_screen()
+            print(f"create_splash_screen()--创建启动画面, 耗时: {(time.time()-_start_time):.2f} 秒")
         except Exception as e:
             print(f"create_splash_screen()--创建启动画面失败: {e}")
 
-        # 3 设置主界面UI
-        # try:
-        #     print("setupUi()--初始化主界面UI")
-        #     # self.drag_flag = True  # 默认设置是图片拖拽模式, self.setupUi(self) 中需要调用
-        #     # self.setupUi(self)
-        # except Exception as e:
-        #     print(f"setupUi()--初始化主界面UI失败: {e}")
+        # 10s后开启预检查更新，不在程序启动的时候调用
+        QTimer.singleShot(10000, self.pre_update)
         
-        # 4 初始化其它所有组件
-        # try:
-        #     print("initialize_components()--初始化其它组件")
-        #     self.initialize_components()
-        # except Exception as e:
-        #     print(f"initialize_components()--初始化其它组件失败: {e}")
 
 
     def initialize_components(self):
@@ -1188,7 +1181,8 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.preloading = False        # 预加载状态
         self.preload_queue = Queue()   # 预加载队列
 
-        self.media_player = None  # 在__init__方法中添加
+        self.media_player = None     # 在__init__方法中添加
+        self.compare_window = None   # 初始化看图子界面的窗口应用
 
         # 初始化线程池
         self.threadpool = QThreadPool()
@@ -1269,10 +1263,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         
         # 显示启动画面
         self.splash.show()
-        print("--开始显示启动动画")
-
-        # 记录结束时间并计算耗时
-        print(f"耗时: {(time.time()-start_time):.2f} 秒")
         
         # 启动进度更新定时器
         self.fla = 0
@@ -1299,7 +1289,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         )
         self.fla = self.fla + 1
         print(f"-------第{self.fla}次进入函数update_splash_message()-------")
-        print(f"耗时: {(time.time()-start_time):.2f} 秒")
+        print(f"当前运行时间: {(time.time()-start_time):.2f} 秒")
 
         # 检查是否完成初始化, 第三次进入
         if not hasattr(self, 'initialize_three') and hasattr(self, 'initialize_two'):
@@ -1332,7 +1322,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
             # 记录结束时间并计算耗时
             self.preview_label.setText(f"⏰启动耗时: {(time.time()-start_time):.2f} 秒")
-            print(f"hiviewer启动耗时: {(time.time()-start_time):.2f} 秒, 已关闭启动动画，显示主界面")
+            print(f"-->>--hiviewer启动耗时: {(time.time()-start_time):.2f} 秒, 已关闭启动动画，显示主界面--<<--")
 
             # 延时显示主窗口,方便启动画面渐出
             QTimer.singleShot(1000, self.show)
@@ -1344,24 +1334,22 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 初始化其余相关变量, 第二次进入
         if not hasattr(self, 'initialize_two') and hasattr(self, 'drag_flag'):
             try:
-                print("initialize_components()--初始化其它组件")
+                _start_time = time.time()
                 self.initialize_two = True
                 self.initialize_components()
-                self.pre_update()
+                print(f"initialize_components()--初始化其它组件, 耗时: {(time.time()-_start_time):.2f} 秒")
             except Exception as e:
                 print(f"initialize_components()--初始化其它组件失败: {e}")
 
         # 初始化界面UI, 第一次进入
         if not hasattr(self, 'drag_flag'):
             try:
-                print("setupUi()--初始化主界面UI")
+                _start_time = time.time()
                 self.drag_flag = True  # 默认设置是图片拖拽模式, self.setupUi(self) 中需要调用
                 self.setupUi(self)
+                print(f"setupUi()--初始化主界面UI, 耗时: {(time.time()-_start_time):.2f} 秒")
             except Exception as e:
                 print(f"setupUi()--初始化主界面UI失败: {e}")
-
-
-
 
 
 
@@ -1733,6 +1721,10 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.z_shortcut.activated.connect(self.reveal_in_explorer) 
 
         """2. 槽函数连接事件"""
+        if self.compare_window: # 连接到看图子窗口的关闭信号
+            self.compare_window.closed.connect(self.on_compare_window_closed)
+
+
         # 连接左侧按钮槽函数
         self.Left_QTreeView.clicked.connect(self.update_combobox)        # 点击左侧文件浏览器时的连接事件
         
@@ -1919,9 +1911,9 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         check_update()
 
     def pre_update(self):
-        print("pre_update()--预更新版本")
-
+        """预更新版本函数"""
         # 获取self.new_version_info最新版本信息
+        _time = time.time()
         self.new_version_info = pre_check_update()
         self.statusbar_button1.setToolTip("设置")
         if self.new_version_info:
@@ -1930,6 +1922,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.apply_theme() # 更新样式表
         else:
             self.statusbar_button2.setToolTip("已是最新版本")
+        print(f"pre_update()--预更新版本耗时:{(time.time()-_time):.2f} 秒")
             
         
 
@@ -4525,26 +4518,15 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             # 暂停预加载
             # self.pause_preloading() # modify by diamond_cz 20250217 不暂停预加载，看图时默认后台加载图标
             
-            # 在主界面加载并显示进度条
-            self.set_progress_bar(len(selected_file_paths))
-
+            # 初始化看图子界面
             if not self.compare_window:
+                print("create_compare_window()-主界面--初始化看图子界面")
                 self.compare_window = SubMainWindow(selected_file_paths, image_indexs, self)
-            else:  
+            else:
+                print("create_compare_window()-主界面--看图子界面已存在，传入图片及索引列表")
                 self.compare_window.set_images(selected_file_paths, image_indexs)
-                print("看图子界面已存在进入窗口！")
-
-            # 延时100ms后关闭进度条显示
-            QTimer.singleShot(100, self.on_progress_complete)
-
-            # 设置看图界面标题
-            self.compare_window.setWindowTitle("图片对比界面")
-            # self.compare_window.setWindowFlags(Qt.Window)
-            # 设置窗口图标
-            icon_path = os.path.join(os.path.dirname(__file__), "icons", "viewer.ico")
-            self.compare_window.setWindowIcon(QIcon(icon_path))
-            self.compare_window.closed.connect(self.on_compare_window_closed)
-            self.compare_window.show()
+                self.compare_window.show()
+            # self.compare_window.closed.connect(self.on_compare_window_closed)
 
             # self.hide()  # modify by diamond_cz 20250217 不隐藏主界面
         except Exception as e:
@@ -4556,18 +4538,10 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # self.show() # self.hide()  # modify by diamond_cz 20250217 不隐藏主界面
         if self.compare_window:
-            print("主界面触发子窗口关闭事件,设置隐藏")
-            # 删除引用以释放资源
-            # self.compare_window.should_close = True
-            self.compare_window.deleteLater()
-            self.compare_window = None
+            print("主界面触发子窗口关闭事件,接受关闭")
             # self.compare_window.close()
-            
-        # else:
-        #     print("子窗口不存在")
+            self.compare_window.hide()
 
-        # self.show() # 显示主窗口
-        # self.resume_preloading() # modify by diamond_cz 20250217 已取消暂定预加载逻辑，不用恢复预加载
         # 恢复第一次按下键盘空格键或B键
         self.last_key_press = False  
 
@@ -4693,84 +4667,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.show()
 
 
-    """
-    设置定时器进度条区域结束线
-    ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    """
-    def set_progress_bar(self, num_all):
-        """设置进度条"""
-        # 检查是否已经存在进度条
-        if hasattr(self, 'progress_bar') and self.progress_bar is not None:
-            return  # 如果已经有进度条在显示，则直接返回
-        
-        # 添加进度条并设置样式
-        self.progress_bar = QProgressBar(self)
-        # 初始化时设置进度条位置
-        self.update_progress_bar_position()
-
-        # 设置进度条样式
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
-                text-align: center;
-            }
-            QProgressBar::chunk {
-                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                stop:0 #36D1DC, stop:1 #5B86E5);
-            }
-        """)
-
-        self.progress_bar.setAlignment(Qt.AlignCenter)  # 设置文字居中
-
-        # 启动进度条显示、
-        self.progress_bar.setMaximum(num_all)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setVisible(True)
-
-
-        # 添加定时器以实现滚动效果
-        self.progress_timer = QTimer(self)
-        self.progress_timer.timeout.connect(self.update_progress)
-        self.progress_timer.start(50)  # 每50ms更新一次进度
-
-        # 设置默认不显示
-        # self.progress_bar.setVisible(False) 
-
-    def update_progress_bar_position(self):
-        """更新进度条位置，确保其始终在窗口中心"""
-        self.progress_bar.setGeometry(
-            (self.width() - self.progress_bar.width()) // 2,
-            (self.height() - self.progress_bar.height()) // 2,
-            400, 40
-        )
-
-    def update_progress(self):
-        """更新进度条值"""
-        if self.progress_bar is None:  # 检查 progress_bar 是否存在
-            self.progress_timer.stop()  # 如果不存在，停止定时器
-            return
-        
-        current_value = self.progress_bar.value()
-        if current_value < self.progress_bar.maximum():
-            self.progress_bar.setValue(current_value + 1)
-        else:
-            self.progress_timer.stop()  # 达到最大值后停止定时器
-
-
-    def on_progress_complete(self):
-        """进度条完成后的回调函数"""
-        if self.progress_bar is not None:  # 检查 progress_bar 是否存在
-            self.progress_bar.setValue(self.progress_bar.maximum())
-            QApplication.processEvents()
-            self.progress_bar.setVisible(False)  # 隐藏进度条
-            self.progress_timer.stop()  # 达到最大值后停止定时器
-            self.progress_bar.deleteLater()  # 销毁进度条
-            self.progress_bar = None  # 将 progress_bar 设置为 None
-
-    """
-    设置定时器进度条区域结束线
-    ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    """
-
     def closeEvent(self, event):
         """重写关闭事件以保存设置和清理资源"""
         print("closeEvent()-主界面--关闭事件")
@@ -4891,8 +4787,9 @@ if __name__ == '__main__':
     # 记录程序启动的开始时间
     start_time = time.time()
 
-    # 读取全局颜色配置
+    # 读取全局颜色配置与版本信息
     COLORSETTING = load_color_settings()
+    VERSION = version_init(VERSION='release-v2.3.2')
 
     # 初始化日志文件
     # setup_logging()  
