@@ -1247,12 +1247,13 @@ class MyGraphicsView(QGraphicsView):
         # 格式化 ROI 统计信息
         roi_stats = (
             f"--- ROI统计信息 ---\n"
-            f"ROI: {stats['width']}x{stats['height']}\n"
+            # f"ROI: {stats['width']}x{stats['height']}\n"
             f"亮度: {stats['avg_brightness']:.1f}\n"
             f"对比度: {stats['contrast']:.1f}\n"
             # f"LAB均值: {stats['avg_lab']}\n"
             f"RGB均值: {stats['avg_rgb']}\n"
-            f"R/G:{stats['R_G']} B/G: {stats['B_G']}"
+            f"(R/G:{stats['R_G']} B/G: {stats['B_G']})"
+            f"(roi:{stats['width']}x{stats['height']})"
             # f"区域大小: {stats['width']}x{stats['height']}"
         )
         self.set_stats_data(roi_stats)
@@ -1859,7 +1860,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
     def update_progress(self, value):
         """更新进度条数值""" 
         self.progress_bar.setValue(value)
-        QApplication.processEvents()
+        self.progress_bar.repaint()
+        # QApplication.processEvents()
 
 
     def resizeEvent(self, event):
@@ -1913,7 +1915,10 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             self.tableWidget_medium.show()
             
             # 1. 预先分配数据结构
-            self.progress_updated.emit(1)
+            self.progress_updated.emit(1)  # 发送进度条更新信号
+            if self.parent_window:         # 主界面标签进度更新
+                self.parent_window.statusbar_label1.setText(f"🔉: 正在更新图片...10%")
+                self.parent_window.statusbar_label1.repaint()  # 刷新标签文本 
             self.cleanup()
             num_images = len(image_paths)
             self.exif_texts = [None] * num_images
@@ -2015,12 +2020,18 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
             # 2. 使用线程池并行处理图片
             self.progress_updated.emit(2)
+            if self.parent_window:
+                self.parent_window.statusbar_label1.setText(f"🔉: 正在更新图片...20%")
+                self.parent_window.statusbar_label1.repaint()  # 刷新标签文本 
             max_workers = min(len(image_paths), cpu_count() - 2)
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = list(executor.map(process_image, enumerate(image_paths)))
 
             # 4. 计算目标尺寸
             self.progress_updated.emit(3)
+            if self.parent_window:
+                self.parent_window.statusbar_label1.setText(f"🔉: 正在更新图片...40%")
+                self.parent_window.statusbar_label1.repaint()  # 刷新标签文本 
             # 使用生成器表达式提高效率
             valid_sizes = ((result[1]['pixmap'].width(), result[1]['pixmap'].height()) for result in futures if result and result[1])
             # 计算多张图片中的最大宽（max_width）和高（max_height）
@@ -2047,6 +2058,9 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
             # 4. 更新表格设置
             self.progress_updated.emit(4)
+            if self.parent_window:
+                self.parent_window.statusbar_label1.setText(f"🔉: 正在更新图片...80%")
+                self.parent_window.statusbar_label1.repaint()  # 刷新标签文本 
             self.tableWidget_medium.setUpdatesEnabled(True) # 表格自动刷新
             self.tableWidget_medium.clearContents()
             self.tableWidget_medium.setColumnCount(num_images)
@@ -2059,6 +2073,9 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
             # 5. 批量更新UI并计算基准缩放比例
             self.progress_updated.emit(5)
+            if self.parent_window:
+                self.parent_window.statusbar_label1.setText(f"🔉: 正在更新图片...90%")
+                self.parent_window.statusbar_label1.repaint()  # 刷新标签文本 
             for index, result in enumerate(futures):
                 if result and result[1]:
                     data = result[1]
@@ -2130,6 +2147,9 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
                 # 更新进度条
                 self.progress_updated.emit(index  + 7)
+                if self.parent_window:
+                    self.parent_window.statusbar_label1.setText(f"🔉: 正在更新图片...100%")
+                    self.parent_window.statusbar_label1.repaint()  # 刷新标签文本    
 
 
             return True

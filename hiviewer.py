@@ -1576,7 +1576,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.statusbar_button2.setText(f"🚀版本({self.version_info})")            
 
         # 初始化标签文本
-        self.statusbar_label1.setText(f"🔉: 进度提示标签🍃")  # 根据需要设置标签的文本
+        self.statusbar_label1.setText(f"🔉: 进度提示标签🍃")
         self.statusbar_label0.setText(f"📢:选中或筛选的文件夹中包含{self.image_index_max}张图")
         self.statusbar_label.setText(f"[0]已选择")
 
@@ -1723,10 +1723,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.z_shortcut.activated.connect(self.reveal_in_explorer) 
 
         """2. 槽函数连接事件"""
-        if self.compare_window: # 连接到看图子窗口的关闭信号
-            self.compare_window.closed.connect(self.on_compare_window_closed)
-
-
         # 连接左侧按钮槽函数
         self.Left_QTreeView.clicked.connect(self.update_combobox)        # 点击左侧文件浏览器时的连接事件
         
@@ -1764,8 +1760,13 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def open_aebox(self,selected_option):
         # 创建并显示自定义对话框,传入图片列表
         try:
-            # 创建并显示自定义对话框,传入图片列表
+            # 初始化自定义的对话框
             dialog = Qualcom_Dialog(selected_option)
+
+            # 设置窗口标题
+            dialog.setWindowTitle("打开AEBOX工具")
+            # 设置窗口大小
+            dialog.setFixedSize(1200, 100)
             # 隐藏对话框的按钮
             dialog.button_box.setVisible(False)
             dialog.label1.setVisible(False)
@@ -4586,6 +4587,10 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             # 暂停预加载
             # self.pause_preloading() # modify by diamond_cz 20250217 不暂停预加载，看图时默认后台加载图标
             
+            # 初始化标签文本
+            self.statusbar_label1.setText(f"🔉: 正在打开看图子界面...")
+            self.statusbar_label1.repaint()  # 刷新标签文本
+
             # 初始化看图子界面
             if not self.compare_window:
                 print("create_compare_window()-主界面--初始化看图子界面")
@@ -4594,7 +4599,11 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 print("create_compare_window()-主界面--看图子界面已存在，传入图片及索引列表")
                 self.compare_window.set_images(selected_file_paths, image_indexs)
                 self.compare_window.show()
-            # self.compare_window.closed.connect(self.on_compare_window_closed)
+
+            # 连接看图子窗口的关闭信号
+            self.compare_window.closed.connect(self.on_compare_window_closed)
+            self.statusbar_label1.setText(f"🔉: 看图子界面打开成功")
+            self.statusbar_label1.repaint()  # 刷新标签文本
 
             # self.hide()  # modify by diamond_cz 20250217 不隐藏主界面
         except Exception as e:
@@ -4609,6 +4618,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             print("主界面触发子窗口关闭事件,接受关闭")
             # self.compare_window.close()
             self.compare_window.hide()
+            self.statusbar_label1.setText(f"🔉: 看图子界面关闭成功")
 
         # 恢复第一次按下键盘空格键或B键
         self.last_key_press = False  
