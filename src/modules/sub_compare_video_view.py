@@ -17,7 +17,8 @@ from PyQt5.QtWidgets import (
     QSpinBox, QScrollArea, QSizePolicy, QDoubleSpinBox, QGridLayout, QMessageBox)
 
 """导入自定义模块"""
-from src.utils.FontManager import SingleFontManager # 字体管理器
+from src.utils.FontManager import SingleFontManager 
+from src.utils.setting import load_color_settings 
 
 """设置本项目的入口路径,全局变量BasePath"""
 # 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
@@ -27,39 +28,8 @@ if True:
 if False: # 暂时禁用，不支持单独运行该模块
     BasePath = os.path.dirname(os.path.abspath(sys.argv[0]))  
 
-# 全局函数
-def load_color_settings():
-    """加载颜色设置"""
-    try:
-        # 确保cache目录存在
-        cache_dir = pathlib.Path("./cache")
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        
-        settings_file = cache_dir / "color_setting.json"
-        if settings_file.exists():
-            with open(settings_file, 'r', encoding='utf-8', errors='ignore') as f:
-                return json.load(f)
-        else: #设置默认颜色设置
-            try:
-                print(f"颜色设置文件不存在: {settings_file}, 设置默认颜色设置")
-                
-                settings = {
-                    "background_color_default": "rgb(173,216,230)",  # 深色背景色_好蓝
-                    "background_color_table": "rgb(127, 127, 127)",   # 表格背景色_18度灰
-                    "font_color_default": "rgb(0, 0, 0)",         # 默认字体颜色_纯黑色
-                    "font_color_exif": "rgb(255, 255, 255)"        # Exif字体颜色_纯白色
-                }
-                
-                with open(settings_file, 'w', encoding='utf-8', errors='ignore') as f:
-                    json.dump(settings, f, indent=4, ensure_ascii=False)
-                
-            except Exception as e:
-                print(f"默认颜色设置失败: {e}")
 
-    except Exception as e:
-        print(f"加载颜色设置失败: {e}")
-    return {}
-
+""""自定义类"""
 class FrameFinderThread(QThread):
     result_ready = pyqtSignal(dict)
     error_occurred = pyqtSignal(str)
@@ -577,7 +547,7 @@ class VideoPlayer(QWidget):
 
     def init_ui(self):
         # 加载保存的颜色设置
-        self.color_settings = load_color_settings()
+        self.color_settings = load_color_settings().get("basic_color_settings")
         # 设置背景色和字体颜色，使用保存的设置或默认值
         self.background_color_default = self.color_settings.get("background_color_default", "rgb(173,216,230)")  # 深色背景色_好蓝
         self.background_color_table = self.color_settings.get("background_color_table", "rgb(127, 127, 127)")    # 表格背景色_18度灰

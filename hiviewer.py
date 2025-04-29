@@ -1516,6 +1516,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         show_file_action = self.treeview_context_menu.addAction(
             "显示所有文件" if not self.left_tree_file_display else "隐藏所有文件")
         open_action = self.treeview_context_menu.addAction("打开所在位置")
+        open_aebox = self.treeview_context_menu.addAction("打开aebox")
         send_path_to_aebox = self.treeview_context_menu.addAction("发送到aebox")
         copy_path_action = self.treeview_context_menu.addAction("复制路径")
         rename_action = self.treeview_context_menu.addAction("重命名")  
@@ -1531,6 +1532,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             send_path_to_aebox.triggered.connect(lambda: self.send_file_path_to_aebox(file_path))
             rename_action.triggered.connect(lambda: self.rename_file(file_path))
             show_file_action.triggered.connect(self.show_file_visibility)
+            open_aebox.triggered.connect(lambda: self.open_aebox(file_path))
 
 
             # 设置右键菜单绑定左侧文件浏览器
@@ -1757,6 +1759,72 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.file_system_model.setFilter(QDir.NoDot | QDir.NoDotDot | QDir.AllDirs)    # 使用QDir的过滤器,只显示文件夹  
         else:
             self.file_system_model.setFilter(QDir.NoDot | QDir.NoDotDot |QDir.AllEntries)  # 显示所有文件和文件夹
+
+
+    def open_aebox(self,selected_option):
+        # 创建并显示自定义对话框,传入图片列表
+        try:
+            # 创建并显示自定义对话框,传入图片列表
+            dialog = Qualcom_Dialog(selected_option)
+            # 隐藏对话框的按钮
+            dialog.button_box.setVisible(False)
+            dialog.label1.setVisible(False)
+            dialog.text_input1.setVisible(False)
+            dialog.load_button.setVisible(False)
+            dialog.status_button1.setVisible(False)
+            dialog.label3.setVisible(False)
+            dialog.text_input3.setVisible(False)
+            dialog.load_images_button.setVisible(False)
+            dialog.status_button3.setVisible(False)
+            
+            # 显示对话框
+            if dialog.exec_() == QDialog.Accepted:
+
+                # 执行命名
+                dict_info = dialog.get_data()
+                # print(f"用户加载的路径信息: {dict_info}")
+
+                qualcom_path = dict_info.get("Qualcom工具路径","")
+                images_path = dict_info.get("Image文件夹路径","")
+                metadata_path = os.path.join(os.path.dirname(__file__), "tools", "metadata.exe")
+
+                # 拼接参数命令字符串
+                if qualcom_path and images_path and os.path.exists(metadata_path) and os.path.exists(images_path) and os.path.exists(qualcom_path):
+                    command = f"{metadata_path} --chromatix \"{qualcom_path}\" --folder \"{images_path}\""
+
+                    """
+                    # 添加检查 图片文件夹目录下是否已存在xml文件，不存在则启动线程解析图片
+                    # xml_exists = [f for f in os.listdir(images_path) if f.endswith('_new.xml')]
+
+                    针对上面的代码，优化了检查'_new.xml'文件的逻辑:
+                    1. os.listdir(images_path) 列出文件夹中的所有文件
+                    2. os.path.exists(os.path.join(images_path, f)) 检查文件是否存在
+                    3. any() 函数会在找到第一个符合条件的文件时立即返回 True, 避免不必要的遍历
+                    """
+                    # 检查图片文件夹目录下是否存在xml文件，不存在则启动线程解析图片
+                    xml_exists = any(f for f in os.listdir(images_path) if f.endswith('_new.xml'))
+
+                    # 创建线程，必须在主线程中连接信号
+                    self.command_thread = CommandThread(command, images_path)
+                    self.command_thread.finished.connect(self.on_command_finished)  # 连接信号
+                    # self.command_thread.finished.connect(self.cleanup_thread)  # 连接清理槽
+
+                    if not xml_exists:
+                        self.command_thread.start()  # 启动线程
+                        show_message_box("正在使用高通工具后台解析图片Exif信息...", "提示", 1000)
+                    else:
+                        show_message_box("已有xml文件, 无须解析图片", "提示", 1000)
+
+                        # 解析xml文件将其保存到excel中去
+                        save_excel_data(images_path)
+
+            # 无论对话框是接受还是取消，都手动销毁对话框
+            dialog.deleteLater()
+            dialog = None
+
+        except Exception as e:
+            print(f"on_i_pressed()-error--处理i键按下事件失败: {e}")
+            return
 
 
     def open_file_location(self, path):

@@ -10,7 +10,7 @@ if sys.platform == "win32":
     args = [
         'nuitka',
         '--standalone',
-        '--lto=no',
+        '--lto=yes',
         '--jobs=10' ,
         '--mingw64',
         '--show-progress',

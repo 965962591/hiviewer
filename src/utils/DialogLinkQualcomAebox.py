@@ -59,9 +59,13 @@ class Qualcom_Dialog(QDialog):
         self.load_button.clicked.connect(self.load_qualcom_path)         
         self.load_images_button.clicked.connect(self.load_image_path)
         self.load_aebox_button.clicked.connect(self.load_aebox_path)
-        self.status_button1.clicked.connect(self.test_button1)   
-        self.status_button2.clicked.connect(self.click_button2) 
-        self.status_button3.clicked.connect(self.test_button3)        
+        self.status_button1.clicked.connect(self.test_button1)
+        self.text_input1.returnPressed.connect(self.test_button1)   
+        self.status_button2.clicked.connect(self.click_button2)
+        self.text_input2.textChanged.connect(self.test_connection)
+        self.text_input2.returnPressed.connect(self.test_connection) 
+        self.status_button3.clicked.connect(self.test_button3)
+        self.text_input3.returnPressed.connect(self.test_button3)          
  
 
     def get_data(self):
