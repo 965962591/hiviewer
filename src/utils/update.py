@@ -283,41 +283,6 @@ def download_with_progress(zip_path, response, total_size, progress_dialog):
         print(f"下载错误: {e}")
         return "error"
 
-
-def start_program_subprocess(program_path=None, args=None):
-    """启动installer.exe程序解压安装新版本
-    Args:
-        program_path (str): 要启动的程序路径
-        args (str): 要传递给主程序的参数字符串
-    """
-    try:
-        if not program_path or not os.path.exists(program_path):
-            print(f"程序文件不存在: {program_path}")
-            return False
-        
-        print(f"正在启动打包程序: {program_path} 参数: {args}")
-
-        # 构建命令字符串
-        command = program_path
-        if args:
-            # 确保args是列表类型，并正确处理字符串参数
-            if isinstance(args, str):
-                args = args.split()
-            command = f"{command} {' '.join(args)}"
-        
-        process = subprocess.run(
-            f'start /wait cmd /c {command}',  # /wait 等待新窗口关闭
-            shell=True,
-            text=True  # 将输出解码为字符串
-        )
-
-        
-        return process  # 返回进程对象以便后续控制
-    except Exception as e:
-        print(f"启动程序失败: {e}")
-        return False
-
-
 def pre_check_update():
     """预检查更新函数，供主程序调用"""
     try:
@@ -411,9 +376,11 @@ def check_update(parent_window=None):
             else:
                 # 适用当前目录下没有installer.exe的情况
                 program_path = os.path.join(BasePath, "tools", "installer.exe")
-                # zip_path = os.path.join(base_path, "downloads", "latest.zip")
-                start_program_subprocess(program_path, f"-z {zip_path} -c 1")
-            
+                if os.path.exists(program_path):
+                    os.startfile(program_path)
+                    return True
+                else:
+                    return False
         else:
             return False
 

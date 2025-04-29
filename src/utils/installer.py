@@ -27,9 +27,9 @@ class UpdateInstaller:
         try:
             with open(self.version_file, 'w', encoding='utf-8') as f:
                 f.write(new_version)
-            print(f"✅版本文件已更新为: {new_version}")
+            print(f"[00]版本文件已更新为: {new_version}")
         except Exception as e:
-            print(f"❌更新版本文件失败: {e}")
+            print(f"[00]更新版本文件失败: {e}")
 
     def _read_version(self, version_file_path):
         """从version.ini文件读取版本号"""
@@ -39,7 +39,7 @@ class UpdateInstaller:
                     return f.read().strip()
             return "release-v1.0.0"  # 默认版本号
         except Exception as e:
-            print(f"❌读取版本文件失败: {e}")
+            print(f"[00]读取版本文件失败: {e}")
             return "release-v1.0.0"  # 读取失败时返回默认版本
 
     def is_program_running(self):
@@ -64,13 +64,13 @@ class UpdateInstaller:
                     shell=True  # 使用shell执行
                 )
             
-                print(f"✅已启动程序: {self.main_executable}")
+                print(f"[03]已启动程序: {self.main_executable}")
                 return True
             else:
-                print(f"❌程序文件不存在: {program_path}")
+                print(f"[00]程序文件不存在: {program_path}")
                 return False
         except Exception as e:
-            print(f"❌启动程序失败: {e}")
+            print(f"[00]启动程序失败: {e}")
             return False
         
     def start_program(self):
@@ -84,14 +84,14 @@ class UpdateInstaller:
                 
                 # 等待5秒确保程序启动
                 time.sleep(5)  
-                print(f"✅已启动程序: {self.main_executable}")
+                print(f"[01]已启动程序: {self.main_executable}")
                 
                 return True
             else:
-                print(f"❌程序文件不存在: {program_path}")
+                print(f"[00]程序文件不存在: {program_path}")
                 return False
         except Exception as e:
-            print(f"❌启动程序失败: {e}")
+            print(f"[00]启动程序失败: {e}")
             return False
 
     def force_close_program(self):
@@ -101,21 +101,21 @@ class UpdateInstaller:
                 try:
                     if proc.info['name'] == self.main_executable:
                         proc.kill()  # 强制终止进程
-                        print(f"✔️已强制关闭 {self.main_executable}")
+                        print(f"[03]已强制关闭 {self.main_executable}")
                         return True
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     continue
             return False
         except Exception as e:
-            print(f"❌强制关闭程序失败: {e}")
+            print(f"[00]强制关闭程序失败: {e}")
             return False
 
     def install_update(self):
         """解压并安装更新"""
         try:
-
+            print(f"开始解压安装包......")
             if not os.path.exists(self.zip_path):
-                print(f"❌没有可更新的安装包：{self.zip_path}")
+                print(f"[00]没有可更新的安装包：{self.zip_path}")
                 return False
 
             # 检查程序是否在运行，若在运行则强制关闭
@@ -129,7 +129,7 @@ class UpdateInstaller:
 
                 # 如果程序仍在运行，返回错误
                 if self.is_program_running():
-                    print("❌无法强制关闭程序hiviewer.exe,请手动关闭后重试")
+                    print("[00]无法强制关闭程序hiviewer.exe,请手动关闭后重试")
                     return "PROGRAM_RUNNING"
 
             # 创建临时解压目录
@@ -149,8 +149,8 @@ class UpdateInstaller:
             # 获取解压后的版本路径,读取最新的版本号
             version_file_path = str(Path(str(extracted_dir)) / "config" / "version.ini")
             self.latest_version = self._read_version(version_file_path)
-            print(f"✔️压缩包解压成功！")
-            print(f"开始更新版本......")
+            print(f"[01]压缩包解压成功！")
+            print(f"[02]开始更新版本......")
             # 复制新文件到安装目录
             self._copy_tree(str(extracted_dir), self.install_path)
             # 更新版本文件
@@ -162,7 +162,7 @@ class UpdateInstaller:
             return True
         
         except Exception as e:
-            print(f"❌安装更新失败: {e}")
+            print(f"[00]安装更新失败: {e}")
             # 发生错误时只清理临时解压目录
             if os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
@@ -182,6 +182,7 @@ class UpdateInstaller:
                     md5.update(chunk)
             return md5.hexdigest()
 
+        print(f"开始复制文件树: {src} -> {dst}")
         # 获取源目录和目标目录中的所有文件
         src_files = set(os.listdir(src.encode('utf-8').decode('utf-8')))
         dst_files = set(os.listdir(dst.encode('utf-8').decode('utf-8'))) if os.path.exists(dst) else set()
@@ -200,22 +201,22 @@ class UpdateInstaller:
                 # 如果是文件，检查是否需要更新
                 if not os.path.exists(dst_path):
                     # 目标文件不存在，直接复制
-                    print(f"🚩新增文件: {dst_path}")
+                    print(f"[01]新增文件: {dst_path}")
                     shutil.copy2(src_path, dst_path)
                 else:
                     # 文件都存在，比较MD5
                     src_md5 = get_file_md5(src_path)
                     dst_md5 = get_file_md5(dst_path)
                     if src_md5 != dst_md5:
-                        print(f"📍更新文件: {dst_path}")
+                        print(f"[02]更新文件: {dst_path}")
                         shutil.copy2(src_path, dst_path)
                     else:
-                        print(f"文件未变更: {dst_path}")
+                        print(f"[03]文件未变更: {dst_path}")
 
         # 保留目标目录中独有的文件
         for item in dst_files - src_files:
             dst_path = os.path.join(dst.encode('utf-8').decode('utf-8'), item.encode('utf-8').decode('utf-8'))
-            print(f"⭕保留本地文件: {dst_path}")
+            print(f"[04]保留本地文件: {dst_path}")
 
     def _cleanup(self, force=False):
         """清理下载的文件和临时目录
@@ -231,7 +232,7 @@ class UpdateInstaller:
                 if os.path.exists(temp_dir):
                     shutil.rmtree(temp_dir)
         except Exception as e:
-            print(f"❌清理临时文件失败: {e}")
+            print(f"[00]清理临时文件失败: {e}")
 
 
 """全局函数"""
@@ -245,7 +246,7 @@ def start_program_subprocess(program_path=None, work_path=None, args=None):
     """
     try:
         if not program_path or not os.path.exists(program_path):
-            print(f"❌程序文件不存在: {program_path}")
+            print(f"[00]程序文件不存在: {program_path}")
             return False
             
         # 构建命令列表
@@ -310,11 +311,11 @@ def installer(zip_path=None):
         install_result = updater.install_update()
 
         if install_result == "PROGRAM_RUNNING":
-            print("❗检测到hiviewer.exe 程序正在运行中,需要手动关闭")
+            print("[00]检测到hiviewer.exe 程序正在运行中,需要手动关闭")
             
         elif install_result:
 
-            print("✔️安装包更新成功, 正在启动程序请稍后......")
+            print("[00]安装包更新成功, 正在启动程序请稍后......")
             
             # 更新成功后启动程序
             updater.start_program()
@@ -336,9 +337,9 @@ def show_info():
     |   |  _  | | |  \ V /  | | |  __/  \ V  V /  |  __/ | |    |     
     |   |_| |_| |_|   \_/   |_|  \___|   \_/\_/    \___| |_|    |  
     |                                                           |                  
----------------------📍HiViewer 更新版本安装程序📍----------------------
-✅程序正在执行中......
-    """)
+-------------------- HiViewer 更新版本安装程序 --------------------
+[installer.exe]安装程序正在执行中......""")
+    
 
 
 
@@ -366,8 +367,14 @@ if __name__ == "__main__":
                 input("按 Enter 键退出...")  # 暂停黑窗口
         else:
             # 什么参数都不传的时候,默认使用当前项目文件下的相对路径安装包
-            zip_path = os.path.join(".", "downloads", "latest.zip")
-            installer(zip_path)
+            zip_path1 = os.path.join(".", "downloads", "latest.zip")
+            zip_path2 = os.path.join("..", "downloads", "latest.zip")
+            if os.path.exists(zip_path1):
+                installer(zip_path1)
+            elif os.path.exists(zip_path2):
+                installer(zip_path2)
+            else:
+                print("[01]没有可更新的安装包")
             input("按 Enter 键退出...")  # 暂停黑窗口
         
 
