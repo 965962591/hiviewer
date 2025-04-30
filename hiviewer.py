@@ -1115,7 +1115,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.new_version_info = False # self.pre_update()函数中获取
         self.version_info = VERSION
         
-        # 创建启动画面
+        # 创建启动画面,启动画面以及相关初始化在self.update_splash_message()函数中
         try:
             _start_time = time.time()
             self.create_splash_screen()
@@ -1123,8 +1123,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         except Exception as e:
             print(f"create_splash_screen()--创建启动画面失败: {e}")
 
-        # 10s后开启预检查更新，不在程序启动的时候调用
-        # QTimer.singleShot(10000, self.pre_update)
         
     def initialize_components(self):
         """初始化所有组件"""
@@ -1149,7 +1147,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 模仿按下回车
         self.input_enter_action()  
 
-        # 显示主窗口,暂时移除，在self.update_splash_message()函数中显示
+        # 显示主窗口,在self.update_splash_message()函数中显示
         # self.show()
 
 
@@ -3373,12 +3371,29 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             }}
         """
 
-        # 左侧文件浏览区域样式
+        # 左侧文件浏览区域样式 使用 QFrame 包裹 QTreeView,可以不破坏圆角
         left_area_style = f"""
             QTreeView#Left_QTreeView {{
                 background-color: {BACKCOLOR};
                 color: {FONTCOLOR};
                 border-radius: 10px;
+                padding: 5px;  /* 添加内边距 */
+            }}
+            QScrollBar:vertical {{
+                background: {GRAY};       /* 纵向滚动条背景色 */
+                width: 5px;               /* 设置滚动条高度 */
+            }}
+
+            QScrollBar:horizontal {{
+                background: {GRAY};        /* 横向滚动条背景色 */
+                height: 5px;               /* 设置滚动条高度 */
+            }}
+            QScrollBar::handle {{
+                background: {GRAY};       /* 滚动条的颜色 */
+                border-radius: 10px;      /* 设置滚动条的圆角 */
+            }}
+            QScrollBar::add-line, QScrollBar::sub-line {{
+                background: none; /* 隐藏箭头 */
             }}
         """
         
