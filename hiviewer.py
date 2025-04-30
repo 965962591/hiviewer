@@ -1126,8 +1126,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 10s后开启预检查更新，不在程序启动的时候调用
         # QTimer.singleShot(10000, self.pre_update)
         
-
-
     def initialize_components(self):
         """初始化所有组件"""
 
@@ -1206,7 +1204,9 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", "MapleMonoNormal_Regular.ttf")     # Maple Mono Normal
         ]
         MultiFontManager.initialize(font_paths=font_paths)
+        self.custom_font = MultiFontManager.get_font(font_family="LXGW WenKai", size=12)
         self.custom_font_jetbrains = MultiFontManager.get_font(font_family="JetBrains Maple Mono", size=12)
+        self.custom_font_jetbrains_medium = MultiFontManager.get_font(font_family="JetBrains Maple Mono", size=11)
         self.custom_font_jetbrains_small = MultiFontManager.get_font(font_family="JetBrains Maple Mono", size=10)
         self.custom_font = self.custom_font_jetbrains
         if False: # 暂时移除，使用MultiFontManager.get_font()方法

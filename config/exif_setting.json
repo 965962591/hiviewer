@@ -4,9 +4,9 @@
         "exif_info": true,
         "roi_info": true,
         "ai_tips": false,
-        "srgb_color_space": false,
+        "srgb_color_space": true,
         "p3_color_space": false,
-        "gray_color_space": true
+        "gray_color_space": false
     },
     "exif_visable_setting": {
         "图片名称": true,
@@ -16,7 +16,7 @@
         "图片大小": true,
         "图片尺寸": true,
         "曝光时间": true,
-        "光圈值": true,
+        "光圈值": false,
         "ISO值": true,
         "原始时间": false,
         "测光模式": false,
