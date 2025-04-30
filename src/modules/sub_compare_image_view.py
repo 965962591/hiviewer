@@ -34,9 +34,8 @@ from src.ui.sub_ui import Ui_MainWindow               # 看图子界面，导入
 from src.utils.AiTips import CustomLLM_Siliconflow    # 看图子界面，AI提示看图复选框功能模块
 from src.utils.FontManager import SingleFontManager   # 看图子界面，导入字体管理器
 from src.utils.hisnot import WScreenshot              # 看图子界面，导入自定义截图的类
-from src.utils.AeboxLink import check_process_running,urlencode_folder_path,get_api_data
-# 导入自定义json配置文件
-from src.utils.setting import load_exif_settings,load_color_settings    
+from src.utils.AeboxLink import check_process_running,get_api_data      # 导入与AEBOX通信的模块函数
+from src.utils.setting import load_exif_settings,load_color_settings    # 导入json配置模块
 
 
 """设置本项目的入口路径,全局变量BasePath"""
@@ -1657,7 +1656,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
         # 直接初始化图片，不使用延迟加载
         self.set_images(self.images_path_list, self.index_list)
-        
+
         # 设置快捷键和槽函数
         self.set_shortcut()
 
@@ -1665,6 +1664,9 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.showMaximized()
         # self.showMinimized()
         # self.show()
+
+        # 更新颜色样式表，放到最后，确保生效
+        self.update_ui_styles()
 
 
     def set_shortcut(self):
@@ -1819,8 +1821,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.label_bottom.setFont(self.font_manager_jetbrains)
         self.label_bottom.setFixedHeight(35)
 
-        # 更新颜色样式表
-        self.update_ui_styles()
+
 
 
 
@@ -2310,7 +2311,10 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         try:
             if not index:     # index == 0 颜色设置，不做任何操作
                 print("show_menu_combox1()-看图子界面--点击了颜色配置选项")
-                # pass 
+                # 从json文件加载配置
+                self.load_settings()
+                # 更新样式表
+                self.update_ui_styles()
             elif index == 1:  # index == 1 一键重置
                 self.background_color_default = "rgb(173,216,230)" # 背景默认色_好蓝
                 self.background_color_table = "rgb(127,127,127)"   # 表格填充背景色_18度灰
@@ -2322,6 +2326,21 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             else: 
                 # 创建菜单
                 self.menu_1 = QtWidgets.QMenu(self)
+
+                # 设置菜单项悬停样式
+                hover_bg = self.background_color_default  # 背景颜色
+                hover_text = self.font_color_default      # 字体颜色
+                self.menu_1.setStyleSheet(f"""
+                    QMenu::item:selected {{
+                        background-color: {hover_bg};
+                        color: {hover_text};
+                    }}
+                    QMenu::item:hover {{
+                        background-color: {hover_bg};
+                        color: {hover_text};
+                    }}
+                """)
+
                 # 定义颜色选项 从self.color_rgb_settings中获取
                 # color_options = ['18度灰', '石榴红', '乌漆嘛黑', '铅白', '水色', '石青', '茶色', '天际', '晴空', '苍穹', '湖光', '曜石', '天际黑', '晴空黑', '苍穹黑', '湖光黑', '曜石黑']
                 color_options = list(self.color_rgb_settings.keys())
@@ -2453,9 +2472,9 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     
                 except Exception as e:
                     print(f"on_comboBox_2_changed()-色彩空间转换失败: {str(e)}")
-
+        # 更新UI
         self.update()
-        QApplication.processEvents()
+        QApplication.processEvents() 
 
     def update_ui_styles(self):
         """更新所有UI组件的样式"""
@@ -2476,19 +2495,38 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         # 更新下拉列表样式
         combobox_style = f"""
             QComboBox {{
+                /* 下拉框本体样式*/
+                background-color: {"rgb(240,240,240)"};                       /* 背景色 */
+                color: {self.font_color_default};                             /* 字体颜色 */
+                selection-background-color: {self.background_color_default};  /* 选中时背景色 */
+                selection-color: {self.font_color_default};                   /* 选中时字体颜色 */
+                min-height: 30px;                                             /* 最小高度 */
+            }}
+            /* 下拉框本体悬停样式*/
+            QComboBox::hover {{
                 background-color: {self.background_color_default};
                 color: {self.font_color_default};
-                selection-background-color: {self.background_color_default};
-                selection-color: {self.font_color_default};
-                min-height: 30px;
-            }}
-            QComboBox QAbstractItemView {{
+            }}   
+            /* 下拉列表项样式*/
+            QComboBox::item {{
+                background-color: {self.background_color_default};
                 color: {self.font_color_default};
-                background-color: white;
-                selection-background-color: {self.background_color_default};
-                selection-color: {self.font_color_default};
+            }}  
+            /* 下拉列表样式*/
+            QComboBox QAbstractItemView {{
+                color: {self.font_color_default};              /* 字体颜色 */
+                background-color: white;                       /* 背景色 */
+                selection-color: {self.font_color_default};    /* 选中时字体颜色 */
+                selection-background-color: {self.background_color_default}; /* 选中时背景色 */
+            }}
+            /* 下拉框列表项悬停样式*/
+            QComboBox QAbstractItemView::item:hover {{
+                background-color: {self.background_color_default};
+                color: {self.font_color_default};
             }}
         """
+       
+
         self.comboBox_1.setStyleSheet(combobox_style)
         self.comboBox_2.setStyleSheet(combobox_style)
 
@@ -2516,10 +2554,13 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 view.scene().setBackgroundBrush(QtGui.QBrush(qcolor))
                 
                 # 更新EXIF标签
-                if hasattr(view, 'exif_label'):
-                    view.exif_label.setStyleSheet(f"color: {self.font_color_exif}; background-color: transparent; font-weight: 900;")
-                    
+                if hasattr(view, 'exif_label') and hasattr(view, 'exif_text'):
+                    exif_info = self.process_exif_info(self.dict_exif_info_visibility, view.exif_text)
+                    view.exif_label.setText(exif_info if exif_info else "解析不出exif信息!")
+                    view.exif_label.setStyleSheet(f"color: {self.font_color_exif}; background-color: transparent; font-weight: 400;")
 
+                
+                
     def toggle_exif_info(self, state):
         print(f"切换 EXIF 信息: {'显示' if state == Qt.Checked else '隐藏'}")
         try:
@@ -3296,9 +3337,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
     def load_settings(self):
         """加载颜色、exif等设置"""
-        # json文件的具体格式，可到函数load_color_settings()和load_exif_settings()中查看
         try:
-            pass
             # 加载保存的颜色设置 basic_color_settings、basic_color_settings
             ColorSettings = load_color_settings()
             color_settings = ColorSettings.get("basic_color_settings",{})

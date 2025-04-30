@@ -1124,7 +1124,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             print(f"create_splash_screen()--创建启动画面失败: {e}")
 
         # 10s后开启预检查更新，不在程序启动的时候调用
-        QTimer.singleShot(10000, self.pre_update)
+        # QTimer.singleShot(10000, self.pre_update)
         
 
 
@@ -1267,7 +1267,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 启动进度更新定时器
         self.fla = 0
         self.splash_progress_timer = QTimer()
-        self.splash_progress_timer.timeout.connect(self.update_splash_message)
+        self.splash_progress_timer.timeout.connect(self.update_splash_message)  # 连接定时器到更新函数,相关函数变量的初始化
         self.dots_count = 0
         self.splash_progress_timer.start(10)  # 每10ms更新一次
 
@@ -1297,7 +1297,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             # 初始化完成标志位
             self.initialize_three = True
             
-    
             # 创建渐出动画
             self.fade_out = QtCore.QPropertyAnimation(self.splash, b"windowOpacity")
             self.fade_out.setDuration(1000)  # 1000ms的渐出动画
@@ -1317,6 +1316,9 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.move(x, y)
 
 
+            # 预先检查更新  
+            self.pre_update()
+
             # 显示主窗口
             # self.show()
 
@@ -1325,7 +1327,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             print(f"-->>--hiviewer启动耗时: {(time.time()-start_time):.2f} 秒, 已关闭启动动画，显示主界面--<<--")
 
             # 延时显示主窗口,方便启动画面渐出
-            QTimer.singleShot(1000, self.show)
+            QTimer.singleShot(800, self.show)
 
             # 延时检查更新
             # QTimer.singleShot(3000, self.pre_update)
@@ -4112,11 +4114,11 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             # 将选中的单元格滚动到视图中间位置
             self.RB_QTableWidget0.scrollToItem(item, QtWidgets.QAbstractItemView.PositionAtCenter)
                                   
-            print(f"当前选中图片张数：{current_image_index}")
+            # print(f"当前选中图片张数：{current_image_index}")
             
             return file_paths, current_image_index  # 返回文件路径列表
         except Exception as e:
-            print(f"处理键盘按下事件时发生错误: {e}")
+            print(f"press_space_and_b_get_selected_file_paths()-error--处理键盘按下事件时发生错误: {e}")
             return [], []
     
     def on_f1_pressed(self):
