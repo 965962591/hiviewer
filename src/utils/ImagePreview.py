@@ -21,7 +21,7 @@ class ImageViewer(QGraphicsView):
         self.pixmap_item.setPixmap(pixmap)
         self.fitInView(self.pixmap_item, Qt.KeepAspectRatio)  # 视图缩放比例自适应视图窗口大小
 
-        self.scale(15, 15)  # 设置初始缩放比例为15倍
+        # self.scale(15, 15)  # 设置初始缩放比例为15倍
 
     def load_image_from_qimage(self, q_img):
         """从QImage对象加载图片"""
@@ -33,7 +33,7 @@ class ImageViewer(QGraphicsView):
         self.pixmap_item.setPixmap(pixmap)
         self.fitInView(self.pixmap_item, Qt.KeepAspectRatio)  # 视图缩放比例自适应视图窗口大小
 
-        self.scale(15, 15)  # 设置初始缩放比例为15倍
+        # self.scale(15, 15)  # 设置初始缩放比例为15倍
 
     def scale_view(self, scale_factor):
         self.scale(scale_factor, scale_factor)
