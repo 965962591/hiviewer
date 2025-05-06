@@ -399,11 +399,14 @@ def load_xml_data(xml_path):
             if name  != 'FaceSA':
                 if value and value[0].text:
                     extracted_values.append(f"\n{name}: {value[0].text}")
-            else:
+            else: # 解析人脸SA的相关value
                 if value:
                     target = ETT.XPath('.//SA/FaceSA/target/start')(root)
+                    frame_luma = ETT.XPath('.//SA/FrameSA/luma')(root)[0].text
+                    face_luma = ETT.XPath('.//SA/FaceSA/luma')(root)[0].text
+                    backlight = float(face_luma)/float(frame_luma) if frame_luma and face_luma else 0.0
                     if target and target[0].text:
-                        extracted_values.append(f"\n{name}: {target[0].text}")
+                        extracted_values.append(f"\n{name}: {target[0].text}(target) & {backlight:.4f}(backlight)")
                 else:
                     extracted_values.append(f"\n{name}: 未识别人脸")
 

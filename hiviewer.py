@@ -3014,22 +3014,26 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def start_image_preloading(self, file_paths):
         """开始预加载图片"""
         if self.preloading:
+            print("start_image_preloading()--预加载已启动, 跳过")
             return
         
         # 设置预加载状态
         self.preloading = True
+        print("start_image_preloading()--开始预加载图标, 启动预加载线程")
         
-        # 创建新的预加载器
-        self.current_preloader = ImagePreloader(file_paths)
-        self.current_preloader.signals.progress.connect(self.update_preload_progress)
-        self.current_preloader.signals.batch_loaded.connect(self.on_batch_loaded)
-        self.current_preloader.signals.finished.connect(self.on_preload_finished)
-        self.current_preloader.signals.error.connect(self.on_preload_error)
-        
-        # 启动预加载
-        self.threadpool.start(self.current_preloader)
+        try:
+            # 创建新的预加载器
+            self.current_preloader = ImagePreloader(file_paths)
+            self.current_preloader.signals.progress.connect(self.update_preload_progress)
+            self.current_preloader.signals.batch_loaded.connect(self.on_batch_loaded)
+            self.current_preloader.signals.finished.connect(self.on_preload_finished)
+            self.current_preloader.signals.error.connect(self.on_preload_error)
+            
+            # 启动预加载
+            self.threadpool.start(self.current_preloader)
+        except Exception as e:
+            print(f"start_image_preloading()--开始预加载图标, 启动预加载线程失败: {e}")
 
-        print("start_image_preloading函数: 开始预加载图标, 启动预加载线程")
         
     def cancel_preloading(self):
         """取消当前预加载任务"""
