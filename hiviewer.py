@@ -1155,7 +1155,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         """初始化整个主界面类所需的变量"""
 
         # 设置图片&视频文件格式
-        self.IMAGE_FORMATS = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tif', '.ico', '.webp')
+        self.IMAGE_FORMATS = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tif', '.webp', '.ico')
         self.VIDEO_FORMATS = ('.mp4', '.avi', '.mov', '.wmv', '.mpeg', '.mpg', '.mkv')
 
         # 初始化属性
@@ -2218,6 +2218,40 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             return
 
 
+    def get_selected_file_path(self):
+            """或取所有选中的单元格的文件路径"""
+            selected_items = self.RB_QTableWidget0.selectedItems()  # 获取选中的项
+            if not selected_items:
+                show_message_box("没有选中的项！", "提示", 500)
+                return
+            
+            # 用于存储所有选中的文件路径
+            file_paths = []  
+            try:
+                for item in selected_items:
+                    row = item.row()
+                    col = item.column()
+
+                    # 构建文件完整路径
+                    file_name = self.RB_QTableWidget0.item(row, col).text().split('\n')[0]  # 获取文件名
+                    column_name = self.RB_QTableWidget0.horizontalHeaderItem(col).text()  # 获取列名
+                    current_directory = self.RT_QComboBox.currentText()  # 获取当前选中的目录
+                    # 移除传统构建路径方法
+                    # full_path = os.path.join(os.path.dirname(current_directory), column_name, file_name)
+                    # 使用 Path 构建路径，自动处理跨平台的路径问题
+                    full_path = str(Path(current_directory).parent / column_name / file_name)
+
+                    if os.path.isfile(full_path):
+                        file_paths.append(full_path)  # 添加有效文件路径到列表
+
+                if file_paths:
+                    return file_paths
+
+            except Exception as e:
+                print(f"get_selected_file_path()-error--获取文件路径失败: {e}")
+                return
+
+
     def copy_selected_file_path(self,flag=1):
         """复制所有选中的单元格的文件路径到系统粘贴板"""
         selected_items = self.RB_QTableWidget0.selectedItems()  # 获取选中的项
@@ -3157,7 +3191,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         selected = self.RB_QTableWidget0.selectedItems()
         if selected:
             # 获取首个选中项的文件路径
-            file_paths = self.copy_selected_file_path(flag=0)  # 复用已有路径获取逻辑
+            file_paths = self.get_selected_file_path()  # 复用已有路径获取逻辑
             if not file_paths:
                 return
             # 只预览第一个选中的文件
@@ -3169,6 +3203,9 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 self.create_image_preview(preview_path)
             elif preview_path.lower().endswith(tuple(self.VIDEO_FORMATS)):
                 self.create_video_preview(preview_path)
+            else:
+                self.show_preview_error("不支持预览的文件类型")
+                
             # 更新状态栏显示选中数量
             self.statusbar_label.setText(f"[{len(selected)}]已选择")
 
@@ -3238,7 +3275,8 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def show_preview_error(self, message):
         """显示预览错误信息"""
         error_label = QLabel(message)
-        error_label.setStyleSheet("color: #FF5555; font-size: 14px;")
+        error_label.setStyleSheet("color: white;")
+        error_label.setFont(self.custom_font_jetbrains)
         error_label.setAlignment(Qt.AlignCenter)
         self.verticalLayout_left_2.addWidget(error_label)
 
