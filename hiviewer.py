@@ -1155,7 +1155,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         """初始化整个主界面类所需的变量"""
 
         # 设置图片&视频文件格式
-        self.IMAGE_FORMATS = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tif', '.webp')
+        self.IMAGE_FORMATS = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tif', '.ico', '.webp')
         self.VIDEO_FORMATS = ('.mp4', '.avi', '.mov', '.wmv', '.mpeg', '.mpg', '.mkv')
 
         # 初始化属性
@@ -2612,13 +2612,12 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         if True:
             # 清空旧预览内容
             self.clear_preview_layout()
-            # 显示预览信息
-            self.show_preview_error("预览区域")
-            # preview_label = QLabel("预览区域")
-            # preview_label.setFont(self.custom_font_jetbrains)
-            # preview_label.setStyleSheet("color: white;")
-            # preview_label.setAlignment(Qt.AlignCenter)
-            # self.verticalLayout_left_2.addWidget(preview_label)
+
+            preview_label = QLabel("预览区域")
+            preview_label.setFont(self.custom_font_jetbrains)
+            preview_label.setStyleSheet("color: white;")
+            preview_label.setAlignment(Qt.AlignCenter)
+            self.verticalLayout_left_2.addWidget(preview_label)
 
 
 
@@ -3155,40 +3154,31 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def handle_table_selection(self):
         """处理表格选中事件（新增预览功能）"""
-        print("handle_table_selection()--处理表格选中事件")
-        try:
-            selected = self.RB_QTableWidget0.selectedItems()
-            if selected:
-                # 获取首个选中项的文件路径
-                file_paths = self.copy_selected_file_path(flag=0)  # 复用已有路径获取逻辑
-                if not file_paths:
-                    return
-                # 只预览第一个选中的文件
-                preview_path = file_paths[0]
-                # 清空旧预览内容
-                self.clear_preview_layout()
-                # 根据文件类型创建预览
-                if preview_path.lower().endswith(tuple(self.IMAGE_FORMATS)):
-                    self.create_image_preview(preview_path)
-                elif preview_path.lower().endswith(tuple(self.VIDEO_FORMATS)):
-                    self.create_video_preview(preview_path)
-                else:
-                    self.show_preview_error("不支持的文件类型")
-                # 更新状态栏显示选中数量
-                self.statusbar_label.setText(f"[{len(selected)}]已选择")
-        except Exception as e:
-            print(f"handle_table_selection()--处理表格选中事件失败: {e}")
+        selected = self.RB_QTableWidget0.selectedItems()
+        if selected:
+            # 获取首个选中项的文件路径
+            file_paths = self.copy_selected_file_path(flag=0)  # 复用已有路径获取逻辑
+            if not file_paths:
+                return
+            # 只预览第一个选中的文件
+            preview_path = file_paths[0]
+            # 清空旧预览内容
+            self.clear_preview_layout()
+            # 根据文件类型创建预览
+            if preview_path.lower().endswith(tuple(self.IMAGE_FORMATS)):
+                self.create_image_preview(preview_path)
+            elif preview_path.lower().endswith(tuple(self.VIDEO_FORMATS)):
+                self.create_video_preview(preview_path)
+            # 更新状态栏显示选中数量
+            self.statusbar_label.setText(f"[{len(selected)}]已选择")
 
     def clear_preview_layout(self):
         """清空预览区域"""
-        try:
-            while self.verticalLayout_left_2.count():
-                item = self.verticalLayout_left_2.takeAt(0)
-                widget = item.widget()
-                if widget:
-                    widget.deleteLater()
-        except Exception as e:
-            print(f"clear_preview_layout()--清空预览区域失败: {e}")
+        while self.verticalLayout_left_2.count():
+            item = self.verticalLayout_left_2.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
 
     def create_image_preview(self, path):
         """创建图片预览"""
@@ -3247,11 +3237,8 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def show_preview_error(self, message):
         """显示预览错误信息"""
-        # 清空旧预览内容
-        self.clear_preview_layout()
         error_label = QLabel(message)
-        error_label.setStyleSheet("color: white;")
-        error_label.setFont(self.custom_font_jetbrains)
+        error_label.setStyleSheet("color: #FF5555; font-size: 14px;")
         error_label.setAlignment(Qt.AlignCenter)
         self.verticalLayout_left_2.addWidget(error_label)
 
