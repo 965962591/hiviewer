@@ -3188,10 +3188,11 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def handle_table_selection(self):
         """处理表格选中事件（新增预览功能）"""
-        selected = self.RB_QTableWidget0.selectedItems()
-        if selected:
-            # 获取首个选中项的文件路径
-            file_paths = self.get_selected_file_path()  # 复用已有路径获取逻辑
+        try:
+            selected = self.RB_QTableWidget0.selectedItems()
+            if selected:
+                # 获取首个选中项的文件路径
+                file_paths = self.get_selected_file_path()  # 复用已有路径获取逻辑
             if not file_paths:
                 return
             # 只预览第一个选中的文件
@@ -3208,14 +3209,20 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 
             # 更新状态栏显示选中数量
             self.statusbar_label.setText(f"[{len(selected)}]已选择")
+        except Exception as e:
+            print(f"handle_table_selection()--处理表格选中事件失败: {e}")
+
 
     def clear_preview_layout(self):
         """清空预览区域"""
-        while self.verticalLayout_left_2.count():
-            item = self.verticalLayout_left_2.takeAt(0)
-            widget = item.widget()
-            if widget:
-                widget.deleteLater()
+        try:
+            while self.verticalLayout_left_2.count():
+                item = self.verticalLayout_left_2.takeAt(0)
+                widget = item.widget()
+                if widget:
+                    widget.deleteLater()
+        except Exception as e:
+            print(f"clear_preview_layout()--清空预览区域失败: {e}")
 
     def create_image_preview(self, path):
         """创建图片预览"""
@@ -3274,6 +3281,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def show_preview_error(self, message):
         """显示预览错误信息"""
+        # 显示错误信息
         error_label = QLabel(message)
         error_label.setStyleSheet("color: white;")
         error_label.setFont(self.custom_font_jetbrains)
