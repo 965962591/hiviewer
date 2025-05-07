@@ -17,9 +17,7 @@ class ImageViewer(QGraphicsView):
             pixmap = QPixmap(path)
             if pixmap.isNull():
                 raise ValueError("无法加载图片")
-            
-            # 设置图片的初始缩放比例为原始大小的50%
-            pixmap = pixmap.scaled(pixmap.size() / 2, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            # 设置图片pixmap_item
             self.pixmap_item.setPixmap(pixmap)
             # 视图缩放比例自适应视图窗口大小
             self.fitInView(self.pixmap_item, Qt.KeepAspectRatio)  
@@ -29,7 +27,6 @@ class ImageViewer(QGraphicsView):
             else: # 如果图片尺寸小于视图窗口尺寸，则缩放比例为8倍
                 self.scale(8, 8)
           
-
         except Exception as e:
             print(f"load_image()-error--从路径加载图片失败: {e}")
             return
@@ -42,14 +39,15 @@ class ImageViewer(QGraphicsView):
             if pixmap.isNull():
                 raise ValueError("无法加载图片")
         
-            # 设置图片的初始缩放比例为原始大小的50%
-            pixmap = pixmap.scaled(pixmap.size() / 2, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            # 设置图片pixmap_item
             self.pixmap_item.setPixmap(pixmap)
-
             # 视图缩放比例自适应视图窗口大小
             self.fitInView(self.pixmap_item, Qt.KeepAspectRatio)  
             # 设置初始缩放比例为10倍
-            self.scale(10, 10)
+            if pixmap.size().width() > 512 or pixmap.size().height() > 512:
+                self.scale(10, 10)  
+            else: # 如果图片尺寸小于视图窗口尺寸，则缩放比例为8倍
+                self.scale(8, 8)
 
         except Exception as e:
             print(f"load_image_from_qimage()-error--从QImage对象加载图片失败: {e}")
