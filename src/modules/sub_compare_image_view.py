@@ -1736,6 +1736,11 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         # self.comboBox_2.currentIndexChanged.connect(self.on_comboBox_2_changed)  # 当用户选择不同选项的时候触发
         self.comboBox_2.activated.connect(self.on_comboBox_2_changed)            # 当用户选择任何选项的时候都会触发 
 
+        # 连接底部状态栏按钮信号到槽函数
+        self.statusbar_button1.clicked.connect(self.on_b_pressed)
+        self.statusbar_button2.clicked.connect(self.on_space_pressed)
+
+
         # 连接AI响应信号到槽函数
         self.ai_response_signal.connect(self.update_ai_response)
         # 连接进度条更新信号到槽函数
@@ -1827,18 +1832,49 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         # self.tableWidget_medium.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch) # 设置表格列宽自适应
         header.setFont(self.custom_font)
 
-        # 设置底部标签
-        self.label_bottom.setText(" 提示: 选中ROI信息复选框选后, 按下P键即可调出矩形框(矩形框移动逻辑同图片移动逻辑); 选中AI提示看图复选框选后, 按下P键即可发起请求(仅支持两张图); ")
-        self.label_bottom.setFont(self.font_manager_jetbrains)
-        self.label_bottom.setFixedHeight(35)
+        # 设置底部状态栏组件文本显示
+        self.label_bottom.setText(" 📢: 选中ROI信息复选框选后, 按下P键即可调出矩形框(矩形框移动逻辑同图片移动逻辑); 选中AI提示看图复选框选后, 按下P键即可发起请求(仅支持两张图); ")
+        self.statusbar_button1.setText("(prev)🔼")
+        self.statusbar_button2.setText("🔽(next)")
 
 
     def update_ui_styles(self):
         """更新所有UI组件的样式"""
+        # 更新底部状态栏样式表
+        statusbar_style = f"""
+            QStatusBar {{
+                background-color: {self.background_color_default};
+                color: {self.font_color_default};
+            }}
+        """
+        self.statusbar.setStyleSheet(statusbar_style)
+        
         # 更新标签样式
         label_style = f"background-color: {self.background_color_default}; color: {self.font_color_default}; text-align: center; border-radius:10px;"
         self.label_0.setStyleSheet(label_style)
-        self.label_bottom.setStyleSheet(label_style)
+        statusbar_label_style = f"""
+            color: {self.font_color_default}; 
+            text-align: center;
+            font-family: "{self.font_manager_jetbrains.family()}";
+            font-size: {self.font_manager_jetbrains.pointSize()}pt;
+        """
+        self.label_bottom.setStyleSheet(statusbar_label_style)
+
+        # 更新按钮样式
+        statusbar_button_style = f"""
+            QPushButton {{
+                color: {self.font_color_default};
+                text-align: center;
+                font-family: "{self.font_manager_jetbrains.family()}";
+                font-size: {self.font_manager_jetbrains.pointSize()}pt;
+            }}
+            QPushButton:hover {{
+                background-color: {self.background_color_table};
+                color: {self.font_color_default};
+            }}
+        """
+        self.statusbar_button1.setStyleSheet(statusbar_button_style)
+        self.statusbar_button2.setStyleSheet(statusbar_button_style)
 
         # 更新复选框样式
         checkbox_style = f"""
@@ -2594,11 +2630,11 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             if state == Qt.Checked:
                 self.ai_tips_flag = True
                 self.is_updating = False
-                self.label_bottom.setText(f" 开启AI提示看图复选框提示: 按下快捷键P发起请求(仅支持两张图). 另: 关闭AI提示看图复选框, 打开ROI信息复选框的状态下, 按P键才会调出矩形框")
+                self.label_bottom.setText(f" 📢: 开启AI提示看图复选框提示, 按下快捷键P发起请求(仅支持两张图). 另: 关闭AI提示看图复选框, 打开ROI信息复选框的状态下, 按P键才会调出矩形框")
             else:
                 self.ai_tips_flag = False
                 self.is_updating = False
-                self.label_bottom.setText(f" 提示: 选中ROI信息复选框选后, 按下P键即可调出矩形框(矩形框移动逻辑同图片移动逻辑); 选中AI提示看图复选框选后, 按下P键即可发起请求(仅支持两张图);")
+                self.label_bottom.setText(f" 📢: 选中ROI信息复选框选后, 按下P键即可调出矩形框(矩形框移动逻辑同图片移动逻辑); 选中AI提示看图复选框选后, 按下P键即可发起请求(仅支持两张图);")
         except Exception as e:
             print(f"处理ai_tips_info函数时发生错误: {e}")
 
@@ -3147,7 +3183,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 # 调用AI提示函数
                 show_message_box("按下了p键,正在发起ai请求...", "提示", 500)
                 # 更新底部信息提示栏
-                self.label_bottom.setText(f"按下了p键,正在发起ai请求...")
+                self.label_bottom.setText(f"📢:按下了p键,正在发起ai请求...")
 
                 def run_ai():
                     try:
@@ -3163,7 +3199,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                         print(f"AI请求失败: {e}")
                         self.ai_response_signal.emit("AI请求失败，请检查网络连接或模型配置")
                         # 更新底部信息提示栏
-                        self.label_bottom.setText(f"AI请求失败，请检查网络连接或模型配置")
+                        self.label_bottom.setText(f"📢:AI请求失败，请检查网络连接或模型配置")
 
                 # 创建并启动子线程
                 tcp_thread = threading.Thread(target=run_ai)
@@ -3476,7 +3512,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
     def update_ai_response(self, response):
         """更新AI响应结果"""
-        self.label_bottom.setText(f"AI提示结果：{response}")
+        self.label_bottom.setText(f"📢: AI提示结果:{response}")
         # 延时1秒后更新is_updating为False
         QTimer.singleShot(1000, lambda: setattr(self, 'is_updating', False))
 

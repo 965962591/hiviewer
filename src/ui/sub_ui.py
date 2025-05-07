@@ -97,19 +97,46 @@ class Ui_MainWindow(object):
         self.tableWidget_medium.setObjectName("tableWidget_medium")
         self.tableWidget_medium.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)  # 设置为可扩展
         
-
         self.main_body.addWidget(self.tableWidget_medium)
         
-        # 底部信息提示栏
-        self.label_bottom = QtWidgets.QLabel(self.Sub_window)
-        self.label_bottom.setObjectName("label_bottom")
+
+        """添加底部状态栏""" 
+        self.statusbar = QtWidgets.QStatusBar(MainWindow)
+        self.statusbar.setObjectName("statusbar")
+        self.statusbar.setSizeGripEnabled(False)
+        self.statusbar.setStyleSheet("QStatusBar::item { border: none; }")
+        self.statusbar.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        
+        # 创建按钮
+        self.statusbar_button1 = QtWidgets.QPushButton("◀️ (prev)")
+        self.statusbar_button2 = QtWidgets.QPushButton("▶️ (next)")
+
+        # 创建标签
+        self.label_bottom = QtWidgets.QLabel()
         self.label_bottom.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)  # 设置为可扩展
-        self.label_bottom.setMinimumWidth(10)  # 设置最小宽度为10像素
-        self.main_body.addWidget(self.label_bottom)
+        self.label_bottom.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)  # 设置右居中对齐
+        self.label_bottom.setMinimumWidth(1)
+
+        # 正确添加组件的方式：注意，addWidget & addPermanentWidget 的区别
+        self.statusbar.addWidget(self.label_bottom)                # 普通部件（左对齐）addWidget
+        self.statusbar.addPermanentWidget(self.statusbar_button1)  # 永久部件（右对齐）addPermanentWidget
+        self.statusbar.addPermanentWidget(self.statusbar_button2)  # 永久部件（右对齐）addPermanentWidget
+        
+
+        # 设置布局方向
+        self.statusbar.setLayoutDirection(QtCore.Qt.LeftToRight)
+        MainWindow.setStatusBar(self.statusbar)
+
+        # 底部信息提示栏
+        # self.label_bottom = QtWidgets.QLabel(self.Sub_window)
+        # self.label_bottom.setObjectName("label_bottom")
+        # self.label_bottom.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)  # 设置为可扩展
+        # self.label_bottom.setMinimumWidth(10)  # 设置最小宽度为10像素
+        # self.main_body.addWidget(self.label_bottom)
 
         self.main_body.setStretch(0, 0)
         self.main_body.setStretch(1, 10)
-        self.main_body.setStretch(2, 1)
+        # self.main_body.setStretch(2, 1)
         
         self.gridLayout.addLayout(self.main_body, 0, 0, 1, 1)
         MainWindow.setCentralWidget(self.Sub_window)

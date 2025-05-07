@@ -2,7 +2,7 @@
     "label_visable_settings": {
         "histogram_info": false,
         "exif_info": true,
-        "roi_info": true,
+        "roi_info": false,
         "ai_tips": false,
         "srgb_color_space": true,
         "p3_color_space": false,
