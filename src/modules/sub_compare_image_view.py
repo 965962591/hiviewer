@@ -1737,6 +1737,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.comboBox_2.activated.connect(self.on_comboBox_2_changed)            # 当用户选择任何选项的时候都会触发 
 
         # 连接底部状态栏按钮信号到槽函数
+        self.statusbar_left_button.clicked.connect(self.open_settings_window)
         self.statusbar_button1.clicked.connect(self.on_b_pressed)
         self.statusbar_button2.clicked.connect(self.on_space_pressed)
 
@@ -1833,7 +1834,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         header.setFont(self.custom_font)
 
         # 设置底部状态栏组件文本显示
-        self.label_bottom.setText(" 📢: 选中ROI信息复选框选后, 按下P键即可调出矩形框(矩形框移动逻辑同图片移动逻辑); 选中AI提示看图复选框选后, 按下P键即可发起请求(仅支持两张图); ")
+        self.label_bottom.setText("📢:选中ROI信息复选框选后, 按下P键即可调出矩形框(矩形框移动逻辑同图片移动逻辑); 选中AI提示看图复选框选后, 按下P键即可发起请求(仅支持两张图); ")
         self.statusbar_button1.setText("(prev)🔼")
         self.statusbar_button2.setText("🔽(next)")
 
@@ -1873,8 +1874,22 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 color: {self.font_color_default};
             }}
         """
+        statusbar_left_button_style = f"""
+            QPushButton {{
+                border: none;
+                color: {self.font_color_default};
+                text-align: center;
+                font-family: "{self.font_manager_jetbrains.family()}";
+                font-size: {self.font_manager_jetbrains.pointSize()}pt;
+            }}
+            QPushButton:hover {{
+                background-color: {self.background_color_table};
+                color: {self.font_color_default};
+            }}
+        """
         self.statusbar_button1.setStyleSheet(statusbar_button_style)
         self.statusbar_button2.setStyleSheet(statusbar_button_style)
+        self.statusbar_left_button.setStyleSheet(statusbar_left_button_style)
 
         # 更新复选框样式
         checkbox_style = f"""
@@ -1985,6 +2000,11 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             (self.height() - self.progress_bar.height()) // 2,
             400, 40
         )
+
+    def open_settings_window(self):
+        """打开设置窗口"""
+        # self.settings_window.show()
+        print("打开设置窗口,还在开发中...")
 
 
     def update_progress(self, value):
@@ -2630,11 +2650,11 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             if state == Qt.Checked:
                 self.ai_tips_flag = True
                 self.is_updating = False
-                self.label_bottom.setText(f" 📢: 开启AI提示看图复选框提示, 按下快捷键P发起请求(仅支持两张图). 另: 关闭AI提示看图复选框, 打开ROI信息复选框的状态下, 按P键才会调出矩形框")
+                self.label_bottom.setText(f"📢:开启AI提示看图复选框提示, 按下快捷键P发起请求(仅支持两张图). 另: 关闭AI提示看图复选框, 打开ROI信息复选框的状态下, 按P键才会调出矩形框")
             else:
                 self.ai_tips_flag = False
                 self.is_updating = False
-                self.label_bottom.setText(f" 📢: 选中ROI信息复选框选后, 按下P键即可调出矩形框(矩形框移动逻辑同图片移动逻辑); 选中AI提示看图复选框选后, 按下P键即可发起请求(仅支持两张图);")
+                self.label_bottom.setText(f"📢:选中ROI信息复选框选后, 按下P键即可调出矩形框(矩形框移动逻辑同图片移动逻辑); 选中AI提示看图复选框选后, 按下P键即可发起请求(仅支持两张图);")
         except Exception as e:
             print(f"处理ai_tips_info函数时发生错误: {e}")
 
@@ -3512,7 +3532,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
     def update_ai_response(self, response):
         """更新AI响应结果"""
-        self.label_bottom.setText(f"📢: AI提示结果:{response}")
+        self.label_bottom.setText(f"📢:AI提示结果:{response}")
         # 延时1秒后更新is_updating为False
         QTimer.singleShot(1000, lambda: setattr(self, 'is_updating', False))
 

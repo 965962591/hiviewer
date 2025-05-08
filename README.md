@@ -73,10 +73,12 @@ hiviewer/
 
 ```bash
 # 安装依赖
+conda create -n hiviewer python=3.11
+conda activate hiviewer
 pip3 install -r requirements.txt
 
 # 运行程序
-python3 hiviewer.py
+python hiviewer.py
 ````
 
 ### 安装包下载

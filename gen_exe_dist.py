@@ -5,8 +5,8 @@ import sys
 优先使用nuitka打包本项目为可执行程序hiviewer.exe
 
 """
-
-if sys.platform == "win32":
+# 打包windows可执行程序
+if sys.platform == "win32": 
     args = [
         'nuitka',
         '--standalone',
@@ -23,7 +23,8 @@ if sys.platform == "win32":
         '--output-dir=dist',
         'hiviewer.py',
     ]
-elif sys.platform == "darwin":
+# 打包macos可执行程序
+elif sys.platform == "darwin": 
     args = [
         'python3 -m nuitka',
         '--standalone',
