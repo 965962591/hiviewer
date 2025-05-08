@@ -1762,7 +1762,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
                 qualcom_path = dict_info.get("Qualcom工具路径","")
                 images_path = dict_info.get("Image文件夹路径","")
-                metadata_path = os.path.join(os.path.dirname(__file__), "tools", "metadata.exe")
+                metadata_path = os.path.join(os.path.dirname(__file__), "resource", "tools", "metadata.exe")
 
                 # 拼接参数命令字符串
                 if qualcom_path and images_path and os.path.exists(metadata_path) and os.path.exists(images_path) and os.path.exists(qualcom_path):
@@ -2083,7 +2083,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.cancel_preloading()
 
             # 构建jpegoptim的完整路径
-            jpegr_path = os.path.join(os.path.dirname(__file__), 'tools', 'jpegr_lossless_rotator', 'jpegr.exe')
+            jpegr_path = os.path.join(os.path.dirname(__file__), "resource", 'tools', 'jpegr_lossless_rotator', 'jpegr.exe')
             if not os.path.exists(jpegr_path):
                 show_message_box(f"jpegr.exe 不存在，请检查/tools/jpegr_lossless_rotator/", "提示", 1500)
                 return
@@ -2476,7 +2476,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def jpgc_tool(self):
         """打开图片体积压缩工具_升级版"""
         try:
-            tools_dir = os.path.join(os.path.dirname(__file__), "tools")
+            tools_dir = os.path.join(os.path.dirname(__file__), "resource", "tools")
             tcp_path = os.path.join(tools_dir, "JPGC.exe")
             
             if not os.path.isfile(tcp_path):
@@ -4324,7 +4324,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
                 qualcom_path = dict_info.get("Qualcom工具路径","")
                 images_path = dict_info.get("Image文件夹路径","")
-                metadata_path = os.path.join(os.path.dirname(__file__), "tools", "metadata.exe")
+                metadata_path = os.path.join(os.path.dirname(__file__), "resource", "tools", "metadata.exe")
 
                 # 拼接参数命令字符串
                 if qualcom_path and images_path and os.path.exists(metadata_path) and os.path.exists(images_path) and os.path.exists(qualcom_path):

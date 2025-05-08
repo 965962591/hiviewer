@@ -375,7 +375,7 @@ def check_update(parent_window=None):
                 return True
             else:
                 # 适用当前目录下没有installer.exe的情况
-                program_path = os.path.join(BasePath, "tools", "installer.exe")
+                program_path = os.path.join(BasePath, "resource", "tools", "installer.exe")
                 if os.path.exists(program_path):
                     os.startfile(program_path)
                     return True

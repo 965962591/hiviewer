@@ -348,7 +348,7 @@ if __name__ == "__main__":
 
     # test
     if False:
-        program_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),"tools","installer.exe")
+        program_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),"resource","tools","installer.exe")
         work_path = os.path.dirname(os.path.abspath(__file__))
         zip_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),"downloads","latest.zip")
         start_program_subprocess(program_path, work_path, f"-z {zip_path} -c 1")

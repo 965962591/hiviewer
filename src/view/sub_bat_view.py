@@ -93,7 +93,6 @@ class LogVerboseMaskApp(QWidget):
     def initUI(self):
         self.setWindowTitle('Bat脚本执行')
         self.resize(1000, 600)
-        self.setWindowIcon(QIcon(r"D:\tuning\tools\AE\aebox_v3\icon\icon.ico"))
         self.mask_value = 0x00000000
 
         # 创建主布局
