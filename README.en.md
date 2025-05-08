@@ -6,7 +6,7 @@
 
 # 📷 hiviewer
 
-<img src="./icons/viewer_3.ico" alt="XianyuBot Logo" width="180">
+<img src="./resource/icons/viewer_3.ico" alt="XianyuBot Logo" width="180">
 
 **hiviewer** is an **intelligent image viewer tool** that supports **image & video** comparison. This project is implemented using **Python + PyQt5**, providing users with a more convenient way to view images.
 
@@ -73,10 +73,12 @@ hiviewer/
 
 ```bash
 # Install dependencies
-pip3 install -r requirements.txt
+conda create -n hiviewer python=3.11
+conda activate hiviewer
+pip3 install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # Run the program
-python3 hiviewer.py
+python hiviewer.py
 ```
 
 ### Download Installer
@@ -96,21 +98,21 @@ Not currently maintained
 
 **Main Interface Demo**
 
-![Alt text](images/Image_mainwindow.png)
+![Alt text](resource/images/Image_mainwindow.png)
 
-![Alt text](images/Image_mainwindow1.png)
+![Alt text](resource/images/Image_mainwindow1.png)
 
 **Image Viewing Interface Demo**
 
-![Alt text](images/Image_subwindow_pic.png)
+![Alt text](resource/images/Image_subwindow_pic.png)
 
 **Video Playback Interface Demo**
 
-![Alt text](images/Image_video.png)
+![Alt text](resource/images/Image_video.png)
 
 ### Technical Implementation
 
-![Alt text](images/Image_pic.png)
+![Alt text](resource/images/Image_pic.png)
 
 ## License
 

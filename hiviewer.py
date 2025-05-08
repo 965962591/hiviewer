@@ -40,22 +40,21 @@ from PyQt5.QtCore import (
 
 """导入用户自定义的模块"""
 from src.ui.main_ui import Ui_MainWindow                        # 假设你的主窗口类名为Ui_MainWindow
-from src.modules.sub_compare_image_view import SubMainWindow    # 假设这是你的子窗口类名
-from src.modules.sub_compare_video_view import VideoWall        # 假设这是你的子窗口类名 
-from src.modules.sub_rename_view import FileOrganizer           # 添加这行以导入批量重名名类名
-from src.modules.sub_image_process_view import SubCompare       # 确保导入 SubCompare 类
-from src.modules.sub_bat_view import LogVerboseMaskApp          # 导入批量执行命令的类
-from src.utils.about import AboutDialog                         # 导入关于对话框类,显示帮助信息
+from src.view.sub_compare_image_view import SubMainWindow    # 假设这是你的子窗口类名
+from src.view.sub_compare_video_view import VideoWall        # 假设这是你的子窗口类名 
+from src.view.sub_rename_view import FileOrganizer           # 添加这行以导入批量重名名类名
+from src.view.sub_image_process_view import SubCompare       # 确保导入 SubCompare 类
+from src.view.sub_bat_view import LogVerboseMaskApp          # 导入批量执行命令的类
+from src.components.about import AboutDialog                          # 导入关于对话框类,显示帮助信息
+from src.components.DialogLinkQualcomAebox import Qualcom_Dialog      # 导入自定义对话框的类
+from src.common.FontManager import SingleFontManager, MultiFontManager     # 字体管理器
+from src.common.VersionInit import version_init                            # 版本号初始化
 from src.utils.hisnot import WScreenshot                        # 导入截图工具类
 from src.utils.raw2jpg import Mipi2RawConverterApp              # 导入MIPI RAW文件转换为JPG文件的类
-from src.utils.DialogLinkQualcomAebox import Qualcom_Dialog               # 导入自定义对话框的类
-from src.utils.FontManager import SingleFontManager, MultiFontManager     # 字体管理器
-from src.utils.update import check_update,pre_check_update                # 导入自动更新检查程序
+from src.utils.update import check_update,pre_check_update      # 导入自动更新检查程序
 from src.utils.AeboxLink import check_process_running,urlencode_folder_path,get_api_data
-# 导入自定义图片预览组件
-from src.utils.ImagePreview import ImageViewer      
-# 导入自定义json配置文件
-from src.utils.setting import load_color_settings   
+from src.utils.ImagePreview import ImageViewer          # 导入自定义图片预览组件
+from src.common.SettingInit import load_color_settings       # 导入自定义json配置文件
 
 
 """python项目多文件夹路径说明
@@ -100,28 +99,6 @@ def show_message_box(text, title="提示", timeout=None):
     
     msg_box.exec_() # 使用 exec_ 显示模态对话框
 
-
-def version_init(VERSION=str):
-    """从配置文件中读取当前软件版本号"""
-    _start_time = time.time()
-    default_version_path = os.path.join(os.path.dirname(__file__), "config", "version.ini")
-    try:
-        # 检查文件是否存在，如果不存在则创建并写入默认版本号
-        if not os.path.exists(default_version_path):
-            # 确保cache目录存在
-            os.makedirs(os.path.dirname(default_version_path), exist_ok=True)
-            with open(default_version_path, 'w', encoding='utf-8') as f:
-                f.write(VERSION)
-            print(f"load_color_settings()--加载颜色设置, 耗时: {(time.time()-_start_time):.2f} 秒")
-            return VERSION
-        else:
-            with open(default_version_path, 'r', encoding='utf-8') as f:
-                print(f"load_color_settings()--加载颜色设置, 耗时: {(time.time()-_start_time):.2f} 秒")
-                return f.read().strip()
-                
-    except Exception as e:
-        print(f"版本号初始化失败: {str(e)}")
-        return VERSION  # 返回默认版本号
 
 def rgb_str_to_qcolor(rgb_str):
     """将 'rgb(r,g,b)' 格式的字符串转换为 QColor"""
@@ -650,7 +627,7 @@ class IconCache:
         """
         try:
             # 构建默认图标路径
-            default_icon_path = os.path.join(os.path.dirname(__file__), "icons", icon_path)
+            default_icon_path = os.path.join(BASEICONPATH, icon_path)
             
             # 检查图标文件是否存在
             if os.path.exists(default_icon_path):
@@ -1195,9 +1172,9 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         """加载字体相关设置""" # 初始化字体管理器,并获取字体，设置默认字体 self.custom_font
         font_paths = [
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", "JetBrainsMapleMono_Regular.ttf"), # JetBrains Maple Mono
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", "xialu_wenkai.ttf"),               # LXGW WenKai
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", "MapleMonoNormal_Regular.ttf")     # Maple Mono Normal
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "resource", "fonts", "JetBrainsMapleMono_Regular.ttf"), # JetBrains Maple Mono
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "resource", "fonts", "xialu_wenkai.ttf"),               # LXGW WenKai
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "resource", "fonts", "MapleMonoNormal_Regular.ttf")     # Maple Mono Normal
         ]
         MultiFontManager.initialize(font_paths=font_paths)
         self.custom_font = MultiFontManager.get_font(font_family="LXGW WenKai", size=12)
@@ -1210,7 +1187,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             # 第一种，直接使用字体管理器默认字体，只是恶
             self.custom_font = SingleFontManager.get_font(12)
             # 第二种，使用字体管理器初始化方法，传入字体路径    
-            font_path_jetbrains = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", "JetBrainsMapleMono_Regular.ttf")
+            font_path_jetbrains = os.path.join(os.path.dirname(os.path.abspath(__file__)), "resource", "fonts", "JetBrainsMapleMono_Regular.ttf")
             self.custom_font = SingleFontManager.get_font(size=12, font_path=font_path_jetbrains)  
 
 
@@ -1222,7 +1199,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def create_splash_screen(self):
         """创建带渐入渐出效果的启动画面"""
         # 加载启动画面图片
-        splash_path = os.path.join(os.path.dirname(__file__), "icons", "viewer_0.png")
+        splash_path = os.path.join(BASEICONPATH, "viewer_0.png")
         splash_pixmap = QPixmap(splash_path)
         
         if splash_pixmap.isNull():
@@ -1382,39 +1359,39 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         """)
 
         # 添加主菜单项并设置图标
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "delete_ico_96x96.ico")
+        icon_path = os.path.join(BASEICONPATH, "delete_ico_96x96.ico")
         delete_icon = QIcon(icon_path) 
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "paste_ico_96x96.ico")
+        icon_path = os.path.join(BASEICONPATH, "paste_ico_96x96.ico")
         paste_icon = QIcon(icon_path) 
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "update_ico_96x96.ico")
+        icon_path = os.path.join(BASEICONPATH, "update_ico_96x96.ico")
         refresh_icon = QIcon(icon_path) 
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "theme_ico_96x96.ico")
+        icon_path = os.path.join(BASEICONPATH, "theme_ico_96x96.ico")
         theme_icon = QIcon(icon_path) 
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "image_size_reduce_ico_96x96.ico")
+        icon_path = os.path.join(BASEICONPATH, "image_size_reduce_ico_96x96.ico")
         image_size_reduce_icon = QIcon(icon_path)
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "ps_ico_96x96.ico")
+        icon_path = os.path.join(BASEICONPATH, "ps_ico_96x96.ico")
         ps_icon = QIcon(icon_path) 
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "cmd_ico_96x96.ico")
+        icon_path = os.path.join(BASEICONPATH, "cmd_ico_96x96.ico")
         command_icon = QIcon(icon_path)
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "exif_ico_96x96.ico")
+        icon_path = os.path.join(BASEICONPATH, "exif_ico_96x96.ico")
         exif_icon = QIcon(icon_path)
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "raw_ico_96x96.ico")
+        icon_path = os.path.join(BASEICONPATH, "raw_ico_96x96.ico")
         raw_icon = QIcon(icon_path)
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "rename_ico_96x96.ico")
+        icon_path = os.path.join(BASEICONPATH, "rename_ico_96x96.ico")
         rename_icon = QIcon(icon_path)
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "about.ico")
+        icon_path = os.path.join(BASEICONPATH, "about.ico")
         help_icon = QIcon(icon_path) 
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "file_zip_ico_96x96.ico")
+        icon_path = os.path.join(BASEICONPATH, "file_zip_ico_96x96.ico")
         zip_icon = QIcon(icon_path)
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "TCP_ico_96x96.ico")
+        icon_path = os.path.join(BASEICONPATH, "TCP_ico_96x96.ico")
         tcp_icon = QIcon(icon_path)
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "rorator_plus_ico_96x96.ico")
+        icon_path = os.path.join(BASEICONPATH, "rorator_plus_ico_96x96.ico")
         rotator_icon = QIcon(icon_path)
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "line_filtrate_ico_96x96.ico")
+        icon_path = os.path.join(BASEICONPATH, "line_filtrate_ico_96x96.ico")
         filtrate_icon = QIcon(icon_path)
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "win_folder_ico_96x96.ico")
+        icon_path = os.path.join(BASEICONPATH, "win_folder_ico_96x96.ico")
         win_folder_icon = QIcon(icon_path)
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "restart_ico_96x96.ico")
+        icon_path = os.path.join(BASEICONPATH, "restart_ico_96x96.ico")
         restart_icon = QIcon(icon_path)
 
 
@@ -1547,7 +1524,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         """设置主界面图标以及标题"""
         print("set_stylesheet()--设置主界面相关组件")
 
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "viewer_3.ico")
+        icon_path = os.path.join(BASEICONPATH, "viewer_3.ico")
         self.setWindowIcon(QIcon(icon_path))
         self.setWindowTitle(f"HiViewer")
 
@@ -3188,9 +3165,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         """处理表格选中事件（新增预览功能）"""
         try:
             selected = self.RB_QTableWidget0.selectedItems()
-            if selected:
-                # 获取首个选中项的文件路径
-                file_paths = self.get_selected_file_path()  # 复用已有路径获取逻辑
+            file_paths = self.get_selected_file_path() if selected else ""
             if not file_paths:
                 return
             # 只预览第一个选中的文件
@@ -4706,7 +4681,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.video_player.setWindowTitle("多视频播放程序")
         self.video_player.setWindowFlags(Qt.Window) 
         # 设置窗口图标
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "video_icon.ico")
+        icon_path = os.path.join(BASEICONPATH, "video_icon.ico")
         self.video_player.setWindowIcon(QIcon(icon_path))
         self.video_player.closed.connect(self.on_video_player_closed)
         self.video_player.show()
@@ -4720,7 +4695,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 设置窗口最大化
         # self.rename_tool.showMaximized()
         # 设置窗口图标
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "rename_ico_96x96.ico")
+        icon_path = os.path.join(BASEICONPATH, "rename_ico_96x96.ico")
         self.rename_tool.setWindowIcon(QIcon(icon_path))
         # 链接关闭事件
         self.rename_tool.closed.connect(self.on_rename_tool_closed) 
@@ -4735,7 +4710,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 设置窗口最大化
         # self.image_process_window.showMaximized()
         # 设置窗口图标
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "ps_ico_96x96.ico")
+        icon_path = os.path.join(BASEICONPATH, "ps_ico_96x96.ico")
         self.image_process_window.setWindowIcon(QIcon(icon_path))
         # 链接关闭事件
         self.image_process_window.closed.connect(self.on_image_process_window_closed) 
@@ -4747,7 +4722,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.bat_tool = LogVerboseMaskApp()
         self.bat_tool.setWindowTitle("批量执行命令")
         # 设置窗口图标
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "cmd_ico_96x96.ico")
+        icon_path = os.path.join(BASEICONPATH, "cmd_ico_96x96.ico")
         self.bat_tool.setWindowIcon(QIcon(icon_path))
         # 设置窗口最大化
         # self.bat_tool.showMaximized()
@@ -4762,7 +4737,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.mipi2raw_tool.setWindowTitle("MIPI RAW文件转换为JPG文件")
         
         # 设置窗口图标
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "raw_ico_96x96.ico")
+        icon_path = os.path.join(BASEICONPATH, "raw_ico_96x96.ico")
         self.mipi2raw_tool.setWindowIcon(QIcon(icon_path))
 
         # 添加链接关闭事件
@@ -4930,16 +4905,18 @@ if __name__ == '__main__':
     # 记录程序启动的开始时间
     start_time = time.time()
 
-    # 读取全局颜色配置与版本信息
+    # 读取全局颜色配置、版本信息以及图标路径
+    BASEICONPATH = os.path.join(os.path.dirname(__file__), "resource", "icons")
     COLORSETTING = load_color_settings()
-    VERSION = version_init(VERSION='release-v2.3.2')
+    VERSION = version_init()
+    
 
     # 初始化日志文件
     # setup_logging()  
 
     # 设置主程序app
     app = QtWidgets.QApplication(sys.argv)
-    app_icon = QIcon(os.path.join(os.path.dirname(__file__), "icons", "viewer_3.ico"))
+    app_icon = QIcon(os.path.join(BASEICONPATH, "viewer_3.ico"))
     app.setWindowIcon(app_icon)
 
     # 设置主界面

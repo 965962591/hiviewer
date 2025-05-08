@@ -6,7 +6,7 @@
 
 # 📷 hiviewer
 
-<img src="./icons/viewer_3.ico" alt="XianyuBot Logo" width="180">
+<img src="resource/icons/viewer_3.ico" alt="XianyuBot Logo" width="180">
 
 **hiviewer**是一款多功能**图片&视频**比较工具，采用 **Python + PyQt5** 实现，旨在为用户提供更便捷的图片&视频对比方案。
 
@@ -105,21 +105,21 @@ python generate_exe.py
 
 **主界面展示**
 
-![Alt text](images/Image_mainwindow.png)
+![Alt text](resource/images/Image_mainwindow.png)
 
-![Alt text](images/Image_mainwindow1.png)
+![Alt text](resource/images/Image_mainwindow1.png)
 
 **看图界面展示**
 
-![Alt text](images/Image_subwindow_pic.png)
+![Alt text](resource/images/Image_subwindow_pic.png)
 
 **视频播放界面展示**
 
-![Alt text](images/Image_video.png)
+![Alt text](resource/images/Image_video.png)
 
 ### 技术实现
 
-![Alt text](images/Image_pic.png)
+![Alt text](resource/images/Image_pic.png)
 
 ## 许可证
 

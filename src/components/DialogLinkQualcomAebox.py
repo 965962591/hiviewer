@@ -13,7 +13,7 @@ if is_standalone:
 
 
 """导入自定义的模块"""
-from src.utils.FontManager import SingleFontManager
+from src.common.FontManager import SingleFontManager
 from src.utils.AeboxLink import test_aebox_link,launch_aebox,urlencode_folder_path,get_api_data
 
 
@@ -86,7 +86,7 @@ class Qualcom_Dialog(QDialog):
         self.json_path = os.path.join(BasePath, "cache", "Qualcom_exif_settings.json")
 
         # 初始化字体管理器
-        self.font_path_jetbrains = os.path.join(BasePath, "fonts", "JetBrainsMapleMono_Regular.ttf")
+        self.font_path_jetbrains = os.path.join(BasePath, "resource", "fonts", "JetBrainsMapleMono_Regular.ttf")
         self.font_manager_jetbrains_big = SingleFontManager.get_font(size=12, font_path=self.font_path_jetbrains) 
         self.font_manager_jetbrains_small = SingleFontManager.get_font(size=10, font_path=self.font_path_jetbrains)
 

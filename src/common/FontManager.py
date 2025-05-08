@@ -25,7 +25,7 @@ class SingleFontManager:
         if not cls._initialized or font_path is not None:
             try:
                 if font_path is None:
-                    font_path = os.path.join(BASE_PATH, "fonts", "xialu_wenkai.ttf")
+                    font_path = os.path.join(BASE_PATH, "resource", "fonts", "xialu_wenkai.ttf")
                 if not os.path.exists(font_path):
                     print(f"字体管理类SingleFontManager中: {font_path}不存在,请检查字体文件是否存在")
                     

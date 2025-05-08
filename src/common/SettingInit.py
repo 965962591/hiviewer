@@ -8,7 +8,6 @@ import time
 import pathlib
 
 
-
 def load_exif_settings():
         """加载EXIF信息配置"""
         try:

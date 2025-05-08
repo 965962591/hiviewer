@@ -56,7 +56,7 @@ class FileOrganizer(QWidget):
         self.resize(1200, 800)
 
         # 设置窗口图标
-        icon_path = os.path.join(BasePath, "icons", "viewer_3.ico")
+        icon_path = os.path.join(BasePath, "resource", "icons", "viewer_3.ico")
         self.setWindowIcon(QIcon(icon_path))
 
         # 主布局

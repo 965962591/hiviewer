@@ -32,10 +32,10 @@ from PyQt5.QtWidgets import (
 """导入自定义模块"""
 from src.ui.sub_ui import Ui_MainWindow               # 看图子界面，导入界面UI
 from src.utils.AiTips import CustomLLM_Siliconflow    # 看图子界面，AI提示看图复选框功能模块
-from src.utils.FontManager import SingleFontManager   # 看图子界面，导入字体管理器
+from src.common.FontManager import SingleFontManager   # 看图子界面，导入字体管理器
 from src.utils.hisnot import WScreenshot              # 看图子界面，导入自定义截图的类
 from src.utils.AeboxLink import check_process_running,get_api_data      # 导入与AEBOX通信的模块函数
-from src.utils.setting import load_exif_settings,load_color_settings    # 导入json配置模块
+from src.common.SettingInit import load_exif_settings,load_color_settings    # 导入json配置模块
 
 
 """设置本项目的入口路径,全局变量BasePath"""
@@ -507,7 +507,7 @@ class CameraTestDialog(QDialog):
         
         # 初始化字体管理器，标签组件使用;设置全局变量，定义项目基础路径
         # BasePath = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) # 使用全局变量 BasePath
-        font_path_jetbrains = os.path.join(BasePath, "fonts", "JetBrainsMapleMono_Regular.ttf")
+        font_path_jetbrains = os.path.join(BasePath, "resource", "fonts", "JetBrainsMapleMono_Regular.ttf")
         self.font_manager_jetbrains_big = SingleFontManager.get_font(size=12, font_path=font_path_jetbrains) 
         self.font_manager_jetbrains_small = SingleFontManager.get_font(size=10, font_path=font_path_jetbrains)
 
@@ -1662,7 +1662,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             # 导入字体设置
             self.custom_font = self.parent_window.custom_font if self.parent_window.custom_font else SingleFontManager.get_font(12) 
             self.font_manager_jetbrains = (self.parent_window.custom_font_jetbrains_medium if self.parent_window.custom_font_jetbrains_medium 
-                                           else SingleFontManager.get_font(size=11, font_path=os.path.join(BasePath, "fonts", "JetBrainsMapleMono_Regular.ttf")))
+                                           else SingleFontManager.get_font(size=11, font_path=os.path.join(BasePath, "resource", "fonts", "JetBrainsMapleMono_Regular.ttf")))
 
             # 导入颜色设置, 背景色，表格背景色，字体颜色，exif字体颜色; 从load_settings()中读取
             # self.background_color_default = self.parent_window.background_color_default
@@ -1756,7 +1756,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         第三排, self.label_bottom
         """
         # 设置主界面图标以及标题
-        icon_path = os.path.join(BasePath, "icons", "viewer.ico")
+        icon_path = os.path.join(BasePath, "resource", "icons", "viewer.ico")
         self.setWindowIcon(QIcon(icon_path))
         self.setWindowTitle("图片对比界面")
 

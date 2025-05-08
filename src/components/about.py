@@ -6,8 +6,9 @@ import os
 import sys
 
 """导入自定义模块,主函数调用"""
-from src.utils.FontManager import SingleFontManager
+from src.common.FontManager import SingleFontManager
 from src.utils.update import check_update
+from src.common.VersionInit import version_init
 
 """
 在本项目结构中正确导入自定义模块的方法：
@@ -35,26 +36,6 @@ if False: # 暂时禁用，不支持单独运行该模块
     BasePath = os.path.dirname(os.path.abspath(sys.argv[0]))
     
 
-# 全局函数，版本号初始化
-def version_init(VERSION=str):
-    # 设置保存版本号的文件
-    default_version_path = os.path.join(BasePath, "config", "version.ini")
-    try:
-        # 检查文件是否存在，如果不存在则创建并写入默认版本号
-        if not os.path.exists(default_version_path):
-            # 确保cache目录存在
-            os.makedirs(os.path.dirname(default_version_path), exist_ok=True)
-            with open(default_version_path, 'w', encoding='utf-8') as f:
-                f.write(VERSION)
-            return VERSION
-        else:
-            with open(default_version_path, 'r', encoding='utf-8') as f:
-                return f.read().strip()
-    except Exception as e:
-        print(f"版本号初始化失败: {str(e)}")
-        return VERSION  # 返回默认版本号
-
-
 class AboutDialog(QDialog):
     def __init__(self, md_path_user=None, md_path_version=None):
         super().__init__()
@@ -70,7 +51,7 @@ class AboutDialog(QDialog):
         self.Version_Update_Mdpath = md_path_version
         
         # 设置默认版本号，并从version.ini配置文件中读取当前最新的版本号
-        self.VERSION = version_init(VERSION='release-v2.3.2')
+        self.VERSION = version_init()
 
         # UI界面初始化
         self.ui_init()
@@ -91,7 +72,7 @@ class AboutDialog(QDialog):
         # 创建一个垂直布局，用于放置图标和版本号
         self.icon_layout = QVBoxLayout()
         self.icon_label = QLabel() # 放置图标
-        icon_path = os.path.join(BasePath, "icons", "viewer_3.ico")
+        icon_path = os.path.join(BasePath, "resource", "icons", "viewer_3.ico")
         self.icon_label.setPixmap(QIcon(icon_path).pixmap(108, 108))
         self.icon_layout.addWidget(self.icon_label)
         self.icon_label.setAlignment(Qt.AlignCenter)
@@ -158,7 +139,7 @@ class AboutDialog(QDialog):
         """设置窗口标题组件和样式表"""
         # 设置标题和图标
         self.setWindowTitle("关于")
-        icon_path = os.path.join(BasePath, "icons", "about.ico")
+        icon_path = os.path.join(BasePath, "resource", "icons", "about.ico")
         self.setWindowIcon(QIcon(icon_path))
 
         # 获取鼠标所在屏幕，并根据当前屏幕分辨率自适应界面大小
