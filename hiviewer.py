@@ -8,7 +8,6 @@ import json
 import shutil
 import ctypes
 import zipfile
-import pathlib
 import hashlib
 import logging
 import threading
@@ -23,11 +22,10 @@ from itertools import zip_longest, chain
 from logging.handlers import RotatingFileHandler
 
 """导入python第三方模块"""
-# import av # 比原生 OpenCV 快 35%（实测 1000 个视频处理仅需 8.2 秒）  
 import cv2
 import piexif
-from openpyxl import Workbook
 import xml.etree.ElementTree as ET
+from openpyxl import Workbook
 from PIL import Image
 from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtGui import (
@@ -45,7 +43,7 @@ from src.ui.main_ui import Ui_MainWindow                        # 假设你的�
 from src.modules.sub_compare_image_view import SubMainWindow    # 假设这是你的子窗口类名
 from src.modules.sub_compare_video_view import VideoWall        # 假设这是你的子窗口类名 
 from src.modules.sub_rename_view import FileOrganizer           # 添加这行以导入批量重名名类名
-from src.modules.sub_image_process import SubCompare            # 确保导入 SubCompare 类
+from src.modules.sub_image_process_view import SubCompare       # 确保导入 SubCompare 类
 from src.modules.sub_bat_view import LogVerboseMaskApp          # 导入批量执行命令的类
 from src.utils.about import AboutDialog                         # 导入关于对话框类,显示帮助信息
 from src.utils.hisnot import WScreenshot                        # 导入截图工具类

@@ -33,11 +33,11 @@ hiviewer/
 │   ├── __init__.py
 │   ├── modules/        # 存放各个子界面功能模块
 │   │   ├── __init__.py
-│   │   ├── sub_bat.py
+│   │   ├── sub_bat_view.py
 │   │   ├── sub_compare_image_view.py
 │   │   ├── sub_compare_video_view.py
-│   │   ├── sub_image_process.py
-│   │   ├── sub_image_size_reduce.py
+│   │   ├── sub_image_process_view.py
+│   │   ├── sub_settings_view.py
 │   │   └── sub_rename_view.py
 │   ├── ui/             # 存在主界面和看图子界面的UI
 │   │   ├── __init__.py
@@ -63,6 +63,7 @@ hiviewer/
 ├── .gitignore          # 忽略文件
 ├── README.md           # 说明文档
 ├── requirements.txt    # 三方库依赖
+├── generate_exe.py     # 打包exe可执行文件
 └── hiviewer.py         # 项目主函数
 
 ````
@@ -72,13 +73,19 @@ hiviewer/
 ### 环境配置
 
 ```bash
-# 安装依赖
+# 安装依赖（清华源）
 conda create -n hiviewer python=3.11
 conda activate hiviewer
-pip3 install -r requirements.txt
+pip3 install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 运行程序
 python hiviewer.py
+
+# 打包exe可执行文件
+pip install nuitka==2.5.0
+python generate_exe.py
+另：也可以使用 auto-py-to-exe 调出图形打包界面，可平替pyinstaller
+
 ````
 
 ### 安装包下载
