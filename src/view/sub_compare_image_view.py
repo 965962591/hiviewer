@@ -31,11 +31,12 @@ from PyQt5.QtWidgets import (
 
 """导入自定义模块"""
 from src.components.UiSub import Ui_MainWindow                              # 看图子界面，导入界面UI
+from src.components.QMessageBox import show_message_box                     # 导入消息框类
 from src.common.SettingInit import load_exif_settings,load_color_settings   # 导入json配置模块
 from src.common.FontManager import SingleFontManager                        # 看图子界面，导入字体管理器
-from src.utils.AiTips import CustomLLM_Siliconflow                          # 看图子界面，AI提示看图复选框功能模块
+from src.utils.aitips import CustomLLM_Siliconflow                          # 看图子界面，AI提示看图复选框功能模块
 from src.utils.hisnot import WScreenshot                                    # 看图子界面，导入自定义截图的类
-from src.utils.AeboxLink import check_process_running,get_api_data          # 导入与AEBOX通信的模块函数
+from src.utils.aeboxlink import check_process_running,get_api_data          # 导入与AEBOX通信的模块函数
 
 """设置本项目的入口路径,全局变量BasePath"""
 # 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
@@ -49,25 +50,6 @@ if False: # 暂时禁用，不支持单独运行该模块
 设置全局函数区域开始线
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 """
-
-def show_message_box(text, title="提示", timeout=None):
-    """显示消息框
-    Args:
-        text: 显示的文本内容
-        title: 窗口标题，默认为"提示" 
-        timeout: 自动关闭的超时时间(毫秒)，默认为None不自动关闭
-    """
-    msg_box = QMessageBox()  # 创建 QMessageBox 实例，不传入 self
-    msg_box.setWindowTitle(title)
-    msg_box.setText(text)
-    msg_box.setStandardButtons(QMessageBox.Ok)
-    
-    if timeout is not None:
-        # 设置定时器自动关闭
-        QTimer.singleShot(timeout, msg_box.close)
-    
-    msg_box.exec_()  # 使用 exec_ 显示模态对话框
-
 
 def convert_to_dict(exif_string):
     """将字符串转换为字典
@@ -3194,7 +3176,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             try:
                 # 检查图片数量
                 if len(self.images_path_list) != 2:
-                    show_message_box("当前AI提示支持两张图比较，请选择两张图片进行比较！", "提示", 500)
+                    show_message_box("当前AI提示支持两张图比较，请选择两张图片进行比较！", "提示", 1000)
                     # 延时1秒后更新is_updatng为False
                     QTimer.singleShot(1000, lambda: setattr(self, 'is_updating', False))
                     return

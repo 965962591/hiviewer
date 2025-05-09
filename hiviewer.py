@@ -24,15 +24,14 @@ from logging.handlers import RotatingFileHandler
 """导入python第三方模块"""
 import cv2
 import piexif
-import xml.etree.ElementTree as ET
 from openpyxl import Workbook
 from PIL import Image
 from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtGui import (
-    QIcon, QKeySequence, QPixmap, QColor, QTransform, QFont, QPainter, QImageReader,QImage)
+    QIcon, QKeySequence, QPixmap, QColor, QTransform, QImageReader,QImage)
 from PyQt5.QtWidgets import (
     QFileSystemModel, QAbstractItemView, QTableWidgetItem, QHeaderView, QShortcut, QSplashScreen, 
-    QMessageBox, QStyledItemDelegate, QStyleOptionButton, QStyle, QApplication, QMenu, QProgressBar,QInputDialog,
+    QStyledItemDelegate, QStyleOptionButton, QStyle, QApplication, QMenu, QInputDialog,
     QProgressDialog, QDialog, QVBoxLayout, QLabel, QHBoxLayout, QPushButton, QLineEdit, QCheckBox)
 from PyQt5.QtCore import (
     Qt, QDir, QTimer, QSize, QTimer, QRunnable, QThreadPool, QObject, pyqtSignal, QAbstractListModel,
@@ -45,16 +44,18 @@ from src.view.sub_compare_video_view import VideoWall                   # 假设
 from src.view.sub_rename_view import FileOrganizer                      # 添加这行以导入批量重名名类名
 from src.view.sub_image_process_view import SubCompare                  # 确保导入 SubCompare 类
 from src.view.sub_bat_view import LogVerboseMaskApp                     # 导入批量执行命令的类
-from src.components.DialogAbout import AboutDialog                      # 导入关于对话框类,显示帮助信息
-from src.components.DialogLinkQualcomAebox import Qualcom_Dialog        # 导入自定义对话框的类
+from src.components.QMessageBox import show_message_box                 # 导入消息框类
+from src.components.QDialogAbout import AboutDialog                     # 导入关于对话框类,显示帮助信息
+from src.components.QDialogLinkQualcomAebox import Qualcom_Dialog       # 导入自定义对话框的类
 from src.common.FontManager import SingleFontManager, MultiFontManager  # 字体管理器
 from src.common.VersionInit import version_init                         # 版本号初始化
 from src.common.SettingInit import load_color_settings                  # 导入自定义json配置文件
 from src.utils.hisnot import WScreenshot                                # 导入截图工具类
+from src.utils.xml import save_excel_data                               # 导入xml文件解析工具类
 from src.utils.raw2jpg import Mipi2RawConverterApp                      # 导入MIPI RAW文件转换为JPG文件的类
 from src.utils.update import check_update,pre_check_update              # 导入自动更新检查程序
 from src.utils.ImagePreview import ImageViewer                          # 导入自定义图片预览组件
-from src.utils.AeboxLink import (check_process_running,urlencode_folder_path,get_api_data)
+from src.utils.aeboxlink import (check_process_running,urlencode_folder_path,get_api_data)
 
 
 
@@ -74,31 +75,13 @@ from src.utils.AeboxLink import (check_process_running,urlencode_folder_path,get
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 """
 
-# 预编译正则表达式，提高效率（针对实现类似widow的文件排名）
-_natural_sort_re = re.compile('([0-9]+)')
+
 
 def natural_sort_key(s):
     """将字符串转换为自然排序的键值（优化版）"""
+    # 预编译正则表达式，提高效率（针对实现类似widow的文件排名）
+    _natural_sort_re = re.compile('([0-9]+)')
     return [int(text) if text.isdigit() else text.lower() for text in _natural_sort_re.split(s)]
-
-def show_message_box(text, title="提示", timeout=None):
-    """显示消息框，宽度自适应文本内容
-    
-    Args:
-        text: 显示的文本内容
-        title: 窗口标题，默认为"提示" 
-        timeout: 自动关闭的超时时间(毫秒)，默认为None不自动关闭
-    """
-    msg_box = QMessageBox()
-    msg_box.setWindowTitle(title)
-    msg_box.setText(text)
-    msg_box.setStandardButtons(QMessageBox.Ok)
-    
-    if timeout is not None:
-        # 设置定时器自动关闭
-        QTimer.singleShot(timeout, msg_box.close)
-    
-    msg_box.exec_() # 使用 exec_ 显示模态对话框
 
 
 def rgb_str_to_qcolor(rgb_str):
@@ -130,141 +113,6 @@ def force_delete_folder(folder_path, suffix='.zip'):
         print(f"强制删除文件夹失败: {e}")   
 
 
-def load_xml_data(xml_path):
-    """加载XML文件并提取Lux值和DRCgain值等EXIF信息"""
-    try:
-        # 加载xml文件
-        tree = ET.parse(xml_path)
-        root = tree.getroot()
-        
-        """
-        # 提取值并转换为字典
-        result_dict = {
-            "Lux": root.find('lux_index').text if root.find('lux_index') is not None else None,
-            "DRCgain": root.find('DRCgain').text if root.find('DRCgain') is not None else None,
-            "Safe_gain": root.find('safe_gain').text if root.find('safe_gain') is not None else None,
-            "Short_gain": root.find('short_gain').text if root.find('short_gain') is not None else None,
-            "Long_gain": root.find('long_gain').text if root.find('long_gain') is not None else None,
-            "CCT": root.find('CCT').text if root.find('CCT') is not None else None,
-            "R_gain": root.find('r_gain').text if root.find('r_gain') is not None else None,
-            "B_gain": root.find('b_gain').text if root.find('b_gain') is not None else None,
-            "Awb_sa": root.find('awb_sa').text if root.find('awb_sa') is not None else None,
-            "Triangle_index": root.find('triangle_index').text if root.find('triangle_index') is not None else None,
-        }
-
-        result_one_list = [
-            "文件名",
-            "Lux",
-            "DRCgain",
-            "Safe_gain",
-            "Short_gain",
-            "Long_gain",
-            "CCT",
-            "R_gain",
-            "B_gain",
-            "Awb_sa",
-            "Triangle_index",
-        ]
-
-        """
-
-        # 提取值并转换为列表
-        result_list = [
-            # str(Path(xml_path).parent / (os.path.basename(xml_path).split('_new.xml')[0]+".jpg")),
-            str(os.path.basename(xml_path).split('_new.xml')[0]+".jpg"),
-            float(root.find('lux_index').text) if root.find('lux_index') is not None else None,
-            root.find('DRCgain').text if root.find('DRCgain') is not None else None,
-            float(root.find('safe_gain').text) if root.find('safe_gain') is not None else None,
-            float(root.find('short_gain').text) if root.find('short_gain') is not None else None,
-            float(root.find('long_gain').text) if root.find('long_gain') is not None else None,
-            float(root.find('CCT').text) if root.find('CCT') is not None else None,
-            float(root.find('r_gain').text) if root.find('r_gain') is not None else None,
-            float(root.find('b_gain').text) if root.find('b_gain') is not None else None,
-            root.find('awb_sa').text if root.find('awb_sa') is not None else None,
-            float(root.find('triangle_index').text) if root.find('triangle_index') is not None else None,
-        ]
-
-        return result_list
-        
-    except Exception as e:
-        print(f"解析XML失败{xml_path}:\n {e}")
-        return None
-
-
-
-def save_excel_data(images_path):
-    """将从XML文件中提取的数据保存到Excel表格中"""
-
-    # 配置保存的Excel文件路径
-    excel_path = os.path.join(images_path, "extracted_data.xlsx")
-    if os.path.exists(excel_path):
-        # 若存在excel文件则不需要保存新的excel文件
-        return
-
-    # 初始化二维列表
-    get_excel_list = [
-        [
-            "文件名",
-            "Lux",
-            "DRCgain",
-            "Safe_gain",
-            "Short_gain",
-            "Long_gain",
-            "CCT",
-            "R_gain",
-            "B_gain",
-            "Awb_sa",
-            "Triangle_index",
-            "AE",
-            "AWB",
-            "ISP",
-            "AF",
-        ]
-    ]
-
-    # 遍历文件夹，列出所有满足条件的xml文件
-    xml_files = [f for f in os.listdir(images_path) if f.endswith('_new.xml')]
-
-    for xml_file in xml_files:
-        xml_file = str(Path(images_path) / xml_file)
-        if os.path.exists(xml_file):
-            # 使用函数load_xml_data加载并解析xml文件
-            result_list = load_xml_data(xml_file)
-            if result_list:
-                get_excel_list.append(result_list)
-
-    # 创建一个新的工作簿
-    wb = Workbook()
-    ws = wb.active
-
-    # 设置边框样式
-    from openpyxl.styles import Border, Side
-    thin = Side(style='thin')
-    border = Border(left=thin, right=thin, top=thin, bottom=thin)
-
-    # 写入数据并设置列宽和边框
-    for row in get_excel_list:
-        ws.append(row)
-        for cell in row:
-            # 设置边框
-            ws.cell(row=ws.max_row, column=row.index(cell) + 1).border = border
-
-    # 自适应列宽
-    for column in ws.columns:
-        max_length = 0
-        column_letter = column[0].column_letter  # 获取列字母
-        for cell in column:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = (max_length + 2)  # 加2以增加一些额外的空间
-        ws.column_dimensions[column_letter].width = adjusted_width
-
-
-    wb.save(excel_path)  # 保存为Excel文件
-    print(f"数据已保存到 {excel_path}")
 
 """
 设置全局函数区域结束线
