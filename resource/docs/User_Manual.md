@@ -67,7 +67,7 @@
 
 1.仅适用于两张图片比较的情况，需要打开AI提示看图复选框，然后按下P键即可发起AI请求
 
-![Alt text](D:\Image_process\hiviewer\docs\images\image.png)
+![Alt text](D:\Image_process\hiviewer\resource\docs\images\image.png)
 
 2.当打开AI提示看图复选框时，无法使用ESC退出当前界面，无法使用Space/B键切换图片
 
@@ -98,13 +98,13 @@
 
 1.使用播放视频子界面时，需要在主界面下拉框打开显示视频文件，否则无法显示视频文件
 
-![Alt text](D:\Image_process\hiviewer\docs\images\image-1.png)
+![Alt text](D:\Image_process\hiviewer\resource\docs\images\image-1.png)
 
 2.在主界面选中视频文件时，除了按下SPACE/B键打开视频，还可以按下对比按钮打开视频文件
 
 3.在视频播放子界面，每个视频底下会显示单个视频的进度条和控制按钮（播放速度、跳帧设置，查找相似帧、暂停，从头播放、左旋转90度、右旋转90度）
 
-![Alt text](D:\Image_process\hiviewer\docs\images\image-2.png)
+![Alt text](D:\Image_process\hiviewer\resource\docs\images\image-2.png)
 
 ## 批量重命名子界面使用说明
 
@@ -121,15 +121,15 @@
 
 1.点击帮助按钮会有重命名的使用说明
 
-![Alt text](D:\Image_process\hiviewer\docs\images\image-3.png)
+![Alt text](D:\Image_process\hiviewer\resource\docs\images\image-3.png)
 
 2.在命名规则下拉框中，预置了常见的规则，选择命名规则后，可以点击预览查看是否符合预期，然后点击开始按钮，即可对文件进行重命名
 
-![Alt text](D:\Image_process\hiviewer\docs\images\image-4.png)
+![Alt text](D:\Image_process\hiviewer\resource\docs\images\image-4.png)
 
 3.查看替换复选框的使用，具体操作如下图，可以替换文件名中的指定字符
 
-![Alt text](D:\Image_process\hiviewer\docs\images\image-5.png)
+![Alt text](D:\Image_process\hiviewer\resource\docs\images\image-5.png)
 
 
 

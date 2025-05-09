@@ -29,41 +29,36 @@
 ```
 
 hiviewer/
-├── src/                # Contains the main functional modules of the project
-│   ├── __init__.py
-│   ├── modules/        # Contains sub-interface functional modules
-│   │   ├── __init__.py
-│   │   ├── sub_bat.py
-│   │   ├── sub_compare_image_view.py
-│   │   ├── sub_compare_video_view.py
-│   │   ├── sub_image_process.py
-│   │   ├── sub_image_size_reduce.py
-│   │   └── sub_rename_view.py
-│   ├── ui/             # Contains the main interface and image viewing sub-interface UI
-│   │   ├── __init__.py
-│   │   ├── main_ui.py
-│   │   └── sub_ui.py
-│   └── utils/          # Contains custom functional modules
-│       ├── __init__.py
-│       ├── about.py
-│       ├── AI_tips.py
-│       ├── Custom_dialog_class.py
-│       ├── Custom_Font_class.py
-│       ├── hisnot.py
-│       ├── installer.py
-│       ├── mipi2raw.py
-│       └── update.py
-├── test/               # Contains test code
-│   ├── __init__.py
-│   └── test_utils_about.py
-├── icons/              # Contains ico icons
-├── docs/               # Contains documentation
-├── fonts/              # Contains custom fonts
-├── tools/              # Contains some exe tools
-├── .gitignore          # Ignore files
-├── README.md           # Documentation
-├── requirements.txt    # Third-party library dependencies
-└── hiviewer.py         # Main function of the project
+├── resource/          
+│   ├── icons/         
+│   ├── docs/          
+│   ├── fonts/         
+│   ├── tools/         
+│   └── installer.exe 
+├── src/                
+│   ├── __init__.py
+│   ├── common/          
+│   │   ├── __init__.py  
+│   │   └── ...
+│   ├── components/      
+│   │   ├── __init__.py 
+│   │   └── ... 
+│   ├── utils/          
+│   │   ├── __init__.py 
+│   │   └── ...
+│   └── view/         
+│       ├── __init__.py 
+│       └── ...  
+├── test/              
+│   ├── __init__.py
+│   └── ...
+├── .gitignore         
+├── README.en.md       
+├── README.md          
+├── LICENSE            
+├── requirements.txt    
+├── generate_exe.py     
+└── hiviewer.py         
 
 ```
 

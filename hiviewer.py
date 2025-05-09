@@ -36,25 +36,26 @@ from PyQt5.QtWidgets import (
     QProgressDialog, QDialog, QVBoxLayout, QLabel, QHBoxLayout, QPushButton, QLineEdit, QCheckBox)
 from PyQt5.QtCore import (
     Qt, QDir, QTimer, QSize, QTimer, QRunnable, QThreadPool, QObject, pyqtSignal, QAbstractListModel,
-    QThread, QSize, QAbstractListModel, QModelIndex, QVariant, QItemSelection, QItemSelectionModel,QUrl)
+    QThread, QSize, QAbstractListModel, QModelIndex, QVariant, QItemSelection, QItemSelectionModel)
 
 """导入用户自定义的模块"""
-from src.ui.main_ui import Ui_MainWindow                        # 假设你的主窗口类名为Ui_MainWindow
-from src.view.sub_compare_image_view import SubMainWindow    # 假设这是你的子窗口类名
-from src.view.sub_compare_video_view import VideoWall        # 假设这是你的子窗口类名 
-from src.view.sub_rename_view import FileOrganizer           # 添加这行以导入批量重名名类名
-from src.view.sub_image_process_view import SubCompare       # 确保导入 SubCompare 类
-from src.view.sub_bat_view import LogVerboseMaskApp          # 导入批量执行命令的类
-from src.components.about import AboutDialog                          # 导入关于对话框类,显示帮助信息
-from src.components.DialogLinkQualcomAebox import Qualcom_Dialog      # 导入自定义对话框的类
-from src.common.FontManager import SingleFontManager, MultiFontManager     # 字体管理器
-from src.common.VersionInit import version_init                            # 版本号初始化
-from src.utils.hisnot import WScreenshot                        # 导入截图工具类
-from src.utils.raw2jpg import Mipi2RawConverterApp              # 导入MIPI RAW文件转换为JPG文件的类
-from src.utils.update import check_update,pre_check_update      # 导入自动更新检查程序
-from src.utils.AeboxLink import check_process_running,urlencode_folder_path,get_api_data
-from src.utils.ImagePreview import ImageViewer          # 导入自定义图片预览组件
-from src.common.SettingInit import load_color_settings       # 导入自定义json配置文件
+from src.components.UiMain import Ui_MainWindow                         # 假设你的主窗口类名为Ui_MainWindow
+from src.view.sub_compare_image_view import SubMainWindow               # 假设这是你的子窗口类名
+from src.view.sub_compare_video_view import VideoWall                   # 假设这是你的子窗口类名 
+from src.view.sub_rename_view import FileOrganizer                      # 添加这行以导入批量重名名类名
+from src.view.sub_image_process_view import SubCompare                  # 确保导入 SubCompare 类
+from src.view.sub_bat_view import LogVerboseMaskApp                     # 导入批量执行命令的类
+from src.components.DialogAbout import AboutDialog                      # 导入关于对话框类,显示帮助信息
+from src.components.DialogLinkQualcomAebox import Qualcom_Dialog        # 导入自定义对话框的类
+from src.common.FontManager import SingleFontManager, MultiFontManager  # 字体管理器
+from src.common.VersionInit import version_init                         # 版本号初始化
+from src.common.SettingInit import load_color_settings                  # 导入自定义json配置文件
+from src.utils.hisnot import WScreenshot                                # 导入截图工具类
+from src.utils.raw2jpg import Mipi2RawConverterApp                      # 导入MIPI RAW文件转换为JPG文件的类
+from src.utils.update import check_update,pre_check_update              # 导入自动更新检查程序
+from src.utils.ImagePreview import ImageViewer                          # 导入自定义图片预览组件
+from src.utils.AeboxLink import (check_process_running,urlencode_folder_path,get_api_data)
+
 
 
 """python项目多文件夹路径说明
@@ -1571,7 +1572,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # 隐藏不需要的列，只显示名称列
         self.Left_QTreeView.header().hide()  # 隐藏列标题
-        self.Left_QTreeView.setColumnWidth(0, 500)  # 设置名称列宽度，以显示横向滚动条
+        self.Left_QTreeView.setColumnWidth(0, 650)  # 设置名称列宽度，以显示横向滚动条
         self.Left_QTreeView.setColumnHidden(1, True)  # 隐藏大小列
         self.Left_QTreeView.setColumnHidden(2, True)  # 隐藏类型列
         self.Left_QTreeView.setColumnHidden(3, True)  # 隐藏修改日期列 
@@ -2617,18 +2618,12 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 清空历史的已选择
         self.statusbar_label.setText(f"[0]已选择")
 
-        # 更新左侧文件浏览器中的radioButton
+        # 更新左侧文件浏览器中的预览区域显示
         if True:
             # 清空旧预览内容
             self.clear_preview_layout()
-
-            preview_label = QLabel("预览区域")
-            preview_label.setFont(self.custom_font_jetbrains)
-            preview_label.setStyleSheet("color: white;")
-            preview_label.setAlignment(Qt.AlignCenter)
-            self.verticalLayout_left_2.addWidget(preview_label)
-
-
+            # 显示预览信息
+            self.show_preview_error("预览区域")
 
         # 获取左侧文件浏览器中当前点击的文件夹路径，并显示在地址栏
         current_path = self.file_system_model.filePath(index)
@@ -2636,9 +2631,11 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             if self.RT_QComboBox.findText(current_path) == -1:
                 self.RT_QComboBox.addItem(current_path)
             self.RT_QComboBox.setCurrentText(current_path)
-            print(f"1. 点击了左侧文件，该文件夹已更新到地址栏中: {current_path}")
+            print(f"点击了左侧文件，该文件夹已更新到地址栏中: {current_path}")
 
-        print("2. 将地址栏文件夹的同级文件夹更新到下拉复选框")
+        # 禁用左侧文件浏览器中的滚动条自动滚动
+        self.Left_QTreeView.setAutoScroll(False)
+
         # 将同级文件夹添加到 RT_QComboBox1 中
         self.RT_QComboBox1_init()      
         # 更新右侧RB_QTableWidget0表格
@@ -4427,7 +4424,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             # 单例模式管理帮助窗口
             if not hasattr(self, 'help_dialog'):
                 # 构建文档路径,使用说明文档+版本更新文档
-                doc_dir = os.path.join(os.path.dirname(__file__), "docs")
+                doc_dir = os.path.join(os.path.dirname(__file__), "resource", "docs")
                 User_path = os.path.join(doc_dir, "User_Manual.md")
                 Version_path = os.path.join(doc_dir, "Version_Updates.md")
                 
@@ -4447,7 +4444,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.help_dialog.finished.connect(self.close_helpinfo)
             
         except Exception as e:
-            error_msg = f"无法打开帮助文档:\n{str(e)}\n请检查程序是否包含文件: ./docs/update_main_logs.md"
+            error_msg = f"无法打开帮助文档:\n{str(e)}\n请检查程序是否包含文件: ./resource/docs/update_main_logs.md"
             show_message_box(error_msg, "严重错误", 3000)
 
     def close_helpinfo(self):

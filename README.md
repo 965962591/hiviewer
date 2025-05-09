@@ -29,42 +29,37 @@
 ```
 
 hiviewer/
+├── resource/           # 存在资源文件
+│   ├── icons/          # 存放ico图标
+│   ├── docs/           # 存放说明文档
+│   ├── fonts/          # 存放自定义字体 
+│   ├── tools/          # 存放一些exe类工具
+│   └── installer.exe   # 存放独立打包的exe文件
 ├── src/                # 存在项目主要功能模块
 │   ├── __init__.py
-│   ├── modules/        # 存放各个子界面功能模块
-│   │   ├── __init__.py
-│   │   ├── sub_bat_view.py
-│   │   ├── sub_compare_image_view.py
-│   │   ├── sub_compare_video_view.py
-│   │   ├── sub_image_process_view.py
-│   │   ├── sub_settings_view.py
-│   │   └── sub_rename_view.py
-│   ├── ui/             # 存在主界面和看图子界面的UI
-│   │   ├── __init__.py
-│   │   ├── main_ui.py
-│   │   └── sub_ui.py
-│   └── utils/          # 存放自定义的功能模块
-│       ├── __init__.py
-│       ├── about.py
-│       ├── AI_tips.py
-│       ├── Custom_dialog_class.py
-│       ├── Custom_Font_class.py
-│       ├── hisnot.py
-│       ├── installer.py
-│       ├── mipi2raw.py
-│       └── update.py
+│   ├── common/          # 存在公共模块
+│   │   ├── __init__.py  # 公共模块初始化
+│   │   └── ...
+│   ├── components/      # 存在组件模块
+│   │   ├── __init__.py  # 组件模块初始化
+│   │   └── ...
+│   ├── utils/           # 存放自定义的功能模块
+│   │   ├── __init__.py  # 自定义功能模块初始化
+│   │   └── ...
+│   └── view/          # 存放各个子界面功能模块
+│       ├── __init__.py  # 子界面功能模块初始化
+│       └── ...
 ├── test/               # 存在测试代码
 │   ├── __init__.py
-│   └── test_utils_about.py
-├── icons/              # 存放ico图标
-├── docs/               # 存放说明文档
-├── fonts/              # 存放自定义字体 
-├── tools/              # 存放一些exe类工具
+│   └── ...
 ├── .gitignore          # 忽略文件
-├── README.md           # 说明文档
+├── README.en.md        # 英文说明文档
+├── README.md           # 中文说明文档
+├── LICENSE             # 许可证
 ├── requirements.txt    # 三方库依赖
 ├── generate_exe.py     # 打包exe可执行文件
 └── hiviewer.py         # 项目主函数
+
 
 ````
 

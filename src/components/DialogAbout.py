@@ -42,12 +42,12 @@ class AboutDialog(QDialog):
 
         # 设置使用说明markdown文件，备用文件
         if not md_path_user or not os.path.exists(md_path_user):
-            md_path_user = os.path.join(BasePath, "docs", "User_Manual.md")
+            md_path_user = os.path.join(BasePath, "resource", "docs", "User_Manual.md")
         self.User_Manual_Mdpath = md_path_user
 
         # 设置版本更新markdown文件
         if not md_path_version or not os.path.exists(md_path_version):
-            md_path_version = os.path.join(BasePath, "docs", "Version_Updates.md")
+            md_path_version = os.path.join(BasePath, "resource", "docs", "Version_Updates.md")
         self.Version_Update_Mdpath = md_path_version
         
         # 设置默认版本号，并从version.ini配置文件中读取当前最新的版本号
