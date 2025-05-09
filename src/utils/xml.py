@@ -20,51 +20,30 @@ def load_xml_data(xml_path):
         # 加载xml文件
         tree = ET.parse(xml_path)
         root = tree.getroot()
-        
-        """
-        # 提取值并转换为字典
-        result_dict = {
-            "Lux": root.find('lux_index').text if root.find('lux_index') is not None else None,
-            "DRCgain": root.find('DRCgain').text if root.find('DRCgain') is not None else None,
-            "Safe_gain": root.find('safe_gain').text if root.find('safe_gain') is not None else None,
-            "Short_gain": root.find('short_gain').text if root.find('short_gain') is not None else None,
-            "Long_gain": root.find('long_gain').text if root.find('long_gain') is not None else None,
-            "CCT": root.find('CCT').text if root.find('CCT') is not None else None,
-            "R_gain": root.find('r_gain').text if root.find('r_gain') is not None else None,
-            "B_gain": root.find('b_gain').text if root.find('b_gain') is not None else None,
-            "Awb_sa": root.find('awb_sa').text if root.find('awb_sa') is not None else None,
-            "Triangle_index": root.find('triangle_index').text if root.find('triangle_index') is not None else None,
-        }
-
-        result_one_list = [
-            "文件名",
-            "Lux",
-            "DRCgain",
-            "Safe_gain",
-            "Short_gain",
-            "Long_gain",
-            "CCT",
-            "R_gain",
-            "B_gain",
-            "Awb_sa",
-            "Triangle_index",
-        ]
-
-        """
 
         # 提取值并转换为列表
         result_list = [
-            # str(Path(xml_path).parent / (os.path.basename(xml_path).split('_new.xml')[0]+".jpg")),
+            # 文件名
             str(os.path.basename(xml_path).split('_new.xml')[0]+".jpg"),
+            # Lux
             float(root.find('lux_index').text) if root.find('lux_index') is not None else None,
+            # DRCgain
             root.find('DRCgain').text if root.find('DRCgain') is not None else None,
+            # Safe_gain
             float(root.find('safe_gain').text) if root.find('safe_gain') is not None else None,
+            # Short_gain
             float(root.find('short_gain').text) if root.find('short_gain') is not None else None,
+            # Long_gain
             float(root.find('long_gain').text) if root.find('long_gain') is not None else None,
+            # CCT
             float(root.find('CCT').text) if root.find('CCT') is not None else None,
+            # R_gain
             float(root.find('r_gain').text) if root.find('r_gain') is not None else None,
+            # B_gain
             float(root.find('b_gain').text) if root.find('b_gain') is not None else None,
+            # Awb_sa
             root.find('awb_sa').text if root.find('awb_sa') is not None else None,
+            # Triangle_index
             float(root.find('triangle_index').text) if root.find('triangle_index') is not None else None,
         ]
 
