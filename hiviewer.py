@@ -6,7 +6,6 @@ import sys
 import time
 import json
 import shutil
-import ctypes
 import zipfile
 import hashlib
 import logging
@@ -26,8 +25,7 @@ import cv2
 import piexif
 from PIL import Image
 from PyQt5 import QtWidgets, QtGui, QtCore
-from PyQt5.QtGui import (
-    QIcon, QKeySequence, QPixmap, QColor, QTransform, QImageReader,QImage)
+from PyQt5.QtGui import (QIcon, QKeySequence, QPixmap, QTransform, QImageReader,QImage)
 from PyQt5.QtWidgets import (
     QFileSystemModel, QAbstractItemView, QTableWidgetItem, QHeaderView, QShortcut, QSplashScreen, 
     QStyledItemDelegate, QStyleOptionButton, QStyle, QApplication, QMenu, QInputDialog,
@@ -37,23 +35,25 @@ from PyQt5.QtCore import (
     QThread, QSize, QAbstractListModel, QModelIndex, QVariant, QItemSelection, QItemSelectionModel)
 
 """导入用户自定义的模块"""
-from src.components.UiMain import Ui_MainWindow                         # 假设你的主窗口类名为Ui_MainWindow
-from src.view.sub_compare_image_view import SubMainWindow               # 假设这是你的子窗口类名
-from src.view.sub_compare_video_view import VideoWall                   # 假设这是你的子窗口类名 
-from src.view.sub_rename_view import FileOrganizer                      # 添加这行以导入批量重名名类名
-from src.view.sub_image_process_view import SubCompare                  # 确保导入 SubCompare 类
-from src.view.sub_bat_view import LogVerboseMaskApp                     # 导入批量执行命令的类
-from src.components.QMessageBox import show_message_box                 # 导入消息框类
-from src.components.QDialogAbout import AboutDialog                     # 导入关于对话框类,显示帮助信息
-from src.components.QDialogLinkQualcomAebox import Qualcom_Dialog       # 导入自定义对话框的类
-from src.common.FontManager import SingleFontManager, MultiFontManager  # 字体管理器
-from src.common.VersionInit import version_init                         # 版本号初始化
-from src.common.SettingInit import load_color_settings                  # 导入自定义json配置文件
-from src.utils.hisnot import WScreenshot                                # 导入截图工具类
-from src.utils.xml import save_excel_data                               # 导入xml文件解析工具类
-from src.utils.raw2jpg import Mipi2RawConverterApp                      # 导入MIPI RAW文件转换为JPG文件的类
-from src.utils.update import check_update,pre_check_update              # 导入自动更新检查程序
-from src.utils.ImagePreview import ImageViewer                          # 导入自定义图片预览组件
+from src.components.UiMain import Ui_MainWindow                          # 假设你的主窗口类名为Ui_MainWindow
+from src.view.sub_compare_image_view import SubMainWindow                # 假设这是你的子窗口类名
+from src.view.sub_compare_video_view import VideoWall                    # 假设这是你的子窗口类名 
+from src.view.sub_rename_view import FileOrganizer                       # 添加这行以导入批量重名名类名
+from src.view.sub_image_process_view import SubCompare                   # 确保导入 SubCompare 类
+from src.view.sub_bat_view import LogVerboseMaskApp                      # 导入批量执行命令的类
+from src.components.QMessageBox import show_message_box                  # 导入消息框类
+from src.components.QDialogAbout import AboutDialog                      # 导入关于对话框类,显示帮助信息
+from src.components.QDialogLinkQualcomAebox import Qualcom_Dialog        # 导入自定义对话框的类
+from src.components.QComboBox import CheckBoxListModel, CheckBoxDelegate # 导入自定义下拉框类中的数据模型和委托代理类
+from src.common.FontManager import SingleFontManager, MultiFontManager   # 字体管理器
+from src.common.VersionInit import version_init                          # 版本号初始化
+from src.common.SettingInit import load_color_settings                   # 导入自定义json配置文件
+from src.utils.hisnot import WScreenshot                                 # 导入截图工具类
+from src.utils.xml import save_excel_data                                # 导入xml文件解析工具类
+from src.utils.raw2jpg import Mipi2RawConverterApp                       # 导入MIPI RAW文件转换为JPG文件的类
+from src.utils.update import check_update,pre_check_update               # 导入自动更新检查程序
+from src.utils.ImagePreview import ImageViewer                           # 导入自定义图片预览组件
+from src.utils.delete import force_delete_folder                         # 导入强制删除文件夹的功能函数
 from src.utils.aeboxlink import (check_process_running,urlencode_folder_path,get_api_data)
 
 
@@ -75,41 +75,11 @@ from src.utils.aeboxlink import (check_process_running,urlencode_folder_path,get
 """
 
 
-
 def natural_sort_key(s):
     """将字符串转换为自然排序的键值（优化版）"""
     # 预编译正则表达式，提高效率（针对实现类似widow的文件排名）
     _natural_sort_re = re.compile('([0-9]+)')
     return [int(text) if text.isdigit() else text.lower() for text in _natural_sort_re.split(s)]
-
-
-def rgb_str_to_qcolor(rgb_str):
-    """将 'rgb(r,g,b)' 格式的字符串转换为 QColor"""
-    # 提取RGB值
-    rgb = rgb_str.strip('rgb()')  # 移除 'rgb()' 
-    r, g, b = map(int, rgb.split(','))  # 分割并转换为整数
-    return QColor(r, g, b)
-
-def force_delete_file(file_path):
-    """强制删除文件"""
-    try:
-        os.remove(file_path)
-    except PermissionError:
-        # 如果文件被占用，尝试强制删除
-        try:
-            # 使用Windows API强制删除文件
-            ctypes.windll.kernel32.DeleteFileW(file_path)
-        except Exception as e:
-            print(f"强制删除文件失败: {e}")
-
-def force_delete_folder(folder_path, suffix='.zip'):
-    """强制删除文件夹内指定后缀文件"""
-    try:
-        for file in os.listdir(folder_path):
-            if file.endswith(suffix):
-                force_delete_file(os.path.join(folder_path, file))
-    except Exception as e:
-        print(f"强制删除文件夹失败: {e}")   
 
 
 
@@ -714,102 +684,7 @@ class ImageTransform:
             return QPixmap()
 
 
-class CheckBoxListModel(QAbstractListModel):
-    """自定义数据模型，用于存储文件夹名和复选框的状态。"""
 
-    def __init__(self, items):
-        super(CheckBoxListModel, self).__init__()
-        self.items = ["全选"] + sorted(items)  # 第一个项作为"全选"，其余按字母排序
-        self.checked_states = [False] * len(self.items)  # 初始化所有项为未选中状态
-        self.checked_order = []  # 新增：记录选中顺序的列表
-
-    def rowCount(self, parent=QModelIndex()):
-        """返回模型中的行数（文件夹项数）。"""
-        return len(self.items)
-
-    def data(self, index, role=Qt.DisplayRole):
-        """根据索引和角色返回相应的数据。"""
-        if not index.isValid():
-            return QVariant()
-        if role == Qt.DisplayRole:
-            return self.items[index.row()]  # 返回项目名称
-        if role == Qt.UserRole:
-            return self.checked_states[index.row()]  # 返回选中状态
-        return QVariant()
-
-    def setChecked(self, index):
-        if not index.isValid():
-            return
-
-        row = index.row()
-        if row == 0:  # 全选逻辑保持不变
-            all_checked = not self.checked_states[0]
-            self.checked_states = [all_checked] * len(self.items)
-            self.checked_order = self.items[1:] if all_checked else []
-            self.dataChanged.emit(self.index(0), self.index(len(self.items) - 1))
-        else:
-            # 更新选中状态
-            self.checked_states[row] = not self.checked_states[row]
-            
-            # 更新选中顺序
-            item = self.items[row]
-            if self.checked_states[row]:
-                if item not in self.checked_order:
-                    self.checked_order.append(item)
-            else:
-                if item in self.checked_order:
-                    self.checked_order.remove(item)
-            
-            self.updateSelectAllState()
-
-        self.dataChanged.emit(index, index)
-
-    def updateSelectAllState(self):
-        """检查是否所有项目都被选中，并更新"全选"的状态。"""
-        all_selected = all(self.checked_states[1:])
-        self.checked_states[0] = all_selected
-        self.dataChanged.emit(self.index(0), self.index(0))  # 更新"全选"选项的显示
-
-    def getCheckedItems(self):
-        """获取当前被选中的文件夹列表（按点击顺序）"""
-        # 直接返回记录顺序的列表
-        return self.checked_order.copy()
-
-
-class CheckBoxDelegate(QStyledItemDelegate):
-    """自定义委托，用于在 ComboBox 中绘制复选框。"""
-
-    def paint(self, painter, option, index):
-        """绘制复选框和文本。"""
-        checked = index.data(Qt.UserRole)
-        is_hovered = option.state & QStyle.State_MouseOver  # 检查鼠标是否悬停
-        if is_hovered:
-            # 设置鼠标悬停的颜色为加载的配置文件中的背景颜色，字体颜色为黑色
-            basic_color_settings = COLORSETTING.get('basic_color_settings')
-            background_color = (
-                basic_color_settings.get('background_color_default', "rgb(173, 216, 230)")
-                if basic_color_settings else "rgb(173, 216, 230)"
-            )
-            background_color = rgb_str_to_qcolor(background_color)  # 将字符串转换为QColor
-            painter.fillRect(option.rect, background_color)  # 鼠标悬停时的颜色
-            # painter.setPen(QPen(Qt.black))  # 设置字体颜色为黑色
-
-        # 绘制复选框
-        checkbox_style_option = QStyleOptionButton()
-        checkbox_style_option.rect = option.rect.adjusted(0, 0, 0, 0)
-        checkbox_style_option.state = QStyle.State_On if checked else QStyle.State_Off
-        checkbox_style_option.state |= QStyle.State_Enabled
-
-        QApplication.style().drawControl(QStyle.CE_CheckBox, checkbox_style_option, painter)
-        # 绘制文本
-        text_rect = option.rect
-        text_rect.adjust(25, 0, 0, 0)  # 调整文本位置
-        painter.drawText(text_rect, Qt.AlignVCenter, index.data(Qt.DisplayRole))
-
-    def sizeHint(self, option, index):
-        """返回项的大小，包括缩进和其他空间设置。"""
-        size = super(CheckBoxDelegate, self).sizeHint(option, index)
-        return QSize(size.width(), size.height())  # 设置项的大小
     
 
 class SingleFileRenameDialog(QDialog):
@@ -2404,6 +2279,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 若是压缩取消，则删除缓存文件中的zip文件
         cache_dir = os.path.join(os.path.dirname(__file__), "cache")
         if os.path.exists(cache_dir):
+            # 强制删除缓存文件中的zip文件
             force_delete_folder(cache_dir, '.zip')
 
     def on_compress_finished(self, zip_path):
@@ -4067,7 +3943,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             return
 
 
-
     def on_f4_pressed(self):
         """处理F4键按下事件"""
         current_folder = self.RT_QComboBox.currentText()
@@ -4092,6 +3967,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             # 删除缓存文件中的zip文件
             cache_dir = os.path.join(os.path.dirname(__file__), "cache")
             if os.path.exists(cache_dir):
+                # 强制删除缓存文件中的zip文件
                 force_delete_folder(cache_dir, '.zip')
 
             # 清除图标缓存
@@ -4507,6 +4383,21 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             # self.compare_window.close()
             self.compare_window.hide()
             self.statusbar_label1.setText(f"🔉: 看图子界面关闭成功")
+
+        # 检查看图子窗口的主题是否与主窗口一致,若不一致则更新主窗口的主题
+        if (self.background_color_default != self.compare_window.background_color_default or 
+            self.background_color_table != self.compare_window.background_color_table or 
+            self.font_color_exif != self.compare_window.font_color_exif or
+            self.font_color_default != self.compare_window.font_color_default):
+            self.background_color_default = self.compare_window.background_color_default
+            self.background_color_table = self.compare_window.background_color_table
+            self.font_color_exif = self.compare_window.font_color_exif
+            self.font_color_default = self.compare_window.font_color_default
+
+        
+            # 更新主题
+            self.apply_theme()
+        
 
         # 恢复第一次按下键盘空格键或B键
         self.last_key_press = False  
