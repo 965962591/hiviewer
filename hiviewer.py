@@ -3006,9 +3006,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def handle_table_selection(self):
         """处理表格选中事件（新增预览功能）"""
         try:
-            
-            print("handle_table_selection()--处理表格选中事件")
-
+            # print("handle_table_selection()--处理表格选中事件")
             # 获取选中文件的路径
             file_paths = self.get_selected_file_path() 
             if not file_paths:
@@ -3035,6 +3033,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 
             # 更新状态栏显示选中数量
             self.statusbar_label.setText(f"[{len(file_paths)}]已选择")
+
         except Exception as e:
             print(f"handle_table_selection()--处理表格选中事件失败: {e}")
 
