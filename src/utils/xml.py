@@ -13,6 +13,80 @@ if False: # 暂时禁用，不支持单独运行该模块
     BasePath = os.path.dirname(os.path.abspath(sys.argv[0]))  
 
 
+def save_excel_data(images_path):
+    """将从XML文件中提取的数据保存到Excel表格中"""
+
+    # 配置保存的Excel文件路径
+    excel_path = os.path.join(images_path, "extracted_data.xlsx")
+    if os.path.exists(excel_path):
+        # 若存在excel文件则不需要保存新的excel文件
+        return
+
+    # 初始化二维列表，第一行的表头数据
+    get_excel_list = [
+        [
+            "文件名",
+            "Lux",
+            "DRCgain",
+            "Safe_gain",
+            "Short_gain",
+            "Long_gain",
+            "CCT",
+            "R_gain",
+            "B_gain",
+            "Awb_sa",
+            "Triangle_index",
+            "AE",   # AE 问题点
+            "AWB",  # AWB 问题点    
+            "ISP",  # ISP 问题点
+            "AF",   # AF 问题点
+        ]
+    ]
+
+    # 遍历文件夹，列出所有满足条件的xml文件
+    xml_files = [f for f in os.listdir(images_path) if f.endswith('_new.xml')]
+
+    # 遍历xml文件
+    for xml_file in xml_files:
+        xml_file = str(Path(images_path) / xml_file)
+        if os.path.exists(xml_file):
+            # 使用函数load_xml_data加载并解析xml文件
+            result_list = load_xml_data(xml_file)
+            if result_list:
+                get_excel_list.append(result_list)
+
+    # 创建一个新的工作簿
+    wb = Workbook()
+    ws = wb.active
+
+    # 设置边框样式
+    from openpyxl.styles import Border, Side
+    thin = Side(style='thin')
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    # 写入数据并设置列宽和边框
+    for row in get_excel_list:
+        ws.append(row)
+        for cell in row:
+            # 设置边框
+            ws.cell(row=ws.max_row, column=row.index(cell) + 1).border = border
+
+    # 自适应列宽
+    for column in ws.columns:
+        max_length = 0
+        column_letter = column[0].column_letter  # 获取列字母
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = (max_length + 2)  # 加2以增加一些额外的空间
+        ws.column_dimensions[column_letter].width = adjusted_width
+
+    wb.save(excel_path)  # 保存为Excel文件
+    print(f"数据已保存到 {excel_path}")
+
 
 def load_xml_data(xml_path):
     """加载XML文件并提取Lux值和DRCgain值等EXIF信息"""
@@ -55,75 +129,3 @@ def load_xml_data(xml_path):
 
 
 
-def save_excel_data(images_path):
-    """将从XML文件中提取的数据保存到Excel表格中"""
-
-    # 配置保存的Excel文件路径
-    excel_path = os.path.join(images_path, "extracted_data.xlsx")
-    if os.path.exists(excel_path):
-        # 若存在excel文件则不需要保存新的excel文件
-        return
-
-    # 初始化二维列表
-    get_excel_list = [
-        [
-            "文件名",
-            "Lux",
-            "DRCgain",
-            "Safe_gain",
-            "Short_gain",
-            "Long_gain",
-            "CCT",
-            "R_gain",
-            "B_gain",
-            "Awb_sa",
-            "Triangle_index",
-            "AE",
-            "AWB",
-            "ISP",
-            "AF",
-        ]
-    ]
-
-    # 遍历文件夹，列出所有满足条件的xml文件
-    xml_files = [f for f in os.listdir(images_path) if f.endswith('_new.xml')]
-
-    for xml_file in xml_files:
-        xml_file = str(Path(images_path) / xml_file)
-        if os.path.exists(xml_file):
-            # 使用函数load_xml_data加载并解析xml文件
-            result_list = load_xml_data(xml_file)
-            if result_list:
-                get_excel_list.append(result_list)
-
-    # 创建一个新的工作簿
-    wb = Workbook()
-    ws = wb.active
-
-    # 设置边框样式
-    from openpyxl.styles import Border, Side
-    thin = Side(style='thin')
-    border = Border(left=thin, right=thin, top=thin, bottom=thin)
-
-    # 写入数据并设置列宽和边框
-    for row in get_excel_list:
-        ws.append(row)
-        for cell in row:
-            # 设置边框
-            ws.cell(row=ws.max_row, column=row.index(cell) + 1).border = border
-
-    # 自适应列宽
-    for column in ws.columns:
-        max_length = 0
-        column_letter = column[0].column_letter  # 获取列字母
-        for cell in column:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = (max_length + 2)  # 加2以增加一些额外的空间
-        ws.column_dimensions[column_letter].width = adjusted_width
-
-    wb.save(excel_path)  # 保存为Excel文件
-    print(f"数据已保存到 {excel_path}")

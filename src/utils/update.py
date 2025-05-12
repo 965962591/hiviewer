@@ -20,7 +20,7 @@ if True:
 if False: # 暂时禁用，不支持单独运行该模块
     BasePath = os.path.dirname(os.path.abspath(sys.argv[0]))  
 
-
+# 更新类
 class Updater:
     def __init__(self):
         self.proxy_prefix = "https://ghproxy.net/"
@@ -383,35 +383,6 @@ def check_update(parent_window=None):
                     return False
         else:
             return False
-
-        """
-        install_result = updater.install_update(zip_path)
-        if install_result == "PROGRAM_RUNNING":
-            reply = gui.show_message(
-                "更新提示",
-                f"请先关闭正在运行的 {updater.main_executable} 程序，然后点击确定继续更新。",
-                QMessageBox.Warning,
-                QMessageBox.Ok | QMessageBox.Cancel
-            )
-            
-            if reply == QMessageBox.Ok:
-                if updater.install_update(zip_path):
-                    gui.show_message("更新成功", f"已成功更新到版本 {version}")
-                    return True
-                else:
-                    gui.show_message("更新失败", "更新安装失败", QMessageBox.Critical)
-                    return False
-            else:
-                return False
-                
-        elif install_result:
-            gui.show_message("更新成功", f"已成功更新到版本 {version}")
-            return True
-        else:
-            gui.show_message("更新失败", "更新安装失败", QMessageBox.Critical)
-            return False
-        """
-        return True
     except Exception as e:
         print(f"更新过程中发生错误: {str(e)}")
         if 'gui' in locals():

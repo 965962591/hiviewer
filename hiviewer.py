@@ -24,7 +24,6 @@ from logging.handlers import RotatingFileHandler
 """导入python第三方模块"""
 import cv2
 import piexif
-from openpyxl import Workbook
 from PIL import Image
 from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtGui import (
@@ -3009,14 +3008,24 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def handle_table_selection(self):
         """处理表格选中事件（新增预览功能）"""
         try:
+            
+            print("handle_table_selection()--处理表格选中事件")
+
+            # 获取选中行文件的路径
             selected = self.RB_QTableWidget0.selectedItems()
+            if not selected:
+                print("handle_table_selection()--没有选中任何文件")
+                return
             file_paths = self.get_selected_file_path() if selected else ""
             if not file_paths:
+                print("handle_table_selection()--无法获取文件路径")
                 return
-            # 只预览第一个选中的文件
+            # 只需要第一个选中文件的路径
             preview_path = file_paths[0]
+
             # 清空旧预览内容
             self.clear_preview_layout()
+
             # 根据文件类型创建预览
             if preview_path.lower().endswith(tuple(self.IMAGE_FORMATS)):
                 self.create_image_preview(preview_path)
@@ -3072,25 +3081,21 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             ret, frame = cap.read()
             if not ret:
                 raise ValueError("无法读取视频帧")
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # 不需要转换颜色空间，因为OpenCV读取的视频帧已经是RGB格式
+            # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             
-            # 转换为QImage
-            height, width, _ = frame.shape
-            q_img = QImage(frame.data, width, height, QImage.Format_RGB888)
-            
-            # 创建 ImageViewer 实例
-            self.image_viewer = ImageViewer(self.Left_QFrame)
-
-            # 加载图片
-            self.image_viewer.load_image_from_qimage(q_img)
-
-            # 添加 ImageViewer 到 layout
-            self.verticalLayout_left_2.addWidget(self.image_viewer)
-
-            # 调整 self.Left_QFrame 的尺寸策略
-            self.Left_QFrame.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
-
+            # 释放资源
             cap.release()
+
+            # 保存视频帧到本地
+            cache_dir = "./cache/videos"
+            if not os.path.exists(cache_dir):
+                os.makedirs(cache_dir, exist_ok=True)
+            frame_path = os.path.join(cache_dir, "video_preview_frame.jpg")
+            cv2.imwrite(frame_path, frame)
+
+            # 创建图片预览
+            self.create_image_preview(frame_path)
 
         except Exception as e:
             print(f"视频预览失败: {e}")

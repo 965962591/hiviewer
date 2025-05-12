@@ -61,6 +61,7 @@ __pycache__/
 hiviewer/__pycache__/
 ui/__pycache__/
 cache/icons/
+cache/videos/
 cache/*.zip
 output/
 dist/

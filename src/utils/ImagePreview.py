@@ -31,28 +31,6 @@ class ImageViewer(QGraphicsView):
             print(f"load_image()-error--从路径加载图片失败: {e}")
             return
 
-
-    def load_image_from_qimage(self, q_img):
-        """从QImage对象加载图片"""
-        try:
-            pixmap = QPixmap.fromImage(q_img)
-            if pixmap.isNull():
-                raise ValueError("无法加载图片")
-        
-            # 设置图片pixmap_item
-            self.pixmap_item.setPixmap(pixmap)
-            # 视图缩放比例自适应视图窗口大小
-            self.fitInView(self.pixmap_item, Qt.KeepAspectRatio)  
-            # 设置初始缩放比例为10倍
-            if pixmap.size().width() > 512 or pixmap.size().height() > 512:
-                self.scale(10, 10)  
-            else: # 如果图片尺寸小于视图窗口尺寸，则缩放比例为8倍
-                self.scale(8, 8)
-
-        except Exception as e:
-            print(f"load_image_from_qimage()-error--从QImage对象加载图片失败: {e}")
-            return
-
     def scale_view(self, scale_factor):
         self.scale(scale_factor, scale_factor)
 
