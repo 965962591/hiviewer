@@ -2043,10 +2043,11 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def get_selected_file_path(self):
             """或取所有选中的单元格的文件路径"""
-            selected_items = self.RB_QTableWidget0.selectedItems()  # 获取选中的项
+            # 获取选中的项
+            selected_items = self.RB_QTableWidget0.selectedItems() 
             if not selected_items:
-                show_message_box("没有选中的项！", "提示", 500)
-                return
+                print("get_selected_file_path()--没有选中的项")
+                return []
             
             # 用于存储所有选中的文件路径
             file_paths = []  
@@ -2056,23 +2057,20 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                     col = item.column()
 
                     # 构建文件完整路径
-                    file_name = self.RB_QTableWidget0.item(row, col).text().split('\n')[0]  # 获取文件名
-                    column_name = self.RB_QTableWidget0.horizontalHeaderItem(col).text()  # 获取列名
-                    current_directory = self.RT_QComboBox.currentText()  # 获取当前选中的目录
-                    # 移除传统构建路径方法
-                    # full_path = os.path.join(os.path.dirname(current_directory), column_name, file_name)
-                    # 使用 Path 构建路径，自动处理跨平台的路径问题
-                    full_path = str(Path(current_directory).parent / column_name / file_name)
+                    file_name = self.RB_QTableWidget0.item(row, col).text().split('\n')[0]      # 获取文件名
+                    column_name = self.RB_QTableWidget0.horizontalHeaderItem(col).text()        # 获取列名
+                    current_directory = self.RT_QComboBox.currentText()                         # 获取当前选中的目录
+                    full_path = str(Path(current_directory).parent / column_name / file_name)   # 构建文件完整路径
 
+                    # 判断文件是否存在，存在则添加到列表
                     if os.path.isfile(full_path):
-                        file_paths.append(full_path)  # 添加有效文件路径到列表
-
-                if file_paths:
-                    return file_paths
+                        file_paths.append(full_path)  
+                
+                return file_paths
 
             except Exception as e:
                 print(f"get_selected_file_path()-error--获取文件路径失败: {e}")
-                return
+                return []
 
 
     def copy_selected_file_path(self,flag=1):
@@ -3011,12 +3009,8 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             
             print("handle_table_selection()--处理表格选中事件")
 
-            # 获取选中行文件的路径
-            selected = self.RB_QTableWidget0.selectedItems()
-            if not selected:
-                print("handle_table_selection()--没有选中任何文件")
-                return
-            file_paths = self.get_selected_file_path() if selected else ""
+            # 获取选中文件的路径
+            file_paths = self.get_selected_file_path() 
             if not file_paths:
                 print("handle_table_selection()--无法获取文件路径")
                 return
@@ -3028,14 +3022,19 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
             # 根据文件类型创建预览
             if preview_path.lower().endswith(tuple(self.IMAGE_FORMATS)):
+                # 创建图片预览
                 self.create_image_preview(preview_path)
+
             elif preview_path.lower().endswith(tuple(self.VIDEO_FORMATS)):
+                # 创建视频预览
                 self.create_video_preview(preview_path)
+            
             else:
+                # 显示错误信息
                 self.show_preview_error("不支持预览的文件类型")
                 
             # 更新状态栏显示选中数量
-            self.statusbar_label.setText(f"[{len(selected)}]已选择")
+            self.statusbar_label.setText(f"[{len(file_paths)}]已选择")
         except Exception as e:
             print(f"handle_table_selection()--处理表格选中事件失败: {e}")
 
