@@ -81,10 +81,12 @@ class FrameFinderThread(QThread):
                         continue
 
                     total_frames = int(target_cap.get(cv2.CAP_PROP_FRAME_COUNT))
-                    best_match_index, best_match_score = self.find_best_match(target_cap, baseline_gray, total_frames)
-                    
+                    best_match_index, best_match_score = self.find_best_match(
+                        target_cap, baseline_gray, total_frames
+                    )
+
                     target_cap.release()
-                    
+
                     if best_match_index != -1:
                         best_frame_indices[target_path] = best_match_index
                 except Exception as e:
@@ -124,7 +126,7 @@ class FrameFinderThread(QThread):
 
     def find_best_match(self, cap, baseline_gray, total_frames):
         """在目标视频中查找与基准帧最相似的帧"""
-        best_score = float('inf')  # 较小的差异值表示更好的匹配
+        best_score = float("inf")  # 较小的差异值表示更好的匹配
         best_index = -1
         
         # 逐帧采样策略，避免处理过多帧
@@ -142,8 +144,10 @@ class FrameFinderThread(QThread):
                 
                 # 确保尺寸匹配
                 if gray.shape != baseline_gray.shape:
-                    gray = cv2.resize(gray, (baseline_gray.shape[1], baseline_gray.shape[0]))
-                
+                    gray = cv2.resize(
+                        gray, (baseline_gray.shape[1], baseline_gray.shape[0])
+                    )
+
                 # 使用平均绝对差异(MAD)来比较相似度
                 diff = cv2.absdiff(gray, baseline_gray)
                 score = np.mean(diff)
@@ -188,7 +192,9 @@ class FrameReader(QThread):
         ret, test_frame = self.cap.read()
         if ret:
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # 重置到开始
-            print(f"视频 {video_path} 打开成功，分辨率: {test_frame.shape[1]}x{test_frame.shape[0]}")
+            print(
+                f"视频 {video_path} 打开成功，分辨率: {test_frame.shape[1]}x{test_frame.shape[0]}"
+            )
         else:
             raise Exception(f"无法读取视频帧: {video_path}")
     
@@ -346,7 +352,13 @@ class VideoPlayer(QWidget):
             
             # 标记是否处于循环播放的过渡期
             self.is_looping = False
-            
+
+            # 添加平移相关属性
+            self.is_panning = False
+            self.pan_start_pos = None
+            self.pan_offset = np.array([0, 0]) # 使用numpy数组方便计算
+            self.current_display_offset = np.array([0, 0])
+
             # 添加析构时的清理
             self.destroyed.connect(self.cleanup)
             self.is_cleaning_up = False  # 添加清理标志
@@ -695,65 +707,111 @@ class VideoPlayer(QWidget):
             
         try:
             # 获取视频标签的当前大小
-            label_size = self.video_label.size()
-            frame_height, frame_width = frame.shape[:2]
+            label_w = self.video_label.width()
+            label_h = self.video_label.height()
+            frame_h_orig, frame_w_orig = frame.shape[:2]
 
             # 检查是否需要重新缩放
-            # 1. 如果缩放因子改变
-            # 2. 如果缓存为空
-            # 3. 如果标签大小改变（这里省略该检查以简化）
             needs_rescale = (self.scaled_frame_cache is None or 
                             abs(self.last_scale_factor - self.scale_factor) > 0.01)
             
             if needs_rescale:
                 # 计算基础缩放比例，再乘以用户设置的缩放因子
                 base_scale = min(
-                    label_size.width() / frame_width, label_size.height() / frame_height
+                    label_w / frame_w_orig, label_h / frame_h_orig
                 )
-                scale = base_scale * self.scale_factor
+                current_scale = base_scale * self.scale_factor
                 
                 # 记录当前使用的缩放因子
                 self.last_scale_factor = self.scale_factor
                 
+                scaled_w = max(1, int(frame_w_orig * current_scale))
+                scaled_h = max(1, int(frame_h_orig * current_scale))
+
                 # 优化大尺寸图像的缩放方式
                 if self.scale_factor > self.high_quality_threshold:
-                    # 对于高缩放率，使用分步缩放减轻CPU负担
-                    # 先降采样到中间大小，再放大到目标大小
-                    intermediate_scale = min(1.0, scale / 2)
+                    intermediate_scale = min(1.0, current_scale / 2)
                     if intermediate_scale < 1.0:
-                        intermediate_width = int(frame_width * intermediate_scale)
-                        intermediate_height = int(frame_height * intermediate_scale)
+                        intermediate_w = max(1, int(frame_w_orig * intermediate_scale))
+                        intermediate_h = max(1, int(frame_h_orig * intermediate_scale))
                         intermediate = cv2.resize(
-                            frame, (intermediate_width, intermediate_height), 
+                            frame, (intermediate_w, intermediate_h), 
                             interpolation=cv2.INTER_AREA
                         )
-                        
-                        final_width = int(frame_width * scale)
-                        final_height = int(frame_height * scale)
                         self.scaled_frame_cache = cv2.resize(
-                            intermediate, (final_width, final_height),
+                            intermediate, (scaled_w, scaled_h),
                             interpolation=cv2.INTER_LINEAR
                         )
                     else:
-                        # 直接放大
-                        new_width = int(frame_width * scale)
-                        new_height = int(frame_height * scale)
                         self.scaled_frame_cache = cv2.resize(
-                            frame, (new_width, new_height),
+                            frame, (scaled_w, scaled_h),
                             interpolation=cv2.INTER_LINEAR
                         )
                 else:
-                    # 正常缩放
-                    new_width = int(frame_width * scale)
-                    new_height = int(frame_height * scale)
                     self.scaled_frame_cache = cv2.resize(
-                        frame, (new_width, new_height),
-                        interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR
+                        frame, (scaled_w, scaled_h),
+                        interpolation=cv2.INTER_AREA if current_scale < 1 else cv2.INTER_LINEAR
                     )
             
             # 使用缓存的缩放帧
-            display_frame = self.scaled_frame_cache
-            
+            current_scaled_frame = self.scaled_frame_cache
+            scaled_h, scaled_w = current_scaled_frame.shape[:2]
+
+            # 应用平移
+            display_frame = current_scaled_frame
+            if self.scale_factor > 1.0: # 仅当放大时才应用平移
+                # 创建一个和标签一样大的黑色背景
+                output_frame = np.zeros((label_h, label_w, 3), dtype=np.uint8)
+                
+                # 计算实际用于裁切的偏移量 (中心对齐 + 用户拖动偏移)
+                center_offset_x = max(0, (scaled_w - label_w) // 2)
+                center_offset_y = max(0, (scaled_h - label_h) // 2)
+
+                # 实际裁切的起点，考虑用户拖动
+                start_x = int(max(0, center_offset_x - self.pan_offset[0]))
+                start_y = int(max(0, center_offset_y - self.pan_offset[1]))
+
+                # 确保裁切区域不超出缩放后图像的边界
+                start_x = min(start_x, max(0, scaled_w - label_w))
+                start_y = min(start_y, max(0, scaled_h - label_h))
+                
+                # 计算实际可用的宽度和高度
+                available_w = min(label_w, scaled_w - start_x)
+                available_h = min(label_h, scaled_h - start_y)
+                
+                if available_w > 0 and available_h > 0:
+                    # 从缩放后的图像中裁切出要显示的部分
+                    cropped = current_scaled_frame[start_y:start_y+available_h, start_x:start_x+available_w]
+                    
+                    # 计算在输出帧中的位置（居中）
+                    paste_x = (label_w - available_w) // 2
+                    paste_y = (label_h - available_h) // 2
+                    
+                    # 将裁切的部分粘贴到输出帧上
+                    output_frame[paste_y:paste_y+available_h, paste_x:paste_x+available_w] = cropped
+                
+                display_frame = output_frame
+            else:
+                # 如果没有放大，或者缩小了，则居中显示
+                self.pan_offset = np.array([0,0])
+                
+                # 创建一个和标签一样大的黑色背景
+                output_frame = np.zeros((label_h, label_w, 3), dtype=np.uint8)
+                
+                # 计算粘贴位置，使其居中
+                paste_x = max(0, (label_w - scaled_w) // 2)
+                paste_y = max(0, (label_h - scaled_h) // 2)
+                
+                # 确保不会越界
+                paste_w = min(scaled_w, label_w - paste_x)
+                paste_h = min(scaled_h, label_h - paste_y)
+                
+                if paste_w > 0 and paste_h > 0:
+                    output_frame[paste_y:paste_y+paste_h, paste_x:paste_x+paste_w] = \
+                        current_scaled_frame[0:paste_h, 0:paste_w]
+                
+                display_frame = output_frame
+
             # 使用 RGB 格式处理图像
             if len(display_frame.shape) == 3:
                 rgb_frame = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
@@ -801,7 +859,7 @@ class VideoPlayer(QWidget):
         self.playback_speed = value
         
         # 将播放速度传递给帧读取器
-        if hasattr(self, 'frame_reader'):
+        if hasattr(self, "frame_reader"):
             self.frame_reader.set_playback_speed(value)
             
         print(f"播放速度从 {old_speed} 更改为 {value}")
@@ -860,8 +918,10 @@ class VideoPlayer(QWidget):
         # 创建 QLabel 用于显示文字
         self.text_label = QLabel("正在检索相似帧...", self.progress_widget)
         self.text_label.setAlignment(Qt.AlignCenter)
-        self.text_label.setStyleSheet("color: white; font-weight: bold;")  # 设置文字颜色为白色并加粗
-        
+        self.text_label.setStyleSheet(
+            "color: white; font-weight: bold;"
+        )  # 设置文字颜色为白色并加粗
+
         # 创建布局并添加 GIF 和文字
         layout = QVBoxLayout(self.progress_widget)
         layout.addWidget(self.progress_label)
@@ -879,7 +939,7 @@ class VideoPlayer(QWidget):
         self.movie.start()
 
         # 使用保存的 VideoWall 引用
-        if hasattr(self.video_wall, 'players'):
+        if hasattr(self.video_wall, "players"):
             all_video_paths = [player.video_path for player in self.video_wall.players]
         else:
             QMessageBox.warning(self, "错误", "无法找到 VideoWall 的实例")
@@ -889,7 +949,9 @@ class VideoPlayer(QWidget):
         # 设置基准视频路径
         baseline_video_path = self.video_path
         # 设置目标视频路径
-        target_video_paths = [path for path in all_video_paths if path != baseline_video_path]
+        target_video_paths = [
+            path for path in all_video_paths if path != baseline_video_path
+        ]
 
         # 获取基准视频的跳帧数值
         frame_num = self.frame_skip_spin.value()
@@ -897,7 +959,9 @@ class VideoPlayer(QWidget):
             frame_num += 1  # 如果为0，则加1
 
         # 创建并启动线程
-        self.frame_finder_thread = FrameFinderThread(baseline_video_path, target_video_paths, frame_num)
+        self.frame_finder_thread = FrameFinderThread(
+            baseline_video_path, target_video_paths, frame_num
+        )
         self.frame_finder_thread.result_ready.connect(self.on_frame_indices_ready)
         self.frame_finder_thread.error_occurred.connect(self.on_frame_indices_error)
         self.frame_finder_thread.start()
@@ -957,8 +1021,24 @@ class VideoPlayer(QWidget):
         
         # 如果缩放因子变化不大，不更新显示
         if abs(old_scale_factor - self.scale_factor) < 0.01:
+            # 即使缩放因子变化不大，如果从放大变为不放大，也需要重置pan_offset
+            if old_scale_factor > 1.0 and self.scale_factor <= 1.0:
+                self.pan_offset = np.array([0, 0])
+                # 需要刷新一下显示以移除平移
+                if self.latest_frame is not None:
+                    if self.rotation_angle != 0:
+                        rotated_frame = self.rotate_image(self.latest_frame, self.rotation_angle)
+                        self.display_frame(rotated_frame)
+                    else:
+                        self.display_frame(self.latest_frame)
+            event.accept() # 仍然接受事件，因为VideoWall可能需要处理
             return
             
+        # 如果从放大状态变为非放大状态，或者从非放大状态变为放大状态，重置pan_offset
+        if (old_scale_factor > 1.0 and self.scale_factor <= 1.0) or \
+           (old_scale_factor <= 1.0 and self.scale_factor > 1.0):
+            self.pan_offset = np.array([0, 0])
+
         # 如果有最新帧，重新显示应用缩放效果
         if self.latest_frame is not None:
             if self.rotation_angle != 0:
@@ -970,6 +1050,43 @@ class VideoPlayer(QWidget):
         # 将事件传递给父组件，以便VideoWall可以处理所有视频的缩放
         if self.video_wall:
             self.video_wall.scale_all_videos(self.scale_factor)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and self.scale_factor > 1.0 and self.video_label.geometry().contains(event.pos()):
+            self.is_panning = True
+            self.pan_start_pos = event.pos()
+            self.setCursor(Qt.ClosedHandCursor) # 改变鼠标样式为拖动
+            event.accept()
+        else:
+            event.ignore() # 如果不满足条件，忽略事件，允许父组件处理
+
+    def mouseMoveEvent(self, event):
+        if self.is_panning and self.pan_start_pos is not None:
+            delta = event.pos() - self.pan_start_pos
+            # 更新总偏移量
+            self.pan_offset += np.array([delta.x(), delta.y()])
+            # 更新下一次拖动的起始点，这样拖动更平滑
+            self.pan_start_pos = event.pos() 
+
+            # 重新显示帧以应用平移
+            if self.latest_frame is not None:
+                if self.rotation_angle != 0:
+                    rotated_frame = self.rotate_image(self.latest_frame, self.rotation_angle)
+                    self.display_frame(rotated_frame)
+                else:
+                    self.display_frame(self.latest_frame)
+            event.accept()
+        else:
+            event.ignore()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton and self.is_panning:
+            self.is_panning = False
+            self.pan_start_pos = None
+            self.unsetCursor() # 恢复默认鼠标样式
+            event.accept()
+        else:
+            event.ignore()
 
 
 class VideoWall(QWidget):
@@ -1182,15 +1299,15 @@ class VideoWall(QWidget):
         try:
             # 先停止所有计时器和线程
             for player in self.players:
-                if hasattr(player, 'timer'):
+                if hasattr(player, "timer"):
                     player.timer.stop()
-                if hasattr(player, 'frame_reader'):
+                if hasattr(player, "frame_reader"):
                     player.frame_reader.pause()
                     player.frame_reader.running = False
             
             # 等待所有线程结束
             for player in self.players:
-                if hasattr(player, 'frame_reader'):
+                if hasattr(player, "frame_reader"):
                     player.frame_reader.wait()
             
             # 清理每个播放器的资源
@@ -1241,7 +1358,7 @@ class VideoWall(QWidget):
                 
                 if frame_skip < player.total_frames:
                     # 将视频定位到指定帧
-                    if hasattr(player, 'frame_reader'):
+                    if hasattr(player, "frame_reader"):
                         # 计算帧对应的时间(毫秒)
                         time_ms = int(frame_skip * (1000 / player.fps))
                         
@@ -1266,8 +1383,10 @@ class VideoWall(QWidget):
                         
                         # 恢复视频读取器运行
                         player.frame_reader.resume()
-                        
-                        print(f"视频 {os.path.basename(player.video_path)} 跳转到帧: {frame_skip}")
+
+                        print(
+                            f"视频 {os.path.basename(player.video_path)} 跳转到帧: {frame_skip}"
+                        )
             except Exception as e:
                 print(f"跳转到帧时出错: {str(e)}")
 
@@ -1395,13 +1514,16 @@ class VideoWall(QWidget):
         # 获取鼠标当前位置
         cursor_pos = QCursor.pos()
         # 获取包含鼠标的屏幕
-        current_screen = QApplication.screenAt(cursor_pos)
-        if current_screen:
+        if current_screen := QApplication.screenAt(cursor_pos):
             # 获取屏幕几何信息
             screen_geometry = current_screen.geometry()
             # 计算窗口在屏幕上的居中位置
-            window_x = screen_geometry.x() + (screen_geometry.width() - self.width()) // 2
-            window_y = screen_geometry.y() + (screen_geometry.height() - self.height()) // 2
+            window_x = (
+                screen_geometry.x() + (screen_geometry.width() - self.width()) // 2
+            )
+            window_y = (
+                screen_geometry.y() + (screen_geometry.height() - self.height()) // 2
+            )
             # 移动窗口到计算出的位置
             self.move(window_x, window_y)
 

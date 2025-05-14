@@ -48,13 +48,13 @@ from src.components.QComboBox import CheckBoxListModel, CheckBoxDelegate # 导�
 from src.common.FontManager import SingleFontManager, MultiFontManager   # 字体管理器
 from src.common.VersionInit import version_init                          # 版本号初始化
 from src.common.SettingInit import load_color_settings                   # 导入自定义json配置文件
-from src.utils.hisnot import WScreenshot                                 # 导入截图工具类
-from src.utils.xml import save_excel_data                                # 导入xml文件解析工具类
 from src.utils.raw2jpg import Mipi2RawConverterApp                       # 导入MIPI RAW文件转换为JPG文件的类
-from src.utils.update import check_update,pre_check_update               # 导入自动更新检查程序
+from src.utils.update import check_update, pre_check_update              # 导入自动更新检查程序
+from src.utils.hisnot import WScreenshot                                 # 导入截图工具类
 from src.utils.ImagePreview import ImageViewer                           # 导入自定义图片预览组件
+from src.utils.xml import save_excel_data                                # 导入xml文件解析工具类
 from src.utils.delete import force_delete_folder                         # 导入强制删除文件夹的功能函数
-from src.utils.aeboxlink import (check_process_running,urlencode_folder_path,get_api_data)
+from src.utils.aeboxlink import (check_process_running, urlencode_folder_path, get_api_data)
 
 
 
