@@ -7,7 +7,7 @@ import time
 import json
 import zipfile
 import logging
-import threading
+
 import subprocess
 from queue import Queue
 from pathlib import Path
@@ -48,7 +48,7 @@ from src.utils.hisnot import WScreenshot                                 # 导�
 from src.utils.ImagePreview import ImageViewer                           # 导入自定义图片预览组件
 from src.utils.xml import save_excel_data                                # 导入xml文件解析工具类
 from src.utils.delete import force_delete_folder                         # 导入强制删除文件夹的功能函数
-from src.utils.Icon import IconCache                                     # 导入文件Icon图标加载类
+from src.utils.Icon import IconCache, ImagePreloader                     # 导入文件Icon图标加载类
 from src.utils.aeboxlink import (check_process_running, urlencode_folder_path, get_api_data)
 
 
@@ -89,12 +89,7 @@ def natural_sort_key(s):
 设置独立封装类区域开始线
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 """
-class WorkerSignals(QObject):
-    """工作线程信号"""
-    finished = pyqtSignal()  # 完成信号
-    progress = pyqtSignal(int, int)  # 进度信号 (当前, 总数)
-    error = pyqtSignal(str)  # 错误信号
-    batch_loaded = pyqtSignal(list)  # 批量加载完成信号
+
 
 
 class CommandThread(QThread):
@@ -230,61 +225,8 @@ class ProgressDialog(QtWidgets.QDialog):
         self.parent().cancel_compression()
         self.close()
 
-class ImagePreloader(QRunnable):
-    """改进的图片预加载工作线程"""
-    def __init__(self, file_paths):
-        super().__init__()
-        self.file_paths = file_paths
-        self.signals = WorkerSignals()
-        self._pause = False
-        self._stop = False
-        self._pause_condition = threading.Event()
-        self._pause_condition.set()  # 初始状态为未暂停
-        
-    def pause(self):
-        """暂停预加载"""
-        self._pause = True
-        self._pause_condition.clear()
-
-    def resume(self):
-        """恢复预加载"""
-        self._pause = False
-        self._pause_condition.set()
-        
-    def run(self):
-        try:
-            total = len(self.file_paths)
-            batch = []
-            batch_size = 10
-            
-            for i, file_path in enumerate(self.file_paths):
-                if self._stop:
-                    break
-                    
-                # 使用 Event 来实现暂停
-                self._pause_condition.wait()
-                    
-                if file_path:
-                    icon = IconCache.get_icon(file_path)  # 使用缓存系统获取图标
-                    batch.append((file_path, icon))
-                    
-                    if len(batch) >= batch_size:
-                        self.signals.batch_loaded.emit(batch)
-                        batch = []
-                        
-                    self.signals.progress.emit(i + 1, total)
-                    
-            if batch:  # 发送最后的批次
-                self.signals.batch_loaded.emit(batch)
-                
-            self.signals.finished.emit()
-            
-        except Exception as e:
-            self.signals.error.emit(str(e))
 
 
-
-    
 
 class SingleFileRenameDialog(QDialog):
     """单文件重命名对话框类"""
@@ -958,6 +900,9 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 添加快捷键，打开命令工具
         self.m_shortcut = QShortcut(QKeySequence('M'), self)
         self.m_shortcut.activated.connect(self.open_bat_tool)
+        # 添加快捷键，切换上一组图片/视频
+        self.b_shortcut = QShortcut(QKeySequence('b'), self)
+        self.b_shortcut.activated.connect(self.on_b_pressed)
         # 添加快捷键，切换下一组图片/视频
         self.space_shortcut = QShortcut(QKeySequence(Qt.Key_Space), self)
         self.space_shortcut.activated.connect(self.on_space_pressed)
@@ -970,9 +915,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 极简模式和EXIF信息切换使用ALT+I快捷键
         self.esc_shortcut = QShortcut(QKeySequence(Qt.AltModifier + Qt.Key_I), self)
         self.esc_shortcut.activated.connect(self.show_exif)
-        # 添加快捷键，切换上一组图片/视频
-        self.b_shortcut = QShortcut(QKeySequence('b'), self)
-        self.b_shortcut.activated.connect(self.on_b_pressed)
         # 添加快捷键 F1，打开MIPI RAW文件转换为JPG文件工具
         self.f1_shortcut = QShortcut(QKeySequence(Qt.Key_F1), self)
         self.f1_shortcut.activated.connect(self.on_f1_pressed)
@@ -2394,7 +2336,8 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 
                 if (header and header.text() == folder and 
                     item and item.text().split('\n')[0] == filename):
-                    item.setIcon(icon)
+                    if bool(icon):
+                        item.setIcon(icon)
                     return  # 找到并更新后直接返回
 
     def update_preload_progress(self, current, total):
@@ -3401,24 +3344,21 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         try:
             selected_items = self.RB_QTableWidget0.selectedItems()  # 获取选中的项
             if not selected_items:
-                print("没有选中的项！")
                 # 弹出提示框
                 show_message_box("没有选中的项！", "提示", 500)
+                print("press_space_and_b_get_selected_file_paths()-没有检测到选中项！")
                 return [], []
             
             # 清除所有选中的项
-            self.RB_QTableWidget0.clearSelection() 
+            # self.RB_QTableWidget0.clearSelection() 
             # 获取最大最小的行索引
-            row_max = self.RB_QTableWidget0.rowCount() - 1 
-            row_min = 0
-            # 用于存储文件路径的列表
-            file_paths = []  
-            # 用于存储当前选中图片张数
-            current_image_index = []    
-            
+            row_min, row_max = 0, self.RB_QTableWidget0.rowCount() - 1 
+            # 用于存储文件路径和文件索引的列表
+            file_paths, current_image_index = [], []  
             # 判断是否是首次按键
             if not self.last_key_press:
-                step_row = 0  # 首次按键不移动
+                # 首次按键不移动
+                step_row = 0  
                 # 第二次进入设置为True
                 self.last_key_press = True
             else:
@@ -3474,8 +3414,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
             # 将选中的单元格滚动到视图中间位置
             self.RB_QTableWidget0.scrollToItem(item, QtWidgets.QAbstractItemView.PositionAtCenter)
-                                  
-            # print(f"当前选中图片张数：{current_image_index}")
+
             
             return file_paths, current_image_index  # 返回文件路径列表
         except Exception as e:
@@ -3788,78 +3727,58 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             # 按键防抖机制，防止快速多次按下导致错误，设置0.5秒内不重复触发
             current_time = time.time()
             if hasattr(self, 'last_space_press_time') and current_time - self.last_space_press_time < 0.5:  
-                return
+                raise ValueError(f"触发了按键防抖机制0.5s内重复按键")
             self.last_space_press_time = current_time
 
             # 获取选中单元格的文件路径和索引
             selected_file_paths, image_indexs = self.press_space_and_b_get_selected_file_paths('b')
             if not selected_file_paths:
-                return
+                raise ValueError(f"无法获取选中的文件路径和索引")
             
-            # 限制最多选中8个文件
-            if len(selected_file_paths) > 8:
-                show_message_box("最多只能同时选中8个文件", "提示", 1000)
-                # 恢复第一次按下键盘空格键或B键
-                self.last_key_press = False 
-                return
-
-            # 获取所有文件的扩展名并去重
+            # 获取所有文件的扩展名并去重，判断这一组文件的格式，纯图片，纯视频，图片+视频
+            flag_video, flag_image, flag_other = 0, 0, 0
             file_extensions = {os.path.splitext(path)[1].lower() for path in selected_file_paths}
-            
-            # 检查是否存在多种文件类型
-            if len(file_extensions) > 1:
-                flag_video = 0
-                flag_image = 0
-                flag_other = 0
-                # 检查文件类型的合法性
-                for ext in file_extensions:
-                    if ext in self.VIDEO_FORMATS:
-                        flag_video = 1
-                        # show_message_box("视频播放功能暂不支持", "提示", 500)
-                    elif ext in self.IMAGE_FORMATS:
-                        flag_image = 1
-                        # show_message_box(f"不支持多选{ext}格式文件", "提示", 500)
-                    else:
-                        flag_other = 1
-                        # show_message_box("不支持的文件格式", "提示", 500)
-                
-                if flag_video and flag_image and flag_other:
-                    show_message_box("不支持同时选中多种文件格式", "提示", 500)
-                    return
-                
-                if flag_video and flag_image and not flag_other:
-                    show_message_box("不支持同时选中视频和图片文件", "提示", 500)
-                    return
+            if not file_extensions:
+                raise ValueError(f"没有提取到有效的文件格式")
+            # 检查文件类型的合法性
+            for ext in list(file_extensions):
+                if ext.endswith(self.VIDEO_FORMATS):
+                    flag_video = 1
+                elif ext.endswith(self.IMAGE_FORMATS):
+                    flag_image = 1
+                else:
+                    flag_other = 1
+            # 检查是否多个文件混合
+            if flag_video + flag_image + flag_other > 1:
+                show_message_box("不支持同时选中图片/视频和其它文件格式,\n请重新选择文件打开", "提示", 1000)
+                raise ValueError(f"不支持同时选中图片和其它文件")
 
-                if flag_video and not flag_image and flag_other:
-                    show_message_box("不支持同时选中视频和其它文件", "提示", 500)
-                    return
-                
-                if not flag_image and flag_video and flag_other:
-                    show_message_box("不支持同时选中图片和其它文件", "提示", 500)
-                    return
-
-            # 获取统一的文件类型
-            file_ext = file_extensions.pop()  # 只有一个元素，直接获取
-
-            # 根据文件类型处理
-            if file_ext in self.VIDEO_FORMATS:
-                
+            # 根据文件类型选择是否打开或者打开是什么子界面
+            if flag_video:
                 # 限制视频文件的数量
                 if len(selected_file_paths) > 5:
                     show_message_box("最多支持同时比较5个视频文件", "提示", 1000)
-                    # 恢复第一次按下键盘空格键或B键
-                    self.last_key_press = False 
-                    return
-                
+                    raise ValueError(f"没有提取到有效的文件格式")
+                # 调用视频播放子界面
                 self.create_video_player(selected_file_paths, image_indexs)
-            elif file_ext in self.IMAGE_FORMATS:
+            
+            elif flag_image:
+                # 限制最多选中8个文件
+                if len(selected_file_paths) > 8:
+                    show_message_box("最多只能同时选中8个文件", "提示", 1000)
+                    raise ValueError(f"没有提取到有效的文件格式")             
+                # 调用看图子界面
                 self.create_compare_window(selected_file_paths, image_indexs)
+
             else:
-                show_message_box("不支持的文件格式", "提示", 1000)
+                show_message_box("不支持打开该文件格式", "提示", 1000)
+                raise ValueError(f"不支持打开的文件格式")
 
         except Exception as e:
-            print(f"处理B键时发生错误: {e}")
+            # 恢复第一次按下键盘空格键或B键
+            self.last_key_press = False 
+            print(f"on_b_pressed()-主界面--处理B键时发生错误: {e}")
+            
 
     def on_space_pressed(self):
         """处理空格键按下事件"""
@@ -3873,76 +3792,57 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             # 获取选中单元格的文件路径和索引
             selected_file_paths, image_indexs = self.press_space_and_b_get_selected_file_paths('space')
             if not selected_file_paths:
-                return
-            
+                raise ValueError(f"无法获取选中的文件路径和索引")
+
             # 限制最多选中8个文件
-            if len(selected_file_paths) > 8:
-                show_message_box("最多只能同时选中8个文件", "提示", 1000)
-                # 恢复第一次按下键盘空格键或B键
-                self.last_key_press = False 
-                return
-
-            # 获取所有文件的扩展名并去重
-            file_extensions = {os.path.splitext(path)[1].lower() for path in selected_file_paths}
+            if len(selected_file_paths) > 10:
+                show_message_box("最多只能同时选中10个文件", "提示", 1000)
+                raise ValueError(f"没有提取到有效的文件格式")
             
-            # 检查是否存在多种文件类型
-            if len(file_extensions) > 1:
-                flag_video = 0
-                flag_image = 0
-                flag_other = 0
-                # 检查文件类型的合法性
-                for ext in file_extensions:
-                    if ext in self.VIDEO_FORMATS:
-                        flag_video = 1
-                        # show_message_box("视频播放功能暂不支持", "提示", 500)
-                    elif ext in self.IMAGE_FORMATS:
-                        flag_image = 1
-                        # show_message_box(f"不支持多选{ext}格式文件", "提示", 500)
-                    else:
-                        flag_other = 1
-                        # show_message_box("不支持的文件格式", "提示", 500)
-                
-                if flag_video and flag_image and flag_other:
-                    show_message_box("不支持同时选中多种文件格式", "提示", 500)
-                    return
-                
-                if flag_video and flag_image and not flag_other:
-                    show_message_box("不支持同时选中视频和图片文件", "提示", 500)
-                    return
+            # 获取所有文件的扩展名并去重，判断这一组文件的格式，纯图片，纯视频，图片+视频
+            flag_video, flag_image, flag_other = 0, 0, 0
+            file_extensions = {os.path.splitext(path)[1].lower() for path in selected_file_paths}
+            if not file_extensions:
+                raise ValueError(f"没有提取到有效的文件格式")
+            # 检查文件类型的合法性
+            for ext in list(file_extensions):
+                if ext.endswith(self.VIDEO_FORMATS):
+                    flag_video = 1
+                elif ext.endswith(self.IMAGE_FORMATS):
+                    flag_image = 1
+                else:
+                    flag_other = 1
+            # 检查是否多个文件混合
+            if flag_video + flag_image + flag_other > 1:
+                show_message_box("不支持同时选中图片/视频和其它文件格式,\n请重新选择文件打开", "提示", 1000)
+                raise ValueError(f"不支持同时选中图片和其它文件")
 
-                if flag_video and not flag_image and flag_other:
-                    show_message_box("不支持同时选中视频和其它文件", "提示", 500)
-                    return
-                
-                if not flag_image and flag_video and flag_other:
-                    show_message_box("不支持同时选中图片和其它文件", "提示", 500)
-                    return
-
-            # 获取统一的文件类型
-            file_ext = file_extensions.pop()  # 只有一个元素，直接获取
-
-            # 根据文件类型处理
-            if file_ext in self.VIDEO_FORMATS:
-                
+            # 根据文件类型选择是否打开或者打开是什么子界面
+            if flag_video:
                 # 限制视频文件的数量
                 if len(selected_file_paths) > 5:
                     show_message_box("最多支持同时比较5个视频文件", "提示", 1000)
-                    return
-                
-                # 打开视频对比界面
+                    raise ValueError(f"没有提取到有效的文件格式")
+                # 调用视频播放子界面
                 self.create_video_player(selected_file_paths, image_indexs)
-
-            elif file_ext in self.IMAGE_FORMATS:
-                
-                # 打开看图对比界面
-                self.create_compare_window(selected_file_paths, image_indexs)
             
+            elif flag_image:
+                # 限制最多选中8个文件
+                if len(selected_file_paths) > 8:
+                    show_message_box("最多只能同时选中8个文件", "提示", 1000)
+                    raise ValueError(f"没有提取到有效的文件格式")             
+                # 调用看图子界面
+                self.create_compare_window(selected_file_paths, image_indexs)
+
             else:
-                show_message_box("不支持的文件格式", "提示", 1000)
+                show_message_box("不支持打开该文件格式", "提示", 1000)
+                raise ValueError(f"不支持打开的文件格式")
 
         except Exception as e:
-            print(f"on_space_pressed()-主界面--处理空格键时发生错误: {e}")
-            return
+            # 恢复第一次按下键盘空格键或B键
+            self.last_key_press = False 
+            print(f"on_space_pressed()-主界面--处理B键时发生错误: {e}")
+
 
     def create_compare_window(self, selected_file_paths, image_indexs):
         """创建看图子窗口的统一方法"""

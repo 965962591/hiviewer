@@ -3233,68 +3233,114 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             pass
 
     def on_space_pressed(self):
-        """处理空格键事件"""
-        if self.is_updating:
-            print("正在更新图片，请稍后...")
-            return
-    
+        """处理看图子界面空格键事件"""
         try:
+            # 预检查当前状态
+            if self.is_updating:
+                print("正在更新图片，请稍后...")
+                return
             if not self.parent_window:
                 print("未找到父窗口，无法获取下一组图片")
                 return
-            if self.roi_selection_active: # 切换图片自动清除ROI信息框
+            # 切换图片自动清除ROI信息框
+            if self.roi_selection_active: 
                 self.roi_selection_active = False
 
-            next_images, next_indexs = self.get_next_images()
-            if not next_images:
-                print("没有下一组图片")
-                self.Escape_close()
-                return 
-            
             # 设置更新标志
             self.is_updating = True
+            # 开始获取下一组文件
+            next_images, next_indexs = self.get_next_images()
+            if not next_images:
+                raise ValueError(f"无效获下一组文件")
+            
+            # 获取所有文件的扩展名并去重，判断这一组文件的格式，纯图片，纯视频，图片+视频
+            is_video, is_image = False, False
+            file_extensions = {os.path.splitext(path)[1].lower() for path in next_images}
+            if not file_extensions:
+                raise ValueError(f"无效的扩展名")
+            for file_extension in list(file_extensions):
+                if file_extension.endswith(self.parent_window.VIDEO_FORMATS):
+                    is_video = True
+                if file_extension.endswith(self.parent_window.IMAGE_FORMATS):
+                    is_image = True
 
-            # 调用图片显示
-            self.set_images(next_images, next_indexs)
+            # 根据当前组文件的格式选择调用子界面
+            if is_image and not is_video:   # 调用图片显示
+                self.set_images(next_images, next_indexs)
+            elif is_video and not is_image: # 调用视频显示
+                self.parent_window.create_video_player(next_images, next_indexs)   
+                raise ValueError(f"看图子界面调用视频子界面，主动抛出异常关闭当前看图子界面")             
+            elif is_image and is_video:
+                # 提示信息框
+                show_message_box("🔉: 这组文件同时包含图片和视频文件，无法调出子界面，返回主界面", "提示",1500)
+                # 抛出异常，退出当前子界面
+                raise ValueError(f"这组文件同时包含图片和视频文件，无法调出子界面，获取的文件如下：\n{next_images}")
+            else:
+                # 提示信息框
+                show_message_box("🔉: 这组文件没有包含图片和视频文件，无法调出子界面，返回主界面", "提示",1500)
+                # 抛出异常，退出当前子界面
+                raise ValueError(f"这组文件没有包含图片和视频文件，无法调出子界面，获取的文件如下：\n{next_images}")
 
         except Exception as e:
-            print(f"处理空格键时发生错误: {e}")
-            self.Escape_close()
-        finally:
+            print(f"看图子界面-on_space_pressed()--处理空格键时发生错误: {e}")
+            # 退出看图界面
             self.is_updating = False
+            self.Escape_close()
             
     def on_b_pressed(self):
         """处理B键事件"""
-        if self.is_updating:
-            print("正在更新图片，请稍后...")
-            return
-        if self.roi_selection_active: # 切换图片自动清除ROI信息框
-            self.roi_selection_active = False
-            
         try:
-            # 获取上一组图片前先检查父窗口是否存在
+            # 预检查当前状态
+            if self.is_updating:
+                print("正在更新图片，请稍后...")
+                return
             if not self.parent_window:
-                print("未找到父窗口，无法获取上一组图片")
+                print("未找到父窗口，无法获取下一组图片")
                 return
+            # 切换图片自动清除ROI信息框
+            if self.roi_selection_active: 
+                self.roi_selection_active = False
 
-            prev_images, prev_indexs = self.get_prev_images()
-            if not prev_images:
-                print("没有上一组图片")
-                self.Escape_close()  # 使用统一的关闭处理
-                return
-            
             # 设置更新标志
             self.is_updating = True
+            # 开始获取上一组文件
+            prev_images, prev_indexs = self.get_prev_images()
+            if not prev_images:
+                raise ValueError(f"无法获取上一组图片")
             
-            # 更新图片
-            self.set_images(prev_images, prev_indexs)
+            # 获取所有文件的扩展名并去重，判断这一组文件的格式，纯图片，纯视频，图片+视频
+            is_image, is_video = False, False
+            file_extensions = {os.path.splitext(path)[1].lower() for path in prev_images}
+            if not file_extensions:
+                raise ValueError(f"无效的扩展名")
+            for file_extension in list(file_extensions):
+                if file_extension.endswith(self.parent_window.VIDEO_FORMATS):
+                    is_video = True
+                if file_extension.endswith(self.parent_window.IMAGE_FORMATS):
+                    is_image = True
+
+            # 根据当前组文件的格式选择调用子界面
+            if is_image and not is_video:   # 调用图片显示
+                self.set_images(prev_images, prev_indexs)
+            elif is_video and not is_image: # 调用视频显示
+                self.parent_window.create_video_player(prev_images, prev_indexs)   
+                raise ValueError(f"看图子界面调用视频子界面，主动抛出异常关闭当前看图子界面")             
+            elif is_image and is_video:
+                # 提示信息框
+                show_message_box("🔉: 这组文件同时包含图片和视频文件，无法调出子界面，返回主界面", "提示",1500)
+                # 抛出异常，退出当前子界面
+                raise ValueError(f"这组文件同时包含图片和视频文件，无法调出子界面，获取的文件如下：\n{prev_images}")
+            else:
+                # 提示信息框
+                show_message_box("🔉: 这组文件没有包含图片和视频文件，无法调出子界面，返回主界面", "提示",1500)
+                # 抛出异常，退出当前子界面
+                raise ValueError(f"这组文件没有包含图片和视频文件，无法调出子界面，获取的文件如下：\n{prev_images}")
 
         except Exception as e:
             print(f"处理B键时发生错误: {e}")
-            self.Escape_close()
-        finally:
             self.is_updating = False
-
+            self.Escape_close()
+            
     
     def get_next_images(self):
         """获取下一组图片"""
@@ -3318,7 +3364,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             if self.parent_window:
                 prev_images, prev_indexs = self.parent_window.press_space_and_b_get_selected_file_paths('b')
                 if prev_images and isinstance(prev_images, list) and len(prev_images) > 0:
-                    print(f"获取到上一组图片: {prev_images}")
+                    # print(f"获取到上一组图片: {prev_images}")
                     return prev_images, prev_indexs
                 else:
                     print("获取到的上一组图片无效")
@@ -3372,9 +3418,9 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         try:
             # 保存颜色设置
             self.save_settings()
-            self.cleanup()  # 清理资源
+            self.cleanup()      # 清理资源
             self.closed.emit()  # 发送关闭信号
-            super().close()  # 调用父类的close方法
+            super().close()     # 调用父类的close方法
         except Exception as e:
             print(f"关闭窗口时发生错误: {e}")
             super().close()

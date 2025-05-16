@@ -3,6 +3,7 @@ import time
 import json
 import shutil
 import hashlib
+import threading
 from io import BytesIO
 from functools import lru_cache
 from typing import Optional, Tuple
@@ -12,7 +13,7 @@ import cv2
 from PIL import Image
 from PyQt5 import QtGui, QtCore
 from PyQt5.QtGui import (QIcon, QPixmap,QImageReader,QImage)
-
+from PyQt5.QtCore import (QRunnable, QThreadPool, QObject, pyqtSignal)
 
 """设置本项目的入口路径,全局变量BASEICONPATH"""
 # 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
@@ -21,6 +22,68 @@ if True:
 # 方法二：直接读取主函数的路径，获取项目入口目录,只适用于hiviewer.py同级目录下的py文件调用
 if False: # 暂时禁用，不支持单独运行该模块
     BASEICONPATH = os.path.dirname(os.path.abspath(sys.argv[0]))  
+
+
+class WorkerSignals(QObject):
+    """工作线程信号类"""
+    finished = pyqtSignal()           # 完成信号
+    progress = pyqtSignal(int, int)   # 进度信号 (当前, 总数)
+    error = pyqtSignal(str)           # 错误信号
+    batch_loaded = pyqtSignal(list)   # 批量加载完成信号
+
+
+class ImagePreloader(QRunnable):
+    """改进的图片预加载工作线程"""
+    def __init__(self, file_paths):
+        super().__init__()
+        self.file_paths = file_paths
+        self.signals = WorkerSignals()
+        self._pause = False
+        self._stop = False
+        self._pause_condition = threading.Event()
+        self._pause_condition.set()  # 初始状态为未暂停
+        
+    def pause(self):
+        """暂停预加载"""
+        self._pause = True
+        self._pause_condition.clear()
+
+    def resume(self):
+        """恢复预加载"""
+        self._pause = False
+        self._pause_condition.set()
+        
+    def run(self):
+        try:
+            total = len(self.file_paths)
+            batch = []
+            batch_size = 10
+            
+            for i, file_path in enumerate(self.file_paths):
+                if self._stop:
+                    break
+                    
+                # 使用 Event 来实现暂停
+                self._pause_condition.wait()
+                    
+                if file_path:
+                    icon = IconCache.get_icon(file_path)  # 使用缓存系统获取图标
+                    batch.append((file_path, icon))
+                    
+                    if len(batch) >= batch_size:
+                        self.signals.batch_loaded.emit(batch)
+                        batch = []
+                        
+                    self.signals.progress.emit(i + 1, total)
+                    
+            if batch:  # 发送最后的批次
+                self.signals.batch_loaded.emit(batch)
+                
+            self.signals.finished.emit()
+            
+        except Exception as e:
+            self.signals.error.emit(str(e))
+
 
 class IconCache:
     """图标缓存类"""
@@ -62,11 +125,11 @@ class IconCache:
                 # print("获取图标, 进入生成新图标")
                 cls._cache[file_path] = icon
                 cls._save_to_cache(file_path, icon)
+            
             return icon
 
         except Exception as e:
             print(f"获取图标失败: {e}")
-            # show_message_box(f"get_icon获取图标失败: {e}", "提示", 1500)
             return QIcon()
 
     # 在_get_cache_path方法中添加文件修改时间校验
@@ -92,6 +155,7 @@ class IconCache:
             
             # 视频文件处理
             if file_ext in cls.VIDEO_FORMATS:
+                
                 return cls.get_video_thumbnail(file_path)
             
             # 图片文件处理
@@ -105,7 +169,6 @@ class IconCache:
 
         except Exception as e:
             print(f"生成图标失败: {e}")
-            # show_message_box(f"_generate_icon生成图标失败: {e}", "提示", 1500)
             return cls.get_default_icon("default_icon.png", (48, 48))
 
 
@@ -179,10 +242,11 @@ class IconCache:
         """
         try:
             # 构建默认图标路径
-            default_icon_path = os.path.join(BASEICONPATH, icon_path)
+            default_icon_path = os.path.join(BASEICONPATH,"resource","icons",icon_path)
             
             # 检查图标文件是否存在
             if os.path.exists(default_icon_path):
+                print(f"图标文件{default_icon_path}存在")
                 try:
                     cls._default_icon = QIcon(default_icon_path)
                     if cls._default_icon.isNull():
@@ -194,6 +258,7 @@ class IconCache:
             else:
                 print(f"图标文件不存在: {default_icon_path}")
                 cls._default_icon = cls._create_fallback_icon()
+                return cls._default_icon
                 
             # 处理图标尺寸
             if icon_size:
@@ -244,7 +309,7 @@ class IconCache:
             # 尝试打开视频文件
             cap = cv2.VideoCapture(video_path)
             if not cap.isOpened():
-                return None
+                return cls.get_default_icon("video_icon.png", (48, 48))
                 
             # 读取第一帧
             # 设置超时机制
@@ -256,7 +321,7 @@ class IconCache:
             cap.release()
             
             if not ret:
-                return None
+                return cls.get_default_icon("video_icon.png", (48, 48))
                 
             # 转换颜色空间从 BGR 到 RGB
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -274,7 +339,6 @@ class IconCache:
             
         except Exception as e:
             print(f"获取视频缩略图失败 {video_path}: {str(e)}")
-            # show_message_box(f"get_video_thumbnails获取视频缩略图失败{os.path.basename(video_path)}: {str(e)}", "提示", 1500)
             return cls.get_default_icon("video_icon.png", (48, 48))
         finally:
             # 确保资源释放

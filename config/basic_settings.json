@@ -6,21 +6,25 @@
         "D:/Tuning/O19/0_pic/02_IN_pic/2025.4.22-O19-IN-一供-FT-原图/normal/O19-1st",
         "D:/Tuning/O19/0_pic/02_IN_pic/2025.5.12-O19-IN-一供-FT原图/normal/N19",
         "D:/Tuning/O19/0_pic/02_IN_pic/2025.5.12-O19-IN-一供-FT原图/夜景/N19",
-        "D:/Tuning/O19/0_pic/02_IN_pic/2025.5.12-O19-IN-一供-FT原图/夜景/O19-1st"
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.5.12-O19-IN-一供-FT原图/夜景/O19-1st",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.5.14-O19-IN-三方测试原图/normal/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.5.14-O19-IN-三方测试原图/Telegram/O19-1st",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.5.14-O19-IN-三方测试原图/X/V50",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.5.14-O19-IN-三方测试原图/X/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.5.14-O19-IN-三方测试原图/lnstagram/N19",
+        "D:\\Tuning\\O19\\0_pic\\0515",
+        "D:/Tuning/O19/0_pic/0515/N19",
+        "D:/Tuning/O19/0_pic/0515/O19"
     ],
-    "current_directory": "D:/Tuning/O19/0_pic/02_IN_pic/2025.5.12-O19-IN-一供-FT原图/夜景/N19",
+    "current_directory": "D:/Tuning/O19/0_pic/0515/N19",
     "file_type_option": "显示图片文件",
     "combobox1_checked_items": [
-        "O19-1st",
-        "VIVO-V50",
-        "xiaomi15"
+        "O19"
     ],
     "combobox1_all_items": [
-        "O19-1st",
-        "VIVO-V50",
-        "xiaomi15"
+        "O19"
     ],
-    "sort_option": "按创建时间排序",
+    "sort_option": "按文件名称排序",
     "theme_option": "默认主题",
     "current_theme": "默认主题",
     "simple_mode": true,
