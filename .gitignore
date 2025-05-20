@@ -67,3 +67,4 @@ output/
 dist/
 downloads/
 hiviewer/cache/
+hiviewer.egg-info/

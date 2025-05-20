@@ -29,16 +29,19 @@
         "C:/Users/caozhen/Downloads/pic/photos_extracted",
         "C:\\Users\\caozhen\\Downloads\\motion-photo-samples-main\\motion-photo-samples-main",
         "D:\\Image_process\\MvimgExtractor",
-        "D:/Image_process/MvimgExtractor/videos_extracted"
+        "D:/Image_process/MvimgExtractor/videos_extracted",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.5.12-O19-IN-一供-FT原图/normal/O19-1st",
+        "D:\\Image_process\\hiviewer\\test"
     ],
-    "current_directory": "D:/Image_process/MvimgExtractor/videos_extracted",
-    "file_type_option": "显示所有文件",
+    "current_directory": "D:\\Image_process\\hiviewer\\test",
+    "file_type_option": "显示图片文件",
     "combobox1_checked_items": [],
     "combobox1_all_items": [
-        "andriod_photos",
-        "apple_photos",
-        "exe",
-        "photos_extracted"
+        ".git",
+        "cache",
+        "config",
+        "resource",
+        "src"
     ],
     "sort_option": "按文件名称排序",
     "theme_option": "默认主题",
