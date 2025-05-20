@@ -14,15 +14,31 @@
         "D:/Tuning/O19/0_pic/02_IN_pic/2025.5.14-O19-IN-三方测试原图/lnstagram/N19",
         "D:\\Tuning\\O19\\0_pic\\0515",
         "D:/Tuning/O19/0_pic/0515/N19",
-        "D:/Tuning/O19/0_pic/0515/O19"
+        "D:/Tuning/O19/0_pic/0515/O19",
+        "C:\\Users\\caozhen\\Downloads\\mvimg_extractor-master\\mvimg_extractor-master",
+        "C:/Users/caozhen/Downloads/mvimg_extractor-master/mvimg_extractor-master/photos_trans",
+        "C:/Users/caozhen/Downloads/mvimg_extractor-master/mvimg_extractor-master/videos",
+        "C:/Users/caozhen/Downloads/mvimg_extractor-master/mvimg_extractor-master/photos",
+        "D:/Image_process/aebox/tools",
+        "D:/Image_process/aebox/icon",
+        "C:\\Users\\caozhen\\Downloads\\pic",
+        "C:/Users/caozhen/Downloads/pic/photos_trans",
+        "C:/Users/caozhen/Downloads/pic/videos",
+        "C:/Users/caozhen/Downloads/pic/videos_extracted",
+        "C:/Users/caozhen/Downloads/pic",
+        "C:/Users/caozhen/Downloads/pic/photos_extracted",
+        "C:\\Users\\caozhen\\Downloads\\motion-photo-samples-main\\motion-photo-samples-main",
+        "D:\\Image_process\\MvimgExtractor",
+        "D:/Image_process/MvimgExtractor/videos_extracted"
     ],
-    "current_directory": "D:/Tuning/O19/0_pic/0515/N19",
-    "file_type_option": "显示图片文件",
-    "combobox1_checked_items": [
-        "O19"
-    ],
+    "current_directory": "D:/Image_process/MvimgExtractor/videos_extracted",
+    "file_type_option": "显示所有文件",
+    "combobox1_checked_items": [],
     "combobox1_all_items": [
-        "O19"
+        "andriod_photos",
+        "apple_photos",
+        "exe",
+        "photos_extracted"
     ],
     "sort_option": "按文件名称排序",
     "theme_option": "默认主题",

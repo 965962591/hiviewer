@@ -1,0 +1,110 @@
+
+import os
+
+def print_directory_structure(start_path, padding="", exclude_extensions=None, exclude_folders=None):
+    """
+    打印指定文件夹的目录结构，可以选择排除特定文件格式和文件夹
+    :param start_path: 起始文件夹路径
+    :param padding: 用于缩进的字符串
+    :param exclude_extensions: 要排除的文件扩展名列表（如 ['.txt', '.jpg']）
+    :param exclude_folders: 要排除的文件夹名列表（如 ['subfolder1', 'subfolder2']）
+    """
+    # 获取当前目录下的所有文件和文件夹
+    entries = sorted(os.listdir(start_path))
+    
+    for i, entry in enumerate(entries):
+        # 构造完整的路径
+        full_path = os.path.join(start_path, entry)
+        
+        # 检查是否在排除的文件夹列表中
+        if exclude_folders and entry in exclude_folders:
+            continue
+        
+        # 判断是否是文件夹
+        if os.path.isdir(full_path):
+            # 判断是否是最后一个条目
+            is_last = i == len(entries) - 1
+            
+            # 打印文件夹
+            print(f"{padding}{'└──> ' if is_last else '├──> '}{entry}")
+            
+            # 递归打印子文件夹的内容
+            new_padding = padding + ("    " if is_last else "│   ")
+            print_directory_structure(full_path, new_padding, exclude_extensions, exclude_folders)
+        else:
+            # 如果是文件，检查扩展名是否符合过滤条件
+            if exclude_extensions and any(full_path.endswith(ext) for ext in exclude_extensions):
+                continue
+            
+            # 判断是否是最后一个条目
+            is_last = i == len(entries) - 1
+            
+            # 打印文件
+            print(f"{padding}{'└── ' if is_last else '├── '}{entry}")
+
+
+
+def print_directory_structure_plus(start_path, padding="", exclude_extensions=None, exclude_folders=None):
+    """
+    打印指定文件夹的目录结构，可以选择排除特定文件格式和文件夹
+    :param start_path: 起始文件夹路径
+    :param padding: 用于缩进的字符串
+    :param exclude_extensions: 要排除的文件扩展名列表（如 ['.txt', '.jpg']）
+    :param exclude_folders: 要排除的文件夹名列表（如 ['subfolder1', 'subfolder2']）
+    """
+    # 获取当前目录下的所有文件和文件夹
+    entries = sorted(os.listdir(start_path))
+    
+    # 分离文件夹和文件
+    folders = [entry for entry in entries if os.path.isdir(os.path.join(start_path, entry))]
+    files = [entry for entry in entries if os.path.isfile(os.path.join(start_path, entry))]
+
+    # 先处理文件
+    for i, file in enumerate(files):
+        full_path = os.path.join(start_path, file)
+        
+        # 检查扩展名是否符合过滤条件
+        if exclude_extensions and any(full_path.endswith(ext) for ext in exclude_extensions):
+            continue
+        
+        # 判断是否是最后一个条目
+        is_last = i == len(files) - 1
+
+        # 打印文件,先处理的不需要用└──
+        # print(f"{padding}{'└── ' if is_last else '├── '}{file}")
+        print(f"{padding}{'├── ' if is_last else '├── '}{file}")
+
+    # 后处理文件夹
+    for i, folder in enumerate(folders):
+        full_path = os.path.join(start_path, folder)
+        
+        # 检查是否在排除的文件夹列表中
+        if exclude_folders and folder in exclude_folders:
+            continue
+        
+        # 判断是否是最后一个条目
+        is_last = i == len(folders) - 1
+        
+        # 打印文件夹
+        print(f"{padding}{'└──> ' if is_last else '├──> '}{folder}")
+        
+        # 递归打印子文件夹的内容
+        new_padding = padding + ("    " if is_last else "│   ")
+        print_directory_structure(full_path, new_padding, exclude_extensions, exclude_folders)
+
+
+
+
+# 示例调用
+if __name__ == "__main__":
+    # folder_path = input("请输入文件夹路径: ")
+    # exclude_extensions_input = input("请输入要排除的文件扩展名（用逗号分隔，如 .txt,.jpg）: ")
+    # exclude_folders_input = input("请输入要排除的文件夹名（用逗号分隔，如 subfolder1,subfolder2）: ")
+    exclude_extensions_input = "D:\Image_process\hiviewer"
+    exclude_extensions = [".py", ".png", ".json", "icon", ".exe", ".lng", ".db", ".dll",".ico",".jpg",".ini",".svg",".gif",".ttf"]
+    exclude_folders = ["__pycache__",".git","jpegr_lossless_rotator"]
+
+    print(f"\nhiviewer")
+    # print_directory_structure(exclude_extensions_input, exclude_extensions=exclude_extensions, exclude_folders=exclude_folders)
+    print_directory_structure_plus(exclude_extensions_input, exclude_extensions=exclude_extensions, exclude_folders=exclude_folders)
+
