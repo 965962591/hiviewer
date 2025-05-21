@@ -1,9 +1,8 @@
-import os
-import sys
-from PyQt5 import QtCore, QtGui, QtWidgets
+from pathlib import Path
 from PyQt5.QtWidgets import (QAbstractItemView, QApplication, QTableWidget)
 from PyQt5.QtCore import (Qt, QTimer, QMimeData, QPoint, QUrl)
-from PyQt5.QtGui import (QPixmap, QPainter, QDrag)
+from PyQt5.QtGui import (QPixmap, QPainter, QDrag, QColor, QFont)
+
 # 自定义模块
 from src.utils.heic import extract_jpg_from_heic
 
@@ -98,7 +97,7 @@ class DragTableWidget(QTableWidget):
                 # 获取文件路径
                 file_path = urls[0].toLocalFile()
                 # 获取文件扩展名
-                file_extension = os.path.splitext(os.path.basename(file_path))[1]
+                file_extension = Path(file_path).suffix
 
                 # 根据文件扩展名创建不同的预览图
                 if file_extension.endswith(self.main_window.IMAGE_FORMATS):
@@ -115,11 +114,10 @@ class DragTableWidget(QTableWidget):
                 
                 elif file_extension.endswith(self.main_window.VIDEO_FORMATS):
                     # 获取视频预览帧
-                    BasePath = os.path.dirname(os.path.abspath(sys.argv[0]))
-                    video_frame_path = os.path.join(BasePath, "cache", "videos", "video_preview_frame.jpg")
-                    if os.path.exists(video_frame_path):
+                    video_frame_path = Path(__file__).parent.parent.parent / "cache" / "videos" / "video_preview_frame.jpg"
+                    if video_frame_path.exists():
                         # 使用视频预览帧创建预览图
-                        preview = QPixmap(video_frame_path).scaled(128, 128, Qt.KeepAspectRatio, Qt.SmoothTransformation) 
+                        preview = QPixmap(video_frame_path._str).scaled(128, 128, Qt.KeepAspectRatio, Qt.SmoothTransformation) 
                     
                     else: # 如果视频预览帧不存在，则使用默认预览图
                         preview = self.create_preview_image(file_extension)
@@ -187,8 +185,8 @@ class DragTableWidget(QTableWidget):
                 painter.setRenderHint(QPainter.Antialiasing)
 
                 # 使用预定义的颜色和字体
-                bg_color = QtGui.QColor(88, 88, 88, 180)
-                text_color = QtGui.QColor(255, 255, 255)
+                bg_color = QColor(88, 88, 88, 180)
+                text_color = QColor(255, 255, 255)
 
                 # 绘制背景
                 painter.setBrush(bg_color)
@@ -196,7 +194,7 @@ class DragTableWidget(QTableWidget):
                 painter.drawRoundedRect(0, 0, 128, 128, 8, 8)   
 
                 # 设置文本样式
-                font = QtGui.QFont()
+                font = QFont()
                 font.setPointSize(12)
                 font.setBold(True)
                 painter.setFont(font)
@@ -214,9 +212,9 @@ class DragTableWidget(QTableWidget):
     def clean_temp_files(self):
         """清理临时文件"""
         for path in self.temp_files.copy():
-            if os.path.exists(path):
+            if Path(path).exists():
                 try:
-                    os.remove(path)
+                    Path(path).unlink()
                     self.temp_files.remove(path)
                 except Exception as e:
                     print(f"清理临时文件失败: {e}")

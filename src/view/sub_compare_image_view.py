@@ -18,7 +18,6 @@ import openpyxl
 import numpy as np
 import win32com.client as win32
 import matplotlib.pyplot as plt
-# import xml.etree.ElementTree as ET
 from lxml import etree as ETT
 from PIL import Image, ImageCms
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -37,6 +36,7 @@ from src.common.FontManager import SingleFontManager                        # �
 from src.utils.aitips import CustomLLM_Siliconflow                          # 看图子界面，AI提示看图复选框功能模块
 from src.utils.hisnot import WScreenshot                                    # 看图子界面，导入自定义截图的类
 from src.utils.aeboxlink import check_process_running,get_api_data          # 导入与AEBOX通信的模块函数
+from src.utils.heic import extract_jpg_from_heic                            # 导入heic图片转换为jpg图片的模块
 
 """设置本项目的入口路径,全局变量BasePath"""
 # 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
@@ -2076,9 +2076,15 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 start_time = time.time()  
                 index, path = args
                 try:
-                    if not path or not os.path.exists(path):
-                        return index, None
-                        
+                    # 如果图片是heic格式，则转换为jpg格式
+                    if path.endswith(".heic"):
+                        if new_path:= extract_jpg_from_heic(path):
+                            path = new_path
+
+                    # 如果图片不存在，则抛出异常
+                    if not os.path.exists(path):
+                        raise FileNotFoundError(f"❌ 图片不存在: {path}")
+
                     # 获取isinstance(image_input, Image.Image)格式图像
                     pil_image = Image.open(path)
                     iamge_format = pil_image.format

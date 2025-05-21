@@ -9,14 +9,15 @@ from functools import lru_cache
 from typing import Optional, Tuple
 
 # 三方库
-import cv2  
 from PIL import Image
 from PyQt5 import QtGui, QtCore
 from PyQt5.QtGui import (QIcon, QPixmap,QImageReader,QImage)
-from PyQt5.QtCore import (QRunnable, QThreadPool, QObject, pyqtSignal)
+from PyQt5.QtCore import (QRunnable, QObject, pyqtSignal)
 
 # 自定义模块
-from src.utils.heic import extract_pil_image_from_heic
+from src.utils.heic import extract_jpg_from_heic
+from src.utils.video import extract_first_frame_from_video
+
 
 """设置本项目的入口路径,全局变量BASEICONPATH"""
 # 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
@@ -163,12 +164,12 @@ class IconCache:
             
             # 图片文件处理
             elif file_ext in cls.IMAGE_FORMATS:
-                # HEIC文件处理
+                # HEIC文件处理,自动转换为jpg格式
                 if file_ext == ".heic":
-                    return cls._generate_heic_image_icon(file_path)
-                # 其他图片文件处理
-                else:
-                    return cls._generate_image_icon(file_path)
+                    if new_path:= extract_jpg_from_heic(file_path):
+                        file_path = new_path
+                
+                return cls._generate_image_icon(file_path)
             
             # 其它文件类型
             else:
@@ -179,28 +180,6 @@ class IconCache:
             print(f"生成图标失败: {e}")
             return cls.get_default_icon("default_icon.png", (48, 48))
 
-
-    @classmethod
-    def _generate_heic_image_icon(cls, file_path):
-        """生成HEIC图片图标"""
-        try:
-            # 提取HEIC图片
-            pil_image = extract_pil_image_from_heic(file_path)  
-            if pil_image:
-                # 缩放图像
-                pil_image.thumbnail((48, 48))
-                buffer = BytesIO()  
-                pil_image.save(buffer, format='PNG')
-                
-                # 转换为QPixmap并缩放
-                pixmap = QPixmap()
-                pixmap.loadFromData(buffer.getvalue())
-                return QIcon(pixmap)
-            else:
-                return cls.get_default_icon("image_icon.png", (48, 48))
-        except Exception as e:
-            print(f"生成HEIC图片图标失败: {e}")
-            return cls.get_default_icon("image_icon.png", (48, 48))
 
 
     @classmethod
@@ -333,28 +312,13 @@ class IconCache:
         Returns:
             QPixmap: 视频缩略图，失败返回None
         """
-        cap = None
+
         try:
-            # 尝试打开视频文件
-            cap = cv2.VideoCapture(video_path)
-            if not cap.isOpened():
-                return cls.get_default_icon("video_icon.png", (48, 48))
-                
-            # 读取第一帧
-            # 设置超时机制
-            start_time = time.time()
-            while time.time() - start_time < 2:  # 最多等待2秒
-                ret, frame = cap.read()
-                if ret:
-                    break
-            cap.release()
-            
-            if not ret:
-                return cls.get_default_icon("video_icon.png", (48, 48))
-                
-            # 转换颜色空间从 BGR 到 RGB
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            
+            # 使用extract_first_frame_from_video()获取视频首帧，若失败则返回None
+            frame = extract_first_frame_from_video(video_path)
+            if frame is None:
+                raise ValueError("无法读取视频首帧")
+
             # 创建 QImage
             height, width, channel = frame.shape
             bytes_per_line = channel * width
@@ -367,12 +331,9 @@ class IconCache:
             return QIcon(pixmap)
             
         except Exception as e:
-            print(f"获取视频缩略图失败 {video_path}: {str(e)}")
+            print(f"get_video_thumbnail()-获取视频缩略图失败--{video_path}: {str(e)}")
             return cls.get_default_icon("video_icon.png", (48, 48))
-        finally:
-            # 确保资源释放
-            if cap is not None:
-                cap.release()  
+
 
     @classmethod
     def _save_to_cache(cls, file_path, icon):
