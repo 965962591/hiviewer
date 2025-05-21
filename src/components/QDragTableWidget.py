@@ -4,7 +4,8 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import (QAbstractItemView, QApplication, QTableWidget)
 from PyQt5.QtCore import (Qt, QTimer, QMimeData, QPoint, QUrl)
 from PyQt5.QtGui import (QPixmap, QPainter, QDrag)
-
+# 自定义模块
+from src.utils.heic import extract_jpg_from_heic
 
 class DragTableWidget(QTableWidget):
     """重写QTableWidget类, 支持拖拽功能"""
@@ -101,8 +102,16 @@ class DragTableWidget(QTableWidget):
 
                 # 根据文件扩展名创建不同的预览图
                 if file_extension.endswith(self.main_window.IMAGE_FORMATS):
-                    # 获取图片预览
-                    preview = QPixmap(file_path).scaled(128, 128, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                    if file_extension.endswith(tuple(".heic")):
+                        if (new_path := extract_jpg_from_heic(file_path)):
+                            # 获取heic格式图片预览
+                            preview = QPixmap(new_path).scaled(128, 128, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                        else:
+                            # 使用默认预览图
+                            preview = self.create_preview_image(file_extension)
+                    else:
+                        # 获取其它图片预览
+                        preview = QPixmap(file_path).scaled(128, 128, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 
                 elif file_extension.endswith(self.main_window.VIDEO_FORMATS):
                     # 获取视频预览帧

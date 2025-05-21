@@ -15,6 +15,9 @@ from PyQt5 import QtGui, QtCore
 from PyQt5.QtGui import (QIcon, QPixmap,QImageReader,QImage)
 from PyQt5.QtCore import (QRunnable, QThreadPool, QObject, pyqtSignal)
 
+# 自定义模块
+from src.utils.heic import extract_pil_image_from_heic
+
 """设置本项目的入口路径,全局变量BASEICONPATH"""
 # 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
 if True:
@@ -88,13 +91,14 @@ class ImagePreloader(QRunnable):
 class IconCache:
     """图标缓存类"""
     _cache = {}
-    _cache_dir = os.path.join(BASEICONPATH, "cache", "icons")
-    _cache_index_file = os.path.join(_cache_dir, "icon_index.json")
+    _cache_base_dir = os.path.join(BASEICONPATH, "cache")
+    _cache_dir = os.path.join(_cache_base_dir, "icons")
+    _cache_index_file = os.path.join(_cache_base_dir, "icons.json")
     _max_cache_size = 1000  # 最大缓存数量，超过会删除最旧的缓存
     # 视频文件格式
     VIDEO_FORMATS = ('.mp4', '.avi', '.mov', '.wmv', '.mpeg', '.mpg', '.mkv')
     # 图片文件格式
-    IMAGE_FORMATS = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tif', '.ico', '.webp')
+    IMAGE_FORMATS = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tif', '.ico', '.webp', '.heic')
     # 其他文件格式类型图标维护
     FILE_TYPE_ICONS = {
     '.txt': "text_icon.png",
@@ -155,13 +159,17 @@ class IconCache:
             
             # 视频文件处理
             if file_ext in cls.VIDEO_FORMATS:
-                
                 return cls.get_video_thumbnail(file_path)
             
             # 图片文件处理
             elif file_ext in cls.IMAGE_FORMATS:
-                return cls._generate_image_icon(file_path)
-    
+                # HEIC文件处理
+                if file_ext == ".heic":
+                    return cls._generate_heic_image_icon(file_path)
+                # 其他图片文件处理
+                else:
+                    return cls._generate_image_icon(file_path)
+            
             # 其它文件类型
             else:
                 """特殊文件类型处理"""
@@ -173,41 +181,63 @@ class IconCache:
 
 
     @classmethod
-    def _generate_image_icon(cls, file_path):
-        """优化后的图片图标生成"""
+    def _generate_heic_image_icon(cls, file_path):
+        """生成HEIC图片图标"""
         try:
-
-            if False:
-                # 方案一：考虑到图片EXIF原始信息标记旋转的方案。现弃用，使用不考虑旋转信息的高效方案二
-                with Image.open(file_path) as img:
-                    image_format  = img.format
-
-                # 单独加载TIFF格式图片, 处理该格式文件会增加程序耗时
-                if image_format == "TIFF":
-                    return cls._generate_fallback_icon(file_path)  
-                            
-                # 使用QImageReader进行高效加载
-                reader = QImageReader(file_path)
-                reader.setScaledSize(QtCore.QSize(48, 48))
-                reader.setAutoTransform(True)
-                image = reader.read()
-                pixmap = QPixmap.fromImage(image)
-
-            if True:
-                # 方案二：不考虑旋转信息,使用QImage直接加载图像
-                image = QImage(file_path)
-                if image.isNull():
-                    raise ValueError("无法加载图像")
-
+            # 提取HEIC图片
+            pil_image = extract_pil_image_from_heic(file_path)  
+            if pil_image:
                 # 缩放图像
-                pixmap = QPixmap.fromImage(image.scaled(48, 48, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
-           
-            return QIcon(pixmap)
+                pil_image.thumbnail((48, 48))
+                buffer = BytesIO()  
+                pil_image.save(buffer, format='PNG')
+                
+                # 转换为QPixmap并缩放
+                pixmap = QPixmap()
+                pixmap.loadFromData(buffer.getvalue())
+                return QIcon(pixmap)
+            else:
+                return cls.get_default_icon("image_icon.png", (48, 48))
+        except Exception as e:
+            print(f"生成HEIC图片图标失败: {e}")
+            return cls.get_default_icon("image_icon.png", (48, 48))
+
+
+    @classmethod
+    def _generate_image_icon(cls, file_path):
+        """优化后的图片图标生成
+        优先使用QImageReader高效加载，如果失败则使用QImage作为备选方案
+        """
+        try:
+            # 方案一：使用QImageReader高效加载
+            reader = QImageReader(file_path)
+            reader.setScaledSize(QtCore.QSize(48, 48))  # 设置目标尺寸
+            reader.setAutoTransform(True)               # 设置自动转换（处理EXIF方向信息）
+            reader.setQuality(100)                      # 设置高质量缩放
+            
+            # 尝试读取图像
+            image = reader.read()
+            if not image.isNull():
+                return QIcon(QPixmap.fromImage(image))
+            
+            # 方案二：如果QImageReader失败，使用QImage作为备选
+            image = QImage(file_path)
+            if not image.isNull():
+                # 使用高质量缩放
+                pixmap = QPixmap.fromImage(image.scaled(
+                    48, 48, 
+                    QtCore.Qt.KeepAspectRatio, 
+                    QtCore.Qt.SmoothTransformation
+                ))
+                return QIcon(pixmap)
+            
+            # 方案三：如果都失败了，使用PIL作为最后的备选
+            return cls._generate_fallback_icon(file_path)
             
         except Exception as e:
-            print(f"高效生成图标失败: {e}")
-            # show_message_box(f"_generate_image_icon生成图标失败: {e}", "提示", 1500)
+            print(f"图片文件生成图标失败: {e}")
             return cls.get_default_icon("image_icon.png", (48, 48))
+
 
     @classmethod
     def _generate_fallback_icon(cls, file_path):
@@ -225,7 +255,6 @@ class IconCache:
                 return QIcon(pixmap)
         except Exception as e:
             print(f"备用图标生成失败: {e}")
-            # show_message_box(f"_generate_fallback_icon图标生成失败: {e}", "提示", 1500)
             return cls.get_default_icon("default_icon.png", (48, 48))
 
 
@@ -399,12 +428,11 @@ class IconCache:
             cls._cache.clear()
 
             # 清理文件缓存
-            if os.path.exists(cls._cache_dir):
-                shutil.rmtree(cls._cache_dir)
-            if os.path.exists(cls._cache_index_file):
-                os.remove(cls._cache_index_file)
+            if os.path.exists(cls._cache_base_dir):
+                shutil.rmtree(cls._cache_base_dir)
+
 
         except Exception as e:
             print(f"清理缓存失败: {e}")
-            # show_message_box(f"clear_cache清理缓存失败: {e}", "提示", 1500)
+            
         

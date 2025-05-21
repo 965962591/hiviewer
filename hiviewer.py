@@ -49,6 +49,8 @@ from src.utils.ImagePreview import ImageViewer                           # 导�
 from src.utils.xml import save_excel_data                                # 导入xml文件解析工具类
 from src.utils.delete import force_delete_folder                         # 导入强制删除文件夹的功能函数
 from src.utils.Icon import IconCache, ImagePreloader                     # 导入文件Icon图标加载类
+from src.utils.heic import extract_jpg_from_heic                         # 导入heic文件解析工具类
+from src.utils.video import extract_video_first_frame                    # 导入视频预览工具类
 from src.utils.aeboxlink import (check_process_running, urlencode_folder_path, get_api_data)
 
 
@@ -395,7 +397,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         """初始化整个主界面类所需的变量"""
 
         # 设置图片&视频文件格式
-        self.IMAGE_FORMATS = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tif', '.webp', '.ico')
+        self.IMAGE_FORMATS = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tif', '.webp', '.ico', '.heic') 
         self.VIDEO_FORMATS = ('.mp4', '.avi', '.mov', '.wmv', '.mpeg', '.mpg', '.mkv')
 
         # 初始化属性
@@ -976,7 +978,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.RT_QPushButton3.clicked.connect(self.clear_combox)                     # 清除地址栏
         self.RT_QPushButton5.clicked.connect(self.compare)                          # 打开看图工具
 
-        # 添加表格选择变化的信号连接 f"🎯[{count}]已选中"
+        # 表格选择变化时，更新状态栏和预览区域显示
         self.RB_QTableWidget0.itemSelectionChanged.connect(self.handle_table_selection)
         
         # 底部状态栏按钮连接函数
@@ -1234,8 +1236,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         print(f"pre_update()--预更新版本耗时:{(time.time()-_time):.2f} 秒")
             
         
-
-
     def show_exif(self):
         """打开Exif信息显示，类似快捷键CTRL+P功能  """
         print("show_exif()--打开Exif信息显示")
@@ -2422,6 +2422,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             return []
 
 
+
     def handle_table_selection(self):
         """处理表格选中事件（新增预览功能）"""
         try:
@@ -2439,13 +2440,28 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
             # 根据文件类型创建预览
             if preview_path.lower().endswith(tuple(self.IMAGE_FORMATS)):
-                # 创建图片预览
-                self.create_image_preview(preview_path)
+                # 处理HEIC格式图片
+                if preview_path.lower().endswith(tuple(".heic")):
+                    if (new_path := extract_jpg_from_heic(preview_path)):
+                        # 创建图片预览
+                        self.create_image_preview(new_path)
+                    else:
+                        # 显示错误信息
+                        self.show_preview_error("提取HEIC图片失败")
+                # 处理其他格式图片
+                else:
+                    # 创建图片预览
+                    self.create_image_preview(preview_path)
 
             elif preview_path.lower().endswith(tuple(self.VIDEO_FORMATS)):
-                # 创建视频预览
-                self.create_video_preview(preview_path)
-            
+                # 提取视频文件首帧图，并且创建预览图
+                if video_path := extract_video_first_frame(preview_path):
+                    # 创建图片预览   
+                    self.create_image_preview(video_path)     
+                else:
+                    # 显示错误信息
+                    self.show_preview_error("视频文件预览失败")
+
             else:
                 # 显示错误信息
                 self.show_preview_error("不支持预览的文件类型")
