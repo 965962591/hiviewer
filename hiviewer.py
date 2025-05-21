@@ -353,7 +353,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         super(HiviewerMainwindow, self).__init__(parent)
         """self.update_splash_message()函数中初始化UI界面self.setupUi(self)和变量初始化函数self.initialize_components()"""
         # 设置版本信息,读取本地配置文件./config/version.ini中的版本信息,没有则默认为release-v2.3.2
-        self.new_version_info = False # self.pre_update()函数中获取
+        self.new_version_info = False
         self.version_info = VERSION
         
         # 创建启动画面,启动画面以及相关初始化在self.update_splash_message()函数中
@@ -1221,19 +1221,26 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         check_update()
 
     def pre_update(self):
-        """预更新版本函数"""
-        # 获取self.new_version_info最新版本信息
-        _time = time.time()
-        self.new_version_info = pre_check_update()
-        self.statusbar_button1.setToolTip("设置")
-        if self.new_version_info:
-            self.statusbar_button2.setText(f"🚀有新版本可用")  
-            self.statusbar_button2.setToolTip(f"🚀新版本: {self.version_info}-->{self.new_version_info}")
-            self.apply_theme() # 更新样式表
-        else:
-            self.statusbar_button2.setToolTip("已是最新版本")
-        print(f"pre_update()--预更新版本耗时:{(time.time()-_time):.2f} 秒")
+        """预更新版本函数
+        检查更新版本信息，并更新状态栏按钮，如果耗时超过2秒，则提示用户更新失败
+        """
+        try:
+            _time = time.time()
+
+            # 预检查更新
+            self.new_version_info = pre_check_update()
             
+            if self.new_version_info:
+                self.statusbar_button2.setText(f"🚀有新版本可用")  
+                self.statusbar_button2.setToolTip(f"🚀新版本: {self.version_info}-->{self.new_version_info}")
+                self.apply_theme() 
+            else:
+                self.statusbar_button2.setToolTip("已是最新版本")
+
+            print(f"pre_update()--预更新版本耗时:{(time.time()-_time):.2f} 秒")
+        except Exception as e:
+            print(f"pre_update()-error--预更新版本失败: {e}")
+            return
         
     def show_exif(self):
         """打开Exif信息显示，类似快捷键CTRL+P功能  """

@@ -54,6 +54,7 @@ class Ui_MainWindow(object):
         
         # 创建按钮
         self.statusbar_button1 = QtWidgets.QPushButton("🔆")
+        self.statusbar_button1.setToolTip("设置")
         self.statusbar_button2 = QtWidgets.QPushButton("🚀版本(2.3.5)")
 
         # 创建标签

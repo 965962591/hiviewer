@@ -12,6 +12,7 @@ def print_directory_structure(start_path, padding="", exclude_extensions=None, e
     # 获取当前目录下的所有文件和文件夹
     entries = sorted(os.listdir(start_path))
     
+
     for i, entry in enumerate(entries):
         # 构造完整的路径
         full_path = os.path.join(start_path, entry)
@@ -27,9 +28,10 @@ def print_directory_structure(start_path, padding="", exclude_extensions=None, e
             
             # 打印文件夹
             print(f"{padding}{'└──> ' if is_last else '├──> '}{entry}")
+
             
             # 递归打印子文件夹的内容
-            new_padding = padding + ("    " if is_last else "│    ")
+            new_padding = padding + "│    "
             print_directory_structure(full_path, new_padding, exclude_extensions, exclude_folders)
         else:
             # 如果是文件，检查扩展名是否符合过滤条件
@@ -64,7 +66,7 @@ def print_directory_structure_plus(start_path, padding="", exclude_extensions=No
         full_path = os.path.join(start_path, folder)
         
         # 检查是否在排除的文件夹列表中
-        if exclude_folders and folder in exclude_folders:
+        if exclude_folders and folder in exclude_folders[0]:
             continue
         
         # 判断是否是最后一个条目
@@ -74,8 +76,8 @@ def print_directory_structure_plus(start_path, padding="", exclude_extensions=No
         print(f"{padding}{'├──> ' if is_last else '├──> '}{folder}")
         
         # 递归打印子文件夹的内容
-        new_padding = padding + ("    " if is_last else "│    ")
-        print_directory_structure(full_path, new_padding, exclude_extensions[1], exclude_folders)
+        new_padding = padding + "│    "
+        print_directory_structure(full_path, new_padding, exclude_extensions[1], exclude_folders[1])
 
     # 后打印文件
     for i, file in enumerate(files):
@@ -99,8 +101,9 @@ if __name__ == "__main__":
     exclude_extensions_input = "D:\Image_process\hiviewer"
     exclude_files = [".py", ".md", ".ini", ".png", ".json", "icon", ".exe", ".lng", ".db", ".dll",".ico",".jpg",".svg",".gif",".ttf"]   # 二级目录排除的文件
     exclude_files_plus = [".png", ".json", "icon", ".exe", ".lng", ".db", ".dll",".ico",".jpg",".svg",".gif",".ttf"]     # 一级目录要排除的文件
-    exclude_folders = ["__pycache__",".git","jpegr_lossless_rotator"]
+    exclude_folders_plus = ["__pycache__",".git","jpegr_lossless_rotator","hiviewer.egg-info"]
+    exclude_folders = ["__pycache__", ".git", "jpegr_lossless_rotator", "hiviewer.egg-info","pic","output"] 
 
     print(f"\nhiviewer")
-    print_directory_structure_plus(exclude_extensions_input, exclude_extensions=[exclude_files_plus,exclude_files], exclude_folders=exclude_folders)
+    print_directory_structure_plus(exclude_extensions_input, exclude_extensions=[exclude_files_plus,exclude_files], exclude_folders=[exclude_folders_plus,exclude_folders])
 
