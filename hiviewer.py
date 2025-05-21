@@ -381,6 +381,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # 设置快捷键
         self.set_shortcut()
+
         # 设置左侧文件浏览器和右侧表格区域的右键菜单
         self.setup_context_menu()  
         self.setup_treeview_context_menu()
@@ -3372,8 +3373,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 print("press_space_and_b_get_selected_file_paths()-没有检测到选中项！")
                 return [], []
             
-            # 清除所有选中的项
-            # self.RB_QTableWidget0.clearSelection() 
+
             # 获取最大最小的行索引
             row_min, row_max = 0, self.RB_QTableWidget0.rowCount() - 1 
             # 用于存储文件路径和文件索引的列表
@@ -3389,9 +3389,13 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 if len(set([item.column() for item in selected_items])) == len(selected_items):
                     # 如果选中项的个数和图片列数相等，则表示是单选，行索引移动step_row = 1
                     step_row = 1
-                else:# 如果选中项的个数和图片列数不相等，则表示是多选，行索引移动step_row = 选中项的行索引去重后长度
-                     step_row = len(set([item.row() for item in selected_items]))   
+                else:
+                    # 如果选中项的个数和图片列数不相等，则表示是多选，行索引移动step_row = 选中项的行索引去重后长度
+                    step_row = len(set([item.row() for item in selected_items]))   
             
+            # 清除所有选中的项
+            self.RB_QTableWidget0.clearSelection() 
+
             # 遍历选中的项
             for item in selected_items:
                 # 获取当前项的列索引行索引

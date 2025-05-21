@@ -182,6 +182,7 @@ class IconCache:
 
 
 
+
     @classmethod
     def _generate_image_icon(cls, file_path):
         """优化后的图片图标生成
@@ -190,14 +191,36 @@ class IconCache:
         try:
             # 方案一：使用QImageReader高效加载
             reader = QImageReader(file_path)
-            reader.setScaledSize(QtCore.QSize(48, 48))  # 设置目标尺寸
-            reader.setAutoTransform(True)               # 设置自动转换（处理EXIF方向信息）
-            reader.setQuality(100)                      # 设置高质量缩放
+            reader.setAutoTransform(True)     # 设置自动转换（处理EXIF方向信息）
+            reader.setQuality(100)            # 设置高质量缩放
+            
+            # 直接设置目标尺寸，QImageReader会自动处理等比例缩放
+            reader.setScaledSize(QtCore.QSize(48, 48))
+
+            if False:
+                # 设置高效缩放，获取原始图像尺寸
+                original_size = reader.size()
+                if original_size.isValid():
+                    # 计算等比例缩放尺寸
+                    target_size = QtCore.QSize(48, 48)
+                    # 计算缩放比例
+                    width_ratio = target_size.width() / original_size.width()
+                    height_ratio = target_size.height() / original_size.height()
+                    scale_ratio = min(width_ratio, height_ratio)
+                    
+                    # 计算新的尺寸
+                    new_width = int(original_size.width() * scale_ratio)
+                    new_height = int(original_size.height() * scale_ratio)
+                    
+                    # 设置缩放尺寸
+                    reader.setScaledSize(QtCore.QSize(new_width, new_height))
             
             # 尝试读取图像
             image = reader.read()
             if not image.isNull():
-                return QIcon(QPixmap.fromImage(image))
+                pixmap = QPixmap.fromImage(image)
+                # pixmap = pixmap.scaled(48, 48, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)  # 低效缩放，暂时注释
+                return QIcon(pixmap)
             
             # 方案二：如果QImageReader失败，使用QImage作为备选
             image = QImage(file_path)
