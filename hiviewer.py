@@ -15,7 +15,6 @@ from itertools import zip_longest, chain
 from logging.handlers import RotatingFileHandler
 
 """导入python第三方模块"""
-import cv2
 from PIL import Image
 from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtGui import (QIcon, QKeySequence, QPixmap, QTransform, QImageReader,QImage)
@@ -2296,6 +2295,8 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # 设置预加载状态
         self.preloading = True
         print("start_image_preloading()--开始预加载图标, 启动预加载线程")
+
+        self.start_time_image_preloading = time.time()
         
         try:
             # 创建新的预加载器
@@ -2357,7 +2358,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         """处理预加载完成"""
         print("on_preload_finished()--图标预加载完成")
         # 更新状态栏信息显示
-        self.statusbar_label1.setText(f"🔉: 图标已全部加载🍃")
+        self.statusbar_label1.setText(f"🔉: 图标已全部加载-^-耗时：{time.time()-self.start_time_image_preloading:.2f}秒🍃")
         gc.collect()
         
     def on_preload_error(self, error):
@@ -2509,37 +2510,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             print(f"图片预览失败: {e}")
             self.show_preview_error("图片预览不可用")
 
-    def create_video_preview(self, path):
-        """创建视频预览（优化为仅读取首帧）"""
-        try:
-            # 使用OpenCV读取视频首帧
-            cap = cv2.VideoCapture(path)
-            if not cap.isOpened():
-                raise ValueError("无法打开视频文件")
-            
-            # 读取第一帧并转换颜色空间
-            ret, frame = cap.read()
-            if not ret:
-                raise ValueError("无法读取视频帧")
-            # 不需要转换颜色空间，因为OpenCV读取的视频帧已经是RGB格式
-            # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            
-            # 释放资源
-            cap.release()
-
-            # 保存视频帧到本地
-            cache_dir = "./cache/videos"
-            if not os.path.exists(cache_dir):
-                os.makedirs(cache_dir, exist_ok=True)
-            frame_path = os.path.join(cache_dir, "video_preview_frame.jpg")
-            cv2.imwrite(frame_path, frame)
-
-            # 创建图片预览
-            self.create_image_preview(frame_path)
-
-        except Exception as e:
-            print(f"视频预览失败: {e}")
-            self.show_preview_error("视频预览不可用")
 
 
     def show_preview_error(self, message):
@@ -4154,10 +4124,7 @@ def setup_logging():
     main_logger.addHandler(console_handler)
     main_logger.addHandler(file_handler)
 
-    # 第三方库日志级别调整
-    logging.getLogger("PIL").setLevel(logging.WARNING)
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
-    logging.getLogger("cv2").setLevel(logging.WARNING)
+
 
 """
 设置日志区域结束线

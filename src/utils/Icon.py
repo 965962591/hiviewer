@@ -4,6 +4,7 @@ import json
 import shutil
 import hashlib
 import threading
+from pathlib import Path
 from io import BytesIO
 from functools import lru_cache
 from typing import Optional, Tuple
@@ -22,10 +23,10 @@ from src.utils.video import extract_first_frame_from_video
 """设置本项目的入口路径,全局变量BASEICONPATH"""
 # 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
 if True:
-    BASEICONPATH = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    BASEICONPATH = Path(__file__).parent.parent.parent
 # 方法二：直接读取主函数的路径，获取项目入口目录,只适用于hiviewer.py同级目录下的py文件调用
 if False: # 暂时禁用，不支持单独运行该模块
-    BASEICONPATH = os.path.dirname(os.path.abspath(sys.argv[0]))  
+    BASEICONPATH = Path(sys.argv[0]).resolve().parent
 
 
 class WorkerSignals(QObject):
@@ -92,9 +93,9 @@ class ImagePreloader(QRunnable):
 class IconCache:
     """图标缓存类"""
     _cache = {}
-    _cache_base_dir = os.path.join(BASEICONPATH, "cache")
-    _cache_dir = os.path.join(_cache_base_dir, "icons")
-    _cache_index_file = os.path.join(_cache_base_dir, "icons.json")
+    _cache_base_dir = BASEICONPATH / "cache"
+    _cache_dir = BASEICONPATH / "cache" / "icons"
+    _cache_index_file = BASEICONPATH / "cache" / "icons.json"
     _max_cache_size = 1000  # 最大缓存数量，超过会删除最旧的缓存
     # 视频文件格式
     VIDEO_FORMATS = ('.mp4', '.avi', '.mov', '.wmv', '.mpeg', '.mpg', '.mkv')
@@ -118,7 +119,7 @@ class IconCache:
 
             # 检查文件缓存
             cache_path = cls._get_cache_path(file_path)
-            if os.path.exists(cache_path):
+            if Path(cache_path).exists():
                 # print("获取图标, 进入文件缓存")
                 icon = QIcon(cache_path)
                 cls._cache[file_path] = icon
@@ -142,7 +143,7 @@ class IconCache:
     def _get_cache_path(cls, file_path):
         file_stat = os.stat(file_path)
         file_hash = hashlib.md5(f"{file_path}-{file_stat.st_mtime}".encode()).hexdigest()
-        return os.path.join(cls._cache_dir, f"{file_hash}.png")
+        return str(cls._cache_dir / f"{file_hash}.png")
 
     @classmethod
     def _generate_icon(cls, file_path):
@@ -156,7 +157,7 @@ class IconCache:
         """
         try:
             # 获取文件类型，提取后缀
-            file_ext = os.path.splitext(file_path)[1].lower()
+            file_ext = Path(file_path).suffix.lower()
             
             # 视频文件处理
             if file_ext in cls.VIDEO_FORMATS:
@@ -195,9 +196,9 @@ class IconCache:
             reader.setQuality(100)            # 设置高质量缩放
             
             # 直接设置目标尺寸，QImageReader会自动处理等比例缩放
-            reader.setScaledSize(QtCore.QSize(48, 48))
+            # reader.setScaledSize(QtCore.QSize(48, 48))
 
-            if False:
+            if True:
                 # 设置高效缩放，获取原始图像尺寸
                 original_size = reader.size()
                 if original_size.isValid():
@@ -273,13 +274,13 @@ class IconCache:
         """
         try:
             # 构建默认图标路径
-            default_icon_path = os.path.join(BASEICONPATH,"resource","icons",icon_path)
+            default_icon_path = BASEICONPATH / "resource" / "icons" / icon_path
             
             # 检查图标文件是否存在
-            if os.path.exists(default_icon_path):
+            if default_icon_path.exists():
                 print(f"图标文件{default_icon_path}存在")
                 try:
-                    cls._default_icon = QIcon(default_icon_path)
+                    cls._default_icon = QIcon(default_icon_path._str)
                     if cls._default_icon.isNull():
                         raise ValueError("无法加载图标文件")
                 except Exception as e:
@@ -355,6 +356,14 @@ class IconCache:
             
         except Exception as e:
             print(f"get_video_thumbnail()-获取视频缩略图失败--{video_path}: {str(e)}")
+            
+            # 将默认图标video_icon.png替换video_preview_frame.jpg
+            default_video_icon_path = BASEICONPATH / "resource" / "icons" / "video_icon.png"
+            video_preview_frame_path = BASEICONPATH / "cache" / "videos" / "video_preview_frame.jpg"
+            video_preview_frame_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(default_video_icon_path, video_preview_frame_path)
+
+            # 返回默认视频图标
             return cls.get_default_icon("video_icon.png", (48, 48))
 
 
@@ -363,7 +372,7 @@ class IconCache:
         """保存图标到缓存"""
         try:
             # 确保缓存目录存在
-            os.makedirs(cls._cache_dir, exist_ok=True)
+            cls._cache_dir.mkdir(parents=True, exist_ok=True)
 
             # 保存图标
             cache_path = cls._get_cache_path(file_path)
@@ -374,7 +383,6 @@ class IconCache:
 
         except Exception as e:
             print(f"保存图标缓存失败: {e}")
-            # show_message_box(f"_save_to_cache保存图标缓存失败: {e}", "提示", 1500)
             
     @classmethod
     def _update_cache_index(cls, file_path):
@@ -382,7 +390,7 @@ class IconCache:
         try:
             # 读取现有索引
             index = {}
-            if os.path.exists(cls._cache_index_file):
+            if cls._cache_index_file.exists():
                 with open(cls._cache_index_file, 'r', encoding='utf-8', errors='ignore') as f:
                     index = json.load(f)
 
@@ -412,7 +420,7 @@ class IconCache:
             cls._cache.clear()
 
             # 清理文件缓存
-            if os.path.exists(cls._cache_base_dir):
+            if cls._cache_base_dir.exists():
                 shutil.rmtree(cls._cache_base_dir)
 
 

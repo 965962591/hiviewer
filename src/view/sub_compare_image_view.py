@@ -382,10 +382,20 @@ def load_xml_data(xml_path):
                     extracted_values.append(f"\n{name}: {value[0].text}")
             else: # 解析人脸SA的相关value
                 if value:
-                    target = ETT.XPath('.//SA/FaceSA/target/start')(root)
-                    frame_luma = ETT.XPath('.//SA/FrameSA/luma')(root)[0].text
-                    face_luma = ETT.XPath('.//SA/FaceSA/luma')(root)[0].text
+                    # 获取FrameSA的luma值
+                    luma_frame = ETT.XPath('.//SA/FrameSA/luma')(root)
+                    luma_frame_ev = ETT.XPath('.//SA/EVFrameSA/luma')(root)
+                    frame_luma = luma_frame[0].text if luma_frame and luma_frame[0].text else luma_frame_ev[0].text if luma_frame_ev and luma_frame_ev[0].text else 0.0001
+                    
+                    # 获取FaceSA的luma值
+                    luma_face = ETT.XPath('.//SA/FaceSA/luma')(root)
+                    face_luma = luma_face[0].text if luma_face and luma_face[0].text else 0.0001
+
+                    # 计算背光值
                     backlight = float(face_luma)/float(frame_luma) if frame_luma and face_luma else 0.0
+                    
+                    # 获取FaceSA的target值
+                    target = ETT.XPath('.//SA/FaceSA/target/start')(root)
                     if target and target[0].text:
                         extracted_values.append(f"\n{name}: {target[0].text}(target) & {backlight:.4f}(backlight)")
                 else:
@@ -393,7 +403,7 @@ def load_xml_data(xml_path):
 
         # 汇总字符串    
         qualcom_exif_info = ''.join(extracted_values)
-        return qualcom_exif_info
+        return qualcom_exif_info, bool(luma_frame_ev)
 
     except Exception as e:
         print(f"解析XML失败{xml_path}:\n {e}")
@@ -1944,7 +1954,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 
                 # 更新EXIF标签
                 if hasattr(view, 'exif_label') and hasattr(view, 'exif_text'):
-                    exif_info = self.process_exif_info(self.dict_exif_info_visibility, view.exif_text)
+                    exif_info = self.process_exif_info(self.dict_exif_info_visibility, view.exif_text, False)
                     view.exif_label.setText(exif_info if exif_info else "解析不出exif信息!")
                     view.exif_label.setStyleSheet(f"color: {self.font_color_exif}; background-color: transparent; font-weight: 400;")
 
@@ -2120,12 +2130,15 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
                     # 检测是否存在同图片路径的xml文件  将lux_index、DRCgain写入到exif信息中去
                     xml_path = os.path.join(os.path.dirname(path), os.path.basename(path).split('.')[0] + "_new.xml")
+                    hdr_flag = False
                     if os.path.exists(xml_path):
                         # 提取xml中lux_index、cct、drcgain等关键信息，拼接到exif_info
-                        exif_info = exif_info + load_xml_data(xml_path)
+                        exif_info_qpm, hdr_flag = load_xml_data(xml_path)
+                        exif_info = exif_info + exif_info_qpm
+                        
 
                     # 处理EXIF信息，根据可见性字典更新
-                    exif_info = self.process_exif_info(self.dict_exif_info_visibility, exif_info)
+                    exif_info = self.process_exif_info(self.dict_exif_info_visibility, exif_info, hdr_flag)
 
                     # 3. 解析直方图信息
                     histogram = self.calculate_brightness_histogram(pil_image) 
@@ -2356,11 +2369,16 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             return False
 
 
-    def process_exif_info(self, visibility_dict, exif_info):
+    def process_exif_info(self, visibility_dict, exif_info, hdr_flag):
         """处理EXIF信息，将其转换为字典并根据可见性字典更新"""
         try:
             # 将 exif_info 转换为字典
             exif_dict = convert_to_dict(exif_info)
+
+            # HDR标签为auto时，如果hdr_flag为True，则设置为auto-on，否则设置为auto-off
+            # hdr_flag 是读取xml文件时，是否存在EVFrameSA标签判断
+            if exif_dict.get("HDR", "") == 'auto' and  exif_dict.get("Lux", ""):
+                exif_dict['HDR'] = 'auto_(ON)' if hdr_flag else 'auto_(OFF)'
             
             # 根据字典中的键值对，更新 exif_dict 中的可见性值
             for key, value in visibility_dict.items():
