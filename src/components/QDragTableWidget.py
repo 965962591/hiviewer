@@ -50,7 +50,11 @@ class DragTableWidget(QTableWidget):
             # 确保有起始拖拽位置
             if not self.drag_start_position:
                 return
-                
+              
+            # 确保选中了 1 个或多个文件
+            if not self.main_window or not self.main_window.RB_QTableWidget0.selectedItems():
+                return
+
             # 计算拖拽距离，避免重复计算
             drag_distance = (event.pos() - self.drag_start_position).manhattanLength()
             # 如果拖拽距离小于最小拖拽距离，则不进行拖拽
@@ -58,7 +62,7 @@ class DragTableWidget(QTableWidget):
                 return
             
             # 主函数中定义的拖拽模式切换标志位
-            if self.main_window and self.main_window.drag_flag: 
+            if self.main_window.drag_flag: 
                 
                 # 收集文件URL
                 urls = self.main_window.get_selected_file_path()

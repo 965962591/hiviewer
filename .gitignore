@@ -60,10 +60,8 @@ GitCommitInfo.txt
 __pycache__/
 hiviewer/__pycache__/
 ui/__pycache__/
-cache/icons/
-cache/videos/
-cache/photos/
-cache/*.zip
+app_cache/
+cache/
 output/
 dist/
 downloads/

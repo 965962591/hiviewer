@@ -2375,7 +2375,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             # 将 exif_info 转换为字典
             exif_dict = convert_to_dict(exif_info)
 
-            # HDR标签为auto时，如果hdr_flag为True，则设置为auto-on，否则设置为auto-off
+            # HDR标签为auto且存在Lux时，如果hdr_flag为True，则设置为auto-on，否则设置为auto-off
             # hdr_flag 是读取xml文件时，是否存在EVFrameSA标签判断
             if exif_dict.get("HDR", "") == 'auto' and  exif_dict.get("Lux", ""):
                 exif_dict['HDR'] = 'auto_(ON)' if hdr_flag else 'auto_(OFF)'
