@@ -10,12 +10,10 @@ import logging
 import subprocess
 from queue import Queue
 from pathlib import Path
-from fractions import Fraction
 from itertools import zip_longest, chain
 from logging.handlers import RotatingFileHandler
 
 """导入python第三方模块"""
-from PIL import Image
 from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtGui import (QIcon, QKeySequence, QPixmap, QTransform, QImageReader,QImage)
 from PyQt5.QtWidgets import (
@@ -49,6 +47,7 @@ from src.utils.delete import force_delete_folder                         # 导�
 from src.utils.Icon import IconCache, ImagePreloader                     # 导入文件Icon图标加载类
 from src.utils.heic import extract_jpg_from_heic                         # 导入heic文件解析工具类
 from src.utils.video import extract_video_first_frame                    # 导入视频预览工具类
+from src.utils.image import ImageProcessor                               # 导入图片处理工具类
 from src.utils.aeboxlink import (check_process_running, urlencode_folder_path, get_api_data)
 
 
@@ -869,14 +868,14 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.RT_QComboBox0.addItem("显示所有文件")
 
         # RT_QComboBox2 添加下拉框选项
-        self.RT_QComboBox2.addItem("按创建时间排序")
         self.RT_QComboBox2.addItem("按文件名称排序")
+        self.RT_QComboBox2.addItem("按创建时间排序")
         self.RT_QComboBox2.addItem("按修改时间排序")
         self.RT_QComboBox2.addItem("按文件大小排序")
         self.RT_QComboBox2.addItem("按曝光时间排序")
         self.RT_QComboBox2.addItem("按ISO排序")
-        self.RT_QComboBox2.addItem("按创建时间逆序排序")
         self.RT_QComboBox2.addItem("按文件名称逆序排序")
+        self.RT_QComboBox2.addItem("按创建时间逆序排序")
         self.RT_QComboBox2.addItem("按修改时间逆序排序")
         self.RT_QComboBox2.addItem("按文件大小逆序排序")
         self.RT_QComboBox2.addItem("按曝光时间逆序排序")
@@ -2126,7 +2125,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 selected_folders_path = [folder for folder in selected_folders_path 
                                     if os.path.exists(folder) and any(os.scandir(folder))]
 
-
             # 获取文件夹名列表
             dir_name_list = [os.path.basename(dir_name) for dir_name in selected_folders_path]
             
@@ -2161,66 +2159,17 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                         if entry.name.lower().endswith(self.IMAGE_FORMATS):
 
                             if self.simple_mode:
-                                width = None   # 宽度  
-                                height = None  # 高度
-                                exposure_time = None  # 曝光时间
-                                iso = None  # ISO
-                            else:       
-                                # 获取图片的元数据
-                                try:
-                                    with Image.open(entry.path) as img:
-                                        width, height = img.size  # 获取分辨率
-                                        exif_data = img._getexif()  # 获取EXIF数据
-                                        if exif_data is None:
-                                            # 设置默认值
-                                            exposure_time = None
-                                            iso = None
-                                        else:
-                                            # 读取ISO
-                                            iso = exif_data.get(34855)  # ISO
-                                            if iso is None:
-                                                iso = None
-                                            # 读取EXP
-                                            exposure_time_ = exif_data.get(33434)  # 曝光时间
-                                            if exposure_time_ is None:
-                                                exposure_time = None
-                                            elif isinstance(exposure_time_, tuple) and len(exposure_time_) == 2 and exposure_time_[1] != 0:
-                                                exposure_time = f"{exposure_time_[0]}/{exposure_time_[1]}"
-                                            elif isinstance(exposure_time_, (int, float)):
-                                                try:    
-                                                    fraction = Fraction(exposure_time_)
-                                                    exposure_time = f"{fraction.numerator}/{fraction.denominator}"
-                                                except Exception:
-                                                    exposure_time = str(exposure_time_)
-                                            elif hasattr(exposure_time_, 'numerator') and hasattr(exposure_time_, 'denominator'):
-                                                try:    
-                                                    fraction = Fraction(exposure_time_.numerator, exposure_time_.denominator)
-                                                    exposure_time = f"{fraction.numerator}/{fraction.denominator}"
-                                                except Exception:
-                                                    exposure_time = None
-                                            elif isinstance(exposure_time_, str):
-                                                try:
-                                                    fraction = Fraction(exposure_time_)
-                                                    exposure_time = f"{fraction.numerator}/{fraction.denominator}"
-                                                except Exception:
-                                                    exposure_time = exposure_time_  
+                                width = None           # 宽度  
+                                height = None          # 高度
+                                exposure_time = None   # 曝光时间
+                                iso = None             # ISO
+                                
+                            else:   
+                                with ImageProcessor(entry.path) as img:
+                                    width, height = img.width, img.height
+                                    exposure_time = img.exposure_time
+                                    iso = img.iso
 
-                                            # 处理曝光时间，确保分母为1
-                                            if exposure_time:        
-                                                if exposure_time.split('/')[0] == '1':
-                                                    pass
-                                                else:
-                                                    if exposure_time.split('/')[0] != '0':
-                                                        t_ = 1
-                                                        b_ = int(exposure_time.split('/')[1]) // int(exposure_time.split('/')[0])   
-                                                        exposure_time = f"{t_}/{b_}"
-
-                                except Exception as e:
-                                    print(f"读取图片元数据失败: {entry.path}, 错误: {e}")
-                                    # 设置默认值
-                                    exposure_time = None
-                                    iso = None
-                            
                             # 文件名称、创建时间、修改时间、文件大小、分辨率、曝光时间、ISO、文件路径
                             files_and_dirs_with_mtime.append((entry.name, entry.stat().st_ctime, entry.stat().st_mtime, 
                                                           entry.stat().st_size, (width, height), 
@@ -2244,41 +2193,41 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                         print("filter_files函数:selected_option没有选择任何选项,跳过")
                         continue
 
-        # 排序
-        if sort_option == "按创建时间排序":  # 按创建时间排序，reverse=False 表示升序，即最小的在前面
+        # 升排序
+        if sort_option == "按文件名称排序":  # 按文件名称排序，reverse=False 表示升序，即最小的在前面
+            files_and_dirs_with_mtime.sort(key=lambda x: natural_sort_key(x[0]), reverse=False)
+        elif sort_option == "按创建时间排序":  # 按创建时间排序，reverse=False 表示升序，即最小的在前面
             files_and_dirs_with_mtime.sort(key=lambda x: x[1], reverse=False)
         elif sort_option == "按修改时间排序":  # 按修改时间排序，reverse=False 表示升序，即最小的在前面
             files_and_dirs_with_mtime.sort(key=lambda x: x[2], reverse=False)
         elif sort_option == "按文件大小排序":  # 按文件大小排序，reverse=False 表示升序，即最小的在前面
             files_and_dirs_with_mtime.sort(key=lambda x: x[3], reverse=False)
-        elif sort_option == "按文件名称排序":  # 按文件名称排序，reverse=False 表示升序，即最小的在前面
-            # files_and_dirs_with_mtime.sort(key=lambda x: x[0], reverse=False)
-            # modify by diamond_cz 修改按文件名排序功能，实现类似window支持数字排序
-            files_and_dirs_with_mtime.sort(key=lambda x: natural_sort_key(x[0]), reverse=False)
+        
+        # 降排序
+        elif sort_option == "按文件名称逆序排序":  # 按文件名称排序，reverse=True 表示降序，即最大的在前面
+            files_and_dirs_with_mtime.sort(key=lambda x: natural_sort_key(x[0]), reverse=True) 
         elif sort_option == "按创建时间逆序排序":  # 按创建时间排序，reverse=True 表示降序，即最大的在前面
             files_and_dirs_with_mtime.sort(key=lambda x: x[1], reverse=True)
         elif sort_option == "按修改时间逆序排序":  # 按修改时间排序，reverse=True 表示降序，即最大的在前面
             files_and_dirs_with_mtime.sort(key=lambda x: x[2], reverse=True)
         elif sort_option == "按文件大小逆序排序":  # 按文件大小排序，reverse=True 表示降序，即最大的在前面
             files_and_dirs_with_mtime.sort(key=lambda x: x[3], reverse=True)
-        elif sort_option == "按文件名称逆序排序":  # 按文件名称排序，reverse=True 表示降序，即最大的在前面
-            # files_and_dirs_with_mtime.sort(key=lambda x: x[0], reverse=True)
-            files_and_dirs_with_mtime.sort(key=lambda x: natural_sort_key(x[0]), reverse=True)
+
         # 极简模式下不使能曝光、ISO排序选项
         elif not self.simple_mode and sort_option == "按曝光时间排序" and selected_option == "显示图片文件":  # 按曝光时间排序，reverse=False 表示升序，即最小的在前面
             # 排序中若存在None,则提供默认值0  
             files_and_dirs_with_mtime.sort(key=lambda x: int(x[5].split('/')[1]) if x[5] is not None else 0, reverse=False)
-        elif not self.simple_mode and sort_option == "按ISO排序" and selected_option == "显示图片文件":  # 按ISO排序，reverse=False 表示升序，即最小的在前面
-            # 排序中若存在None,则提供默认值0  
-            files_and_dirs_with_mtime.sort(key=lambda x: int(x[5].split('/')[1]) if x[5] is not None else 0, reverse=False)
         elif not self.simple_mode and sort_option == "按曝光时间逆序排序" and selected_option == "显示图片文件":  # 按曝光时间排序，reverse=True 表示降序，即最大的在前面
             # 排序中若存在None,则提供默认值0  
-            files_and_dirs_with_mtime.sort(key=lambda x: int(x[5].split('/')[1]) if x[5] is not None else 0, reverse=False)
+            files_and_dirs_with_mtime.sort(key=lambda x: int(x[5].split('/')[1]) if x[5] is not None else 0, reverse=True)
+        elif not self.simple_mode and sort_option == "按ISO排序" and selected_option == "显示图片文件":  # 按ISO排序，reverse=False 表示升序，即最小的在前面
+            # 排序中若存在None,则提供默认值0  
+            files_and_dirs_with_mtime.sort(key=lambda x: x[6], reverse=False)
         elif not self.simple_mode and sort_option == "按ISO逆序排序" and selected_option == "显示图片文件":  # 按ISO排序，reverse=True 表示降序，即最大的在前面
             # 排序中若存在None,则提供默认值0  
-            files_and_dirs_with_mtime.sort(key=lambda x: int(x[5].split('/')[1]) if x[5] is not None else 0, reverse=False) 
-        else:  # 默认按创建时间排序，reverse=False 表示升序，即最小的在前面
-            files_and_dirs_with_mtime.sort(key=lambda x: x[1], reverse=False)
+            files_and_dirs_with_mtime.sort(key=lambda x: x[6], reverse=True) 
+        else:  # 默认文件名称排序，reverse=False 表示升序，即最小的在前面
+            files_and_dirs_with_mtime.sort(key=lambda x: x[0], reverse=False)
 
         # 获取文件路径列表，files_and_dirs_with_mtime的最后一列
         file_paths = [item[-1] for item in files_and_dirs_with_mtime]
@@ -2527,16 +2476,19 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         try:
             sort_option = self.RT_QComboBox2.currentText()
             if self.simple_mode:
-                if sort_option == "按曝光时间排序":
+                if sort_option == "按曝光时间排序" or sort_option == "按曝光时间逆序排序":
                     # 弹出提示框
-                    show_message_box("极简模式下不使能曝光时间排序", "提示", 500)
-                    return
-                elif sort_option == "按ISO排序":
+                    show_message_box("极简模式下不使能曝光时间排序，\nALT+I快捷键可切换进入极简模式", "提示", 1000)
+                    # 设置排序选项为默认排序
+                    self.RT_QComboBox2.setCurrentText("按文件名称排序")
+                    
+                elif sort_option == "按ISO排序" or sort_option == "按ISO逆序排序":
                     # 弹出提示框    
-                    show_message_box("极简模式下不使能ISO排序", "提示", 500)
-                    return
-
-            self.update_RB_QTableWidget0()  # 更新右侧表格
+                    show_message_box("极简模式下不使能ISO排序，\nALT+I快捷键可切换进入极简模式", "提示", 1000)
+                    # 设置排序选项为默认排序
+                    self.RT_QComboBox2.setCurrentText("按文件名称排序")
+            # 更新右侧表格
+            self.update_RB_QTableWidget0()  
         except Exception as e:
             print(f"handle_sort_option()--处理排序选项失败: {e}")
 

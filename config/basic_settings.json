@@ -60,7 +60,7 @@
     "file_type_option": "显示所有文件",
     "combobox1_checked_items": [],
     "combobox1_all_items": [],
-    "sort_option": "按文件名称逆序排序",
+    "sort_option": "按文件名称排序",
     "theme_option": "默认主题",
     "current_theme": "默认主题",
     "simple_mode": true,
