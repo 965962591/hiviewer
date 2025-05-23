@@ -5,10 +5,11 @@ import sys
 优先使用nuitka打包本项目为可执行程序hiviewer.exe
 
 """
-# 打包windows可执行程序
+# 打包windows可执行程序，清理缓存 ccache -C
 if sys.platform == "win32": 
     args = [
         'nuitka',
+        #'--disable-ccache',
         '--standalone',
         '--lto=yes',
         '--jobs=10' ,

@@ -161,12 +161,3 @@ class ImageProcessor:
     def __del__(self):
         """析构函数，确保资源被释放。"""
         self.close()
-
-
-
-
-
-
-
-
-

@@ -54,12 +54,27 @@
         "D:/Tuning/O19/0_pic/02_IN_pic/0521_IN_回归验证原图/HDR/O19",
         "D:/Tuning/O19/0_pic/02_IN_pic",
         "D:/Tuning/O19/0_pic/02_IN_pic/0521_IN_回归验证原图/normal/O19",
-        "C:/Users/caozhen/Downloads/新建文件夹 (2)/新建文件夹 (2)"
+        "C:/Users/caozhen/Downloads/新建文件夹 (2)/新建文件夹 (2)",
+        "C:/Users/caozhen/camera",
+        "C:/Users/caozhen/camera/model",
+        "C:/Users/caozhen/camera/xiaomi",
+        "C:/Users/caozhen/camera/resources",
+        "D:/Tuning/O19/0_pic/02_IN_pic/0521_IN_回归验证原图/HDR",
+        "D:/Tuning/O19/0_pic/02_IN_pic/0521_IN_回归验证原图/normal/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/0521_IN_回归验证原图/normal/15pro"
     ],
-    "current_directory": "C:/Users/caozhen/Downloads/新建文件夹 (2)/新建文件夹 (2)",
-    "file_type_option": "显示所有文件",
-    "combobox1_checked_items": [],
-    "combobox1_all_items": [],
+    "current_directory": "D:/Tuning/O19/0_pic/02_IN_pic/0521_IN_回归验证原图/normal/O19",
+    "file_type_option": "显示图片文件",
+    "combobox1_checked_items": [
+        "15pro",
+        "N19",
+        "vico V50"
+    ],
+    "combobox1_all_items": [
+        "15pro",
+        "N19",
+        "vico V50"
+    ],
     "sort_option": "按文件名称排序",
     "theme_option": "默认主题",
     "current_theme": "默认主题",
