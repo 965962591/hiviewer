@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import numpy as np
 from functools import partial
@@ -115,4 +116,3 @@ def stitch_images(image_paths, output_path, font_path, max_width=1920, max_heigh
     except Exception as e:
         print(f"拼接图片时发生错误: {str(e)}")
         return False
-

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import subprocess
 import argparse 
@@ -46,4 +47,3 @@ if __name__ == "__main__":
     print("高通工具处理metadata数据完成，正在从metadata数据解析成提取关键信息，请稍等...")
     parse_main(folder_path)
     # input("按任意键继续...")
-    

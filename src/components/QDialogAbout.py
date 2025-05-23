@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QDialog, QVBoxLayout, QLabel, QPushButton, QTextBrowser, QHBoxLayout
 from PyQt5.QtGui import QIcon, QDesktopServices

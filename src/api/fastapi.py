@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """目录结构
 hiviewer
 ├──> cache

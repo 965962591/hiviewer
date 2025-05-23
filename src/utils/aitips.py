@@ -1,4 +1,5 @@
 
+# -*- coding: utf-8 -*-
 """导入python内置库"""
 import os
 import base64

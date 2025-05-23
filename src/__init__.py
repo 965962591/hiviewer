@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """ 项目结构
 hiviewer_root/
 ├── src/

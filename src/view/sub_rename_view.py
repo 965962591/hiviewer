@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """导入python内置模块"""
 import os
 import sys

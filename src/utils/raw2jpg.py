@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """python标准库"""
 import os
 import sys

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import cv2
 import time
 from PIL import Image

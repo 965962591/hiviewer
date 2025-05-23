@@ -1,4 +1,6 @@
 # 设置默认行为
+# LF (Line Feed): Unix/Linux/Mac 系统使用的换行符
+# CRLF (Carriage Return Line Feed): Windows 系统使用的换行符
 * text=auto
 
 # 明确指定文本文件

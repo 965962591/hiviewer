@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from PyQt5.QtGui import QColor
 
 def rgb_str_to_qcolor(rgb_str):

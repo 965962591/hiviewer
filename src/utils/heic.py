@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from PIL import Image
 from pathlib import Path 
 from pillow_heif import read_heif

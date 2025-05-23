@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # setup.py 
 # pip install -e .
 from setuptools import setup, find_packages

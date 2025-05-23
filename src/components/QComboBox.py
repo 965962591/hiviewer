@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from PyQt5.QtWidgets import QComboBox, QStyledItemDelegate, QStyleOptionButton, QStyle, QApplication
 from PyQt5.QtCore import Qt, QSize, QAbstractListModel, QModelIndex, QVariant
 

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from pathlib import Path
 from PyQt5.QtWidgets import (QAbstractItemView, QApplication, QTableWidget)
 from PyQt5.QtCore import (Qt, QTimer, QMimeData, QPoint, QUrl)
