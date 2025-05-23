@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QApplication, QDialog, QVBoxLayout, QLabel, QPushButton, QTextBrowser, QHBoxLayout
-from PyQt5.QtGui import QIcon, QDesktopServices
-from PyQt5.QtCore import QUrl, Qt
 import os
 import sys
+from PyQt5 import QtWidgets
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QTextBrowser, QHBoxLayout
+from PyQt5.QtGui import QIcon, QDesktopServices
+from PyQt5.QtCore import QUrl, Qt
 
 """导入自定义模块,主函数调用"""
 from src.common.FontManager import SingleFontManager

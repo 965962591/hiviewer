@@ -6,7 +6,6 @@ import os
 import sys
 import time
 import json
-import zipfile
 import logging
 import subprocess
 from queue import Queue
@@ -15,40 +14,41 @@ from itertools import zip_longest, chain
 from logging.handlers import RotatingFileHandler
 
 """导入python第三方模块"""
-from PyQt5 import QtWidgets, QtGui, QtCore
-from PyQt5.QtGui import (QIcon, QKeySequence, QPixmap, QTransform, QImageReader,QImage)
+from PyQt5.QtGui import (
+    QIcon, QKeySequence, QPixmap)
 from PyQt5.QtWidgets import (
     QFileSystemModel, QAbstractItemView, QTableWidgetItem, QHeaderView, QShortcut, QSplashScreen, 
-    QStyledItemDelegate, QStyleOptionButton, QStyle, QApplication, QMenu, QInputDialog,
-    QProgressDialog, QDialog, QVBoxLayout, QLabel, QHBoxLayout, QPushButton, QLineEdit, QCheckBox)
+    QMainWindow, QSizePolicy, QApplication, QMenu, QInputDialog, QProgressDialog, QDialog, QLabel)
 from PyQt5.QtCore import (
-    Qt, QDir, QTimer, QSize, QTimer, QRunnable, QThreadPool, QObject, pyqtSignal, QAbstractListModel,
-    QThread, QSize, QAbstractListModel, QModelIndex, QVariant, QItemSelection, QItemSelectionModel)
+    Qt, QDir, QTimer, QSize, QTimer, QThreadPool, QUrl, QSize, QMimeData, QPropertyAnimation, QItemSelection, QItemSelectionModel)
 
 """导入用户自定义的模块"""
-from src.components.UiMain import Ui_MainWindow                          # 假设你的主窗口类名为Ui_MainWindow
-from src.view.sub_compare_image_view import SubMainWindow                # 假设这是你的子窗口类名
-from src.view.sub_compare_video_view import VideoWall                    # 假设这是你的子窗口类名 
-from src.view.sub_rename_view import FileOrganizer                       # 添加这行以导入批量重名名类名
-from src.view.sub_image_process_view import SubCompare                   # 确保导入 SubCompare 类
-from src.view.sub_bat_view import LogVerboseMaskApp                      # 导入批量执行命令的类
-from src.components.QMessageBox import show_message_box                  # 导入消息框类
-from src.components.QDialogAbout import AboutDialog                      # 导入关于对话框类,显示帮助信息
-from src.components.QDialogLinkQualcomAebox import Qualcom_Dialog        # 导入自定义对话框的类
-from src.components.QComboBox import CheckBoxListModel, CheckBoxDelegate # 导入自定义下拉框类中的数据模型和委托代理类
-from src.common.FontManager import SingleFontManager, MultiFontManager   # 字体管理器
-from src.common.VersionInit import version_init                          # 版本号初始化
-from src.common.SettingInit import load_color_settings                   # 导入自定义json配置文件
-from src.utils.raw2jpg import Mipi2RawConverterApp                       # 导入MIPI RAW文件转换为JPG文件的类
-from src.utils.update import check_update, pre_check_update              # 导入自动更新检查程序
-from src.utils.hisnot import WScreenshot                                 # 导入截图工具类
-from src.utils.ImagePreview import ImageViewer                           # 导入自定义图片预览组件
-from src.utils.xml import save_excel_data                                # 导入xml文件解析工具类
-from src.utils.delete import force_delete_folder                         # 导入强制删除文件夹的功能函数
-from src.utils.Icon import IconCache, ImagePreloader                     # 导入文件Icon图标加载类
-from src.utils.heic import extract_jpg_from_heic                         # 导入heic文件解析工具类
-from src.utils.video import extract_video_first_frame                    # 导入视频预览工具类
-from src.utils.image import ImageProcessor                               # 导入图片处理工具类
+from src.components.UiMain import Ui_MainWindow                             # 假设你的主窗口类名为Ui_MainWindow
+from src.view.sub_compare_image_view import SubMainWindow                   # 假设这是你的子窗口类名
+from src.view.sub_compare_video_view import VideoWall                       # 假设这是你的子窗口类名 
+from src.view.sub_rename_view import FileOrganizer                          # 添加这行以导入批量重名名类名
+from src.view.sub_image_process_view import SubCompare                      # 确保导入 SubCompare 类
+from src.view.sub_bat_view import LogVerboseMaskApp                         # 导入批量执行命令的类
+from src.components.QMessageBox import show_message_box                     # 导入消息框类
+from src.components.QDialogAbout import AboutDialog                         # 导入关于对话框类,显示帮助信息
+from src.components.QDialogLinkQualcomAebox import Qualcom_Dialog           # 导入自定义对话框的类
+from src.components.QComboBox import CheckBoxListModel, CheckBoxDelegate    # 导入自定义下拉框类中的数据模型和委托代理类
+from src.components.QDialogRename import SingleFileRenameDialog             # 导入自定义重命名对话框类
+from src.components.QDialogProgress import ProgressDialog, CompressWorker   # 导入自定义压缩进度对话框类
+from src.common.FontManager import SingleFontManager, MultiFontManager      # 字体管理器
+from src.common.VersionInit import version_init                             # 版本号初始化
+from src.common.SettingInit import load_color_settings                      # 导入自定义json配置文件
+from src.qpm.qualcom import CommandThread                                    # 导入高通图片解析工具独立线程类
+from src.utils.raw2jpg import Mipi2RawConverterApp                          # 导入MIPI RAW文件转换为JPG文件的类
+from src.utils.update import check_update, pre_check_update                 # 导入自动更新检查程序
+from src.utils.hisnot import WScreenshot                                    # 导入截图工具类
+from src.utils.ImagePreview import ImageViewer                              # 导入自定义图片预览组件
+from src.utils.xml import save_excel_data                                   # 导入xml文件解析工具类
+from src.utils.delete import force_delete_folder                            # 导入强制删除文件夹的功能函数
+from src.utils.Icon import IconCache, ImagePreloader                        # 导入文件Icon图标加载类
+from src.utils.heic import extract_jpg_from_heic                            # 导入heic文件解析工具类
+from src.utils.video import extract_video_first_frame                       # 导入视频预览工具类
+from src.utils.image import ImageProcessor                                  # 导入图片处理工具类
 from src.utils.aeboxlink import (check_process_running, urlencode_folder_path, get_api_data)
 
 
@@ -80,274 +80,10 @@ def natural_sort_key(s):
 
 
 """
-设置全局函数区域结束线
-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-"""
-
-
-
-"""
-设置独立封装类区域开始线
-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-"""
-
-
-
-class CommandThread(QThread):
-    """执行高通图片解析工具独立线程类"""
-    finished = pyqtSignal(bool, str, str)  # 添加 images_path 参数
-
-    def __init__(self, command, images_path):
-        super().__init__()
-        self.command = command
-        self.images_path = images_path
-
-    def run(self):
-        try:
-            if False:
-                result = subprocess.run(
-                    self.command, 
-                    check=True, 
-                    stdout=subprocess.PIPE, 
-                    stderr=subprocess.PIPE, 
-                    text=True, 
-                    encoding='utf-8')
-                self.finished.emit(result.returncode == 0, result.stderr, self.images_path)  # 发射信号，传递结果
-            
-            # 使用 /c 参数，命令执行完成后关闭窗口，直接独立线程
-            result = subprocess.run(
-                f'start /wait cmd /c {self.command}',  # /wait 等待新窗口关闭
-                shell=True,
-                stdout=subprocess.PIPE,  # 捕获标准输出
-                stderr=subprocess.PIPE,  # 捕获标准错误
-                text=True  # 将输出解码为字符串
-            )
-            
-            # 发射信号，传递结果
-            self.finished.emit(result.returncode == 0, result.stderr, self.images_path)
-            
-        except Exception as e:
-            self.finished.emit(False, str(e), self.images_path)  # 发射信号，传递错误信息
-
-
-class CompressWorker(QRunnable):
-    """压缩工作线程类"""
-    class Signals(QObject):
-        """压缩工作线程信号"""
-        progress = pyqtSignal(int, int)  # 当前进度,总数
-        finished = pyqtSignal(str)  # 完成信号,返回压缩包路径
-        error = pyqtSignal(str)  # 错误信号
-        cancel = pyqtSignal()  # 取消信号
-        
-    def __init__(self, files_to_compress, zip_path):
-        super().__init__()
-        self.files = files_to_compress
-        self.zip_path = zip_path
-        self.signals = self.Signals()
-        self._stop = False
-        
-    def run(self):
-        try:
-            with zipfile.ZipFile(self.zip_path, 'w') as zip_file:
-                for i, (file_path, arcname) in enumerate(self.files):
-                    if self._stop:
-                        return
-                    
-                    try:
-                        zip_file.write(file_path, arcname)
-                        self.signals.progress.emit(i + 1, len(self.files))
-                    except Exception as e:
-                        self.signals.error.emit(f"压缩文件失败: {file_path}, 错误: {e}")
-                        continue
-                    
-            self.signals.finished.emit(self.zip_path)
-            
-        except Exception as e:
-            self.signals.error.emit(f"创建压缩包失败: {e}")
-        
-    def cancel(self):
-        """取消压缩任务"""
-        self._stop = True  # 设置停止标志
-
-
-# 更新 ProgressDialog 类以添加取消按钮
-class ProgressDialog(QtWidgets.QDialog):
-    """压缩进度对话框"""
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("压缩进度")
-        self.setModal(True)
-
-        # 使用无边框窗口风格
-        self.setWindowFlags(QtCore.Qt.Dialog | QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowCloseButtonHint | QtCore.Qt.FramelessWindowHint)
-
-        self.layout = QtWidgets.QVBoxLayout(self)
-        self.progress_bar = QtWidgets.QProgressBar(self)
-        self.message_label = QtWidgets.QLabel(self)  # 新增 QLabel 用于显示消息
-        self.cancel_button = QtWidgets.QPushButton("取消", self)
-
-        # 添加进度条、消息标签和取消按钮到布局
-        self.layout.addWidget(self.progress_bar)
-        self.layout.addWidget(self.message_label)  # 添加消息标签到布局
-        self.layout.addWidget(self.cancel_button)
-
-        # 设置窗口大小
-        self.setFixedSize(450, 150)
-
-        self.cancel_button.clicked.connect(self.cancel_compression)
-
-        # 设置窗口位置为当前鼠标所在显示屏的中央
-        self.center_on_current_screen()
-
-
-    def center_on_current_screen(self):
-        # 获取当前鼠标位置和显示屏
-        cursor_pos = QtGui.QCursor.pos()  # 从QtCore导入QCursor
-        screen = QtWidgets.QApplication.desktop().screenNumber(cursor_pos)
-
-        # 获取该显示屏的矩形区域
-        screen_geometry = QtWidgets.QApplication.desktop().screenGeometry(screen)
-
-        # 计算中央位置
-        center_x = screen_geometry.x() + (screen_geometry.width() - self.width()) // 2
-        center_y = screen_geometry.y() + (screen_geometry.height() - self.height()) // 2
-
-        # 设置窗口位置
-        self.move(center_x, center_y)
-
-    def update_progress(self, value):
-        self.progress_bar.setValue(value)
-
-    def set_message(self, message):
-        self.message_label.setText(message)  # 更新 QLabel 内容
-
-    def cancel_compression(self):
-        # 发送取消信号
-        self.parent().cancel_compression()
-        self.close()
-
-
-
-
-class SingleFileRenameDialog(QDialog):
-    """单文件重命名对话框类"""
-    def __init__(self, file_path, parent=None):
-        super().__init__(parent)
-        self.file_path = file_path
-        self.file_name = os.path.basename(file_path)
-        self.file_dir = os.path.dirname(file_path)
-        self.name_without_ext, self.ext = os.path.splitext(self.file_name)
-        self.new_file_path = None  # 添加新文件路径属性
-        
-        # 添加设置对象用于保存复选框状态
-        self.settings = QtCore.QSettings('HiViewer', 'SingleFileRename')
-        
-        self.setup_ui()
-        self.setup_connections()
-
-    def setup_ui(self):
-        """初始化UI"""
-        self.setWindowTitle("重命名文件")
-        self.setFixedSize(650, 180)
-        
-        # 主布局
-        layout = QVBoxLayout()
-        
-        # 文件名显示
-        self.file_label = QLabel(f"文件名：{self.file_name}")
-        layout.addWidget(self.file_label)
-        
-        # 重命名输入区域
-        name_layout = QHBoxLayout()
-        name_label = QLabel("重命名为：")
-        self.name_input = QLineEdit(self.name_without_ext)
-        name_layout.addWidget(name_label)
-        name_layout.addWidget(self.name_input)
-        layout.addLayout(name_layout)
-        
-        # 显示扩展名选项 - 从设置中读取上次的状态
-        show_ext_layout = QHBoxLayout()
-        self.show_ext_checkbox = QCheckBox("显示扩展名")
-        # 读取上次的选择,默认为False
-        last_state = self.settings.value('show_extension', False, type=bool)
-        self.show_ext_checkbox.setChecked(last_state)
-        show_ext_layout.addWidget(self.show_ext_checkbox)
-        show_ext_layout.addStretch()
-        layout.addLayout(show_ext_layout)
-        
-        # 按钮区域
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-        self.ok_button = QPushButton("确定")
-        self.cancel_button = QPushButton("取消")
-        button_layout.addWidget(self.ok_button)
-        button_layout.addWidget(self.cancel_button)
-        layout.addLayout(button_layout)
-        
-        self.setLayout(layout)
-
-        # 如果上次选择显示扩展名,则在输入框中显示完整文件名
-        if last_state:
-            self.name_input.setText(self.name_without_ext + self.ext)
-
-    def setup_connections(self):
-        """设置信号连接"""
-        self.ok_button.clicked.connect(self.on_ok_clicked)
-        self.cancel_button.clicked.connect(self.reject)
-        self.show_ext_checkbox.stateChanged.connect(self.on_checkbox_changed)
-
-    def on_checkbox_changed(self, state):
-        """处理显示扩展名复选框状态改变"""
-        # 保存当前选择到设置中
-        self.settings.setValue('show_extension', state == Qt.Checked)
-        
-        if state == Qt.Checked:
-            self.name_input.setText(self.name_without_ext + self.ext)
-        else:
-            self.name_input.setText(self.name_without_ext)
-
-    def on_ok_clicked(self):
-        """处理确定按钮点击"""
-        new_name = self.name_input.text()
-        if not new_name:
-            show_message_box("文件名不能为空！", "错误", 500)
-            return
-            
-        # 构建新文件路径
-        if not self.show_ext_checkbox.isChecked():
-            new_name = new_name + self.ext
-        new_path = os.path.join(self.file_dir, new_name)
-        
-        # 检查文件是否已存在
-        if os.path.exists(new_path) and new_path != self.file_path:
-            show_message_box("文件已存在！", "错误", 500)
-            return
-            
-        try:
-            os.rename(self.file_path, new_path)
-            self.new_file_path = new_path  # 更新新文件路径
-            self.accept()
-        except Exception as e:
-            show_message_box(f"重命名失败: {str(e)}", "错误", 1000)
-
-    def get_new_file_path(self):
-        """返回新的文件路径"""
-        return self.new_file_path
-    
-    
-
-
-"""
-设置独立封装类区域结束线
-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-"""
-
-
-"""
 设置主界面类区域开始线
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 """
-class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
+class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def __init__(self, parent=None):
         super(HiviewerMainwindow, self).__init__(parent)
         """self.update_splash_message()函数中初始化UI界面self.setupUi(self)和变量初始化函数self.initialize_components()"""
@@ -475,8 +211,8 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.splash = QSplashScreen(splash_pixmap)
         
         # 获取当前屏幕并计算居中位置
-        screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
-        screen_geometry = QtWidgets.QApplication.desktop().screenGeometry(screen)
+        screen = QApplication.desktop().screenNumber(QApplication.desktop().cursor().pos())
+        screen_geometry = QApplication.desktop().screenGeometry(screen)
         x = screen_geometry.x() + (screen_geometry.width() - splash_pixmap.width()) // 2
         y = screen_geometry.y() + (screen_geometry.height() - splash_pixmap.height()) // 2
         self.splash.move(x, y)
@@ -485,7 +221,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.splash.setWindowOpacity(0)
         
         # 创建渐入动画
-        self.fade_anim = QtCore.QPropertyAnimation(self.splash, b"windowOpacity")
+        self.fade_anim = QPropertyAnimation(self.splash, b"windowOpacity")
         self.fade_anim.setDuration(1000)  # 1000ms的渐入动画
         self.fade_anim.setStartValue(0)
         self.fade_anim.setEndValue(1)
@@ -537,7 +273,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.initialize_three = True
             
             # 创建渐出动画
-            self.fade_out = QtCore.QPropertyAnimation(self.splash, b"windowOpacity")
+            self.fade_out = QPropertyAnimation(self.splash, b"windowOpacity")
             self.fade_out.setDuration(1000)  # 1000ms的渐出动画
             self.fade_out.setStartValue(1)
             self.fade_out.setEndValue(0)
@@ -548,8 +284,8 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.splash_progress_timer.stop()
 
             # 获取当前屏幕并计算居中位置，移动到该位置
-            screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
-            screen_geometry = QtWidgets.QApplication.desktop().screenGeometry(screen)
+            screen = QApplication.desktop().screenNumber(QApplication.desktop().cursor().pos())
+            screen_geometry = QApplication.desktop().screenGeometry(screen)
             x = screen_geometry.x() + (screen_geometry.width() - self.width()) // 2
             y = screen_geometry.y() + (screen_geometry.height() - self.height()) // 2
             self.move(x, y)
@@ -794,12 +530,9 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.setWindowIcon(QIcon(icon_path))
         self.setWindowTitle(f"HiViewer")
 
-        # 设置窗口尺寸为分辨率的一半,改为固定比例
-        # 主屏幕的几何信息
-        # screen = QtWidgets.QApplication.desktop().screenGeometry() 
         # 根据鼠标的位置返回当前光标所在屏幕的几何信息
-        screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
-        screen_geometry = QtWidgets.QApplication.desktop().screenGeometry(screen)
+        screen = QApplication.desktop().screenNumber(QApplication.desktop().cursor().pos())
+        screen_geometry = QApplication.desktop().screenGeometry(screen)
         width = int(screen_geometry.width() * 0.65)
         height = int(screen_geometry.height() * 0.65)
         self.resize(width, height)
@@ -1071,7 +804,6 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def open_file_location(self, path):
         """在资源管理器中打开路径"""
-        # QtCore.QDesktopServices.openUrl(QUrl.fromLocalFile(path))
         try:
             # 跨平台处理优化
             if sys.platform == 'win32':
@@ -1565,8 +1297,8 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
             if file_paths:
                 # 创建QMimeData对象
-                mime_data = QtCore.QMimeData()
-                mime_data.setUrls([QtCore.QUrl.fromLocalFile(path) for path in file_paths])  # 设置文件路径
+                mime_data = QMimeData()
+                mime_data.setUrls([QUrl.fromLocalFile(path) for path in file_paths])  # 设置文件路径
 
                 # 将QMimeData放入剪贴板
                 clipboard = QApplication.clipboard()
@@ -1674,7 +1406,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 return
 
             # 获取压缩包名称
-            zip_name, ok = QtWidgets.QInputDialog.getText(self, "输入压缩包名称", "请输入压缩包名称（不带扩展名）:")
+            zip_name, ok = QInputDialog.getText(self, "输入压缩包名称", "请输入压缩包名称（不带扩展名）:")
             if not ok or not zip_name:
                 show_message_box("未输入有效的名称！", "提示", 500)
                 return
@@ -1820,8 +1552,8 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def cancel_compression(self):
         """取消压缩任务"""
         if self.compress_worker:
-            self.compress_worker.cancel()  # 假设CompressWorker有一个cancel方法
-        self.progress_dialog.close()  # 关闭进度窗口
+            self.compress_worker.cancel()  
+        self.progress_dialog.close()  
         show_message_box("压缩已取消", "提示", 500)
 
         # 若是压缩取消，则删除缓存文件中的zip文件
@@ -1832,10 +1564,10 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def on_compress_finished(self, zip_path):
         """处理压缩完成"""
-        self.progress_dialog.close()  # 关闭进度窗口
+        self.progress_dialog.close()
         # 将压缩包复制到剪贴板
-        mime_data = QtCore.QMimeData()
-        url = QtCore.QUrl.fromLocalFile(zip_path)
+        mime_data = QMimeData()
+        url = QUrl.fromLocalFile(zip_path)
         mime_data.setUrls([url])
         QApplication.clipboard().setMimeData(mime_data)
         # 更新状态栏信息显示
@@ -1844,7 +1576,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def on_compress_error(self, error_msg):
         """处理压缩错误"""
-        self.progress_dialog.close()  # 关闭进度窗口
+        self.progress_dialog.close()  
         # 更新状态栏信息显示
         self.statusbar_label1.setText(f"🔉: 压缩出错🍃")
         show_message_box(error_msg, "错误", 2000)
@@ -2454,7 +2186,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
             # 添加 ImageViewer 到 layout
             self.verticalLayout_left_2.addWidget(self.image_viewer)
             # 调整 self.Left_QFrame 的尺寸策略
-            self.Left_QFrame.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+            self.Left_QFrame.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
         except Exception as e:
             print(f"图片预览失败: {e}")
@@ -3363,7 +3095,7 @@ class HiviewerMainwindow(QtWidgets.QMainWindow, Ui_MainWindow):
                     current_image_index.append(f"{row_index+1}/{self.image_index_max[col_index]}")
 
             # 将选中的单元格滚动到视图中间位置
-            self.RB_QTableWidget0.scrollToItem(item, QtWidgets.QAbstractItemView.PositionAtCenter)
+            self.RB_QTableWidget0.scrollToItem(item, QAbstractItemView.PositionAtCenter)
 
             
             return file_paths, current_image_index  # 返回文件路径列表
@@ -4100,7 +3832,7 @@ if __name__ == '__main__':
     # setup_logging()  
 
     # 设置主程序app
-    app = QtWidgets.QApplication(sys.argv)
+    app = QApplication(sys.argv)
     app_icon = QIcon(os.path.join(BASEICONPATH, "viewer_3.ico"))
     app.setWindowIcon(app_icon)
 
