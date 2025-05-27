@@ -11,7 +11,6 @@ from queue import Queue
 from pathlib import Path
 from itertools import zip_longest, chain
 
-
 """导入python第三方模块"""
 from PyQt5.QtGui import (
     QIcon, QKeySequence, QPixmap)
@@ -49,34 +48,20 @@ from src.utils.Icon import IconCache, ImagePreloader                        # �
 from src.utils.heic import extract_jpg_from_heic                            # 导入heic文件解析工具类
 from src.utils.video import extract_video_first_frame                       # 导入视频预览工具类
 from src.utils.image import ImageProcessor                                  # 导入图片处理工具类
+from src.utils.sort import sort_by_custom                                   # 导入文件排序工具类
+from src.utils.decorator import timing_decorator                            # 导入自定义装饰器
 from src.utils.aeboxlink import (check_process_running, urlencode_folder_path, get_api_data)
 
 
 
-
 """python项目多文件夹路径说明
-
 (1)获取当前py文件的路径: os.path.abspath(__file__)
 (2)获取当前py文件的父文件夹路径: os.path.dirname(os.path.abspath(__file__))
-
+BASEICONPATH = Path(__file__).parent
 (1)获取主函数py文件的路径: os.path.abspath(sys.argv[0])
-(2)获取主函数py文件的父文件夹路径: os.path.dirname(os.path.abspath(sys.argv[0]))
-
+(2)获取主函数py文件的父文件夹路径: os.path.dirname(os.path.abspath(sys.argv[0]))  
+BASEICONPATH = Path(sys.argv[0]).parent
 """
-
-
-"""
-设置全局变量以及全局函数区域开始线
-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-"""
-
-
-def natural_sort_key(s):
-    """将字符串转换为自然排序的键值（优化版）"""
-    # 预编译正则表达式，提高效率（针对实现类似widow的文件排名）
-    _natural_sort_re = re.compile('([0-9]+)')
-    return [int(text) if text.isdigit() else text.lower() for text in _natural_sort_re.split(s)]
-
 
 
 """
@@ -949,16 +934,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     
 
     def update(self):
-        print("setting()-版本按钮被点击--update()")
+        print("setting()-版本按钮被点击")
         check_update()
 
+    @timing_decorator
     def pre_update(self):
         """预更新版本函数
         检查更新版本信息，并更新状态栏按钮，如果耗时超过2秒，则提示用户更新失败
         """
         try:
-            _time = time.time()
-
             # 预检查更新
             self.new_version_info = pre_check_update()
             
@@ -969,7 +953,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             else:
                 self.statusbar_button2.setToolTip("已是最新版本")
 
-            print(f"pre_update()--预更新版本耗时:{(time.time()-_time):.2f} 秒")
         except Exception as e:
             print(f"pre_update()-error--预更新版本失败: {e}")
             return
@@ -1890,14 +1873,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 if entry.is_file():
                     if selected_option == "显示图片文件":
                         if entry.name.lower().endswith(self.IMAGE_FORMATS):
-
-                            if self.simple_mode:
+                            # 获取图片的分辨率
+                            if self.simple_mode:       # 极简模式下不获取图片的分辨率
                                 width = None           # 宽度  
                                 height = None          # 高度
                                 exposure_time = None   # 曝光时间
                                 iso = None             # ISO
                                 
                             else:   
+                                # 获取图片的分辨率、曝光时间、ISO
                                 with ImageProcessor(entry.path) as img:
                                     width, height = img.width, img.height
                                     exposure_time = img.exposure_time
@@ -1926,41 +1910,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                         print("filter_files函数:selected_option没有选择任何选项,跳过")
                         continue
 
-        # 升排序
-        if sort_option == "按文件名称排序":  # 按文件名称排序，reverse=False 表示升序，即最小的在前面
-            files_and_dirs_with_mtime.sort(key=lambda x: natural_sort_key(x[0]), reverse=False)
-        elif sort_option == "按创建时间排序":  # 按创建时间排序，reverse=False 表示升序，即最小的在前面
-            files_and_dirs_with_mtime.sort(key=lambda x: x[1], reverse=False)
-        elif sort_option == "按修改时间排序":  # 按修改时间排序，reverse=False 表示升序，即最小的在前面
-            files_and_dirs_with_mtime.sort(key=lambda x: x[2], reverse=False)
-        elif sort_option == "按文件大小排序":  # 按文件大小排序，reverse=False 表示升序，即最小的在前面
-            files_and_dirs_with_mtime.sort(key=lambda x: x[3], reverse=False)
-        
-        # 降排序
-        elif sort_option == "按文件名称逆序排序":  # 按文件名称排序，reverse=True 表示降序，即最大的在前面
-            files_and_dirs_with_mtime.sort(key=lambda x: natural_sort_key(x[0]), reverse=True) 
-        elif sort_option == "按创建时间逆序排序":  # 按创建时间排序，reverse=True 表示降序，即最大的在前面
-            files_and_dirs_with_mtime.sort(key=lambda x: x[1], reverse=True)
-        elif sort_option == "按修改时间逆序排序":  # 按修改时间排序，reverse=True 表示降序，即最大的在前面
-            files_and_dirs_with_mtime.sort(key=lambda x: x[2], reverse=True)
-        elif sort_option == "按文件大小逆序排序":  # 按文件大小排序，reverse=True 表示降序，即最大的在前面
-            files_and_dirs_with_mtime.sort(key=lambda x: x[3], reverse=True)
-
-        # 极简模式下不使能曝光、ISO排序选项
-        elif not self.simple_mode and sort_option == "按曝光时间排序" and selected_option == "显示图片文件":  # 按曝光时间排序，reverse=False 表示升序，即最小的在前面
-            # 排序中若存在None,则提供默认值0  
-            files_and_dirs_with_mtime.sort(key=lambda x: int(x[5].split('/')[1]) if x[5] is not None else 0, reverse=False)
-        elif not self.simple_mode and sort_option == "按曝光时间逆序排序" and selected_option == "显示图片文件":  # 按曝光时间排序，reverse=True 表示降序，即最大的在前面
-            # 排序中若存在None,则提供默认值0  
-            files_and_dirs_with_mtime.sort(key=lambda x: int(x[5].split('/')[1]) if x[5] is not None else 0, reverse=True)
-        elif not self.simple_mode and sort_option == "按ISO排序" and selected_option == "显示图片文件":  # 按ISO排序，reverse=False 表示升序，即最小的在前面
-            # 排序中若存在None,则提供默认值0  
-            files_and_dirs_with_mtime.sort(key=lambda x: x[6], reverse=False)
-        elif not self.simple_mode and sort_option == "按ISO逆序排序" and selected_option == "显示图片文件":  # 按ISO排序，reverse=True 表示降序，即最大的在前面
-            # 排序中若存在None,则提供默认值0  
-            files_and_dirs_with_mtime.sort(key=lambda x: x[6], reverse=True) 
-        else:  # 默认文件名称排序，reverse=False 表示升序，即最小的在前面
-            files_and_dirs_with_mtime.sort(key=lambda x: x[0], reverse=False)
+        # 使用sort_by_custom函数进行排序
+        files_and_dirs_with_mtime = sort_by_custom(sort_option, files_and_dirs_with_mtime, self.simple_mode, selected_option)
 
         # 获取文件路径列表，files_and_dirs_with_mtime的最后一列
         file_paths = [item[-1] for item in files_and_dirs_with_mtime]

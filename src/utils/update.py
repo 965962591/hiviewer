@@ -6,11 +6,10 @@ import shutil
 import hashlib
 import zipfile
 import requests
-import subprocess
 from pathlib import Path
 from PyQt5.QtWidgets import (QApplication, QMessageBox, QProgressDialog)
 from PyQt5.QtCore import Qt, QPoint
-from PyQt5.QtGui import QIcon,QCursor
+from PyQt5.QtGui import QIcon, QCursor
 
 
 """设置本项目的入口路径,全局变量BasePath"""
@@ -307,7 +306,7 @@ def check_update(parent_window=None):
         updater = Updater()
         cursor_pos = QPoint(QCursor.pos())
         
-        print("开始检查更新...")
+        print("check_update()--开始检查更新...")
         download_url, version = updater.check_for_updates()
         
         if not download_url:
