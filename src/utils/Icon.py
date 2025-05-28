@@ -99,7 +99,7 @@ class IconCache:
     _cache_index_file = BASEICONPATH / "cache" / "icons.json"
     _max_cache_size = 1000  # 最大缓存数量，超过会删除最旧的缓存
     # 视频文件格式
-    VIDEO_FORMATS = ('.mp4', '.avi', '.mov', '.wmv', '.mpeg', '.mpg', '.mkv')
+    VIDEO_FORMATS = ('.mp4', '.avi', '.mov', '.wmv', '.mpeg', '.mpg', '.mkv') 
     # 图片文件格式
     IMAGE_FORMATS = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tif', '.ico', '.webp', '.heic')
     # 其他文件格式类型图标维护
@@ -147,7 +147,6 @@ class IconCache:
         return str(cls._cache_dir / f"{file_hash}.png")
 
     @classmethod
-    @lru_cache(maxsize=_max_cache_size)
     def _generate_icon(cls, file_path):
         """生成图标，确保正确处理图片旋转和视频缩略图
         
@@ -187,7 +186,6 @@ class IconCache:
 
 
     @classmethod
-    @lru_cache(maxsize=_max_cache_size)
     def _generate_image_icon(cls, file_path):
         """优化后的图片图标生成
         优先使用QImageReader高效加载，如果失败则使用QImage作为备选方案
@@ -329,7 +327,6 @@ class IconCache:
             return QIcon()
 
     @classmethod
-    @lru_cache(maxsize=_max_cache_size)
     def get_video_thumbnail(cls, video_path: str, size: Tuple[int, int] = (48, 48)):
         """获取视频的第一帧作为缩略图
         
@@ -419,8 +416,7 @@ class IconCache:
 
             # 清除lru_cache的缓存
             cls.get_icon.cache_clear()  
-            cls._generate_image_icon.cache_clear()        
-            cls.get_video_thumbnail.cache_clear()
+
 
             # 清理内存缓存
             cls._cache.clear()

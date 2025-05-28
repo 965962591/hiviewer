@@ -2,15 +2,16 @@
 import os
 import sys
 import logging
+from pathlib import Path
 from logging.handlers import RotatingFileHandler
 
 """设置根目录"""
 # 通过当前py文件来定位项目主入口路径，向上找两层父文件夹
 if True:
-    BASE_PATH = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    BASE_PATH = Path(__file__).parent.parent.parent
 # 通过主函数hiviewer.py文件来定位项目主入口路径
 if False:
-    BASE_PATH = os.path.dirname(os.path.abspath(sys.argv[0]))
+    BASE_PATH = Path(sys.argv[0]).parent
     
 
 """
@@ -70,13 +71,14 @@ logging.info(f"文件处理成功 [大小：{size}MB] [类型：{file_type}]")
 # 通过配置文件动态调整
 logging.getLogger().setLevel(logging.DEBUG if DEBUG else logging.INFO)
 
-
+设置日志区域结束线
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 """
 
 def setup_logging():
     # 创建日志目录
-    log_dir = os.path.join(os.path.dirname(__file__), "logs")
-    os.makedirs(log_dir, exist_ok=True)
+    log_dir = BASE_PATH / "cache" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
     
     # 基础配置
     log_format = "%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
@@ -90,7 +92,7 @@ def setup_logging():
 
     # 文件处理器（带轮转功能）
     file_handler = RotatingFileHandler(
-        filename=os.path.join(log_dir, "hiviewer.log"),
+        filename=log_dir / "hiviewer.log",
         maxBytes=10*1024*1024,  # 10MB
         backupCount=5,
         encoding="utf-8"
@@ -106,7 +108,3 @@ def setup_logging():
 
 
 
-"""
-设置日志区域结束线
-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-"""
