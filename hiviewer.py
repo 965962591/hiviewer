@@ -202,10 +202,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.splash = QSplashScreen(splash_pixmap)
         
         # 获取当前屏幕并计算居中位置, 移动到该位置
-        screen = QApplication.desktop().screenNumber(QApplication.desktop().cursor().pos())
-        screen_geometry = QApplication.desktop().screenGeometry(screen)
-        x = screen_geometry.x() + (screen_geometry.width() - splash_pixmap.width()) // 2
-        y = screen_geometry.y() + (screen_geometry.height() - splash_pixmap.height()) // 2
+        x, y, _, _ = self.__get_screen_geometry()
         self.splash.move(x, y)
         
         # 设置半透明效果
@@ -277,10 +274,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.splash_progress_timer.stop()
 
             # 获取当前屏幕并计算居中位置，移动到该位置
-            screen = QApplication.desktop().screenNumber(QApplication.desktop().cursor().pos())
-            screen_geometry = QApplication.desktop().screenGeometry(screen)
-            x = screen_geometry.x() + (screen_geometry.width() - self.width()) // 2
-            y = screen_geometry.y() + (screen_geometry.height() - self.height()) // 2
+            x, y, _, _ = self.__get_screen_geometry()
             self.move(x, y)
 
             # 预先检查更新  
@@ -314,8 +308,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     设置hiviewer类中的可重复使用的common私有方法开始线
     ---------------------------------------------------------------------------------------------------------------------------------------------
     """
-
-
+    def __get_screen_geometry(self):
+        """获取当前屏幕的几何信息"""
+        screen = QApplication.desktop().screenNumber(QApplication.desktop().cursor().pos())
+        screen_geometry = QApplication.desktop().screenGeometry(screen)
+        x = screen_geometry.x() + (screen_geometry.width() - self.width()) // 2
+        y = screen_geometry.y() + (screen_geometry.height() - self.height()) // 2
+        w = int(screen_geometry.width())
+        h = int(screen_geometry.height())
+        return x, y, w, h
 
 
 
@@ -515,10 +516,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.setWindowTitle(f"HiViewer")
 
         # 根据鼠标的位置返回当前光标所在屏幕的几何信息
-        screen = QApplication.desktop().screenNumber(QApplication.desktop().cursor().pos())
-        screen_geometry = QApplication.desktop().screenGeometry(screen)
-        width = int(screen_geometry.width() * 0.65)
-        height = int(screen_geometry.height() * 0.65)
+        _, _, w, h = self.__get_screen_geometry()
+        width, height = int(w * 0.65), int(h * 0.65)
         self.resize(width, height)
 
         # 启用拖放功能
@@ -3637,11 +3636,22 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         print("接受主界面关闭事件, 保存关闭前的配置并清理内存")
         event.accept()
 
-"""
-设置主界面类区域结束线
-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-"""
 
+
+"""
+python对象命名规范
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+类名都使用首字母大写开头(Pascal命名风格)的规范
+
+全局变量全用大写字母，单词之间用 _分割
+
+普通变量用小写字母，单词之间用 _分割
+
+普通函数和普通变量一样；
+
+私有函数以 __ 开头(2个下划线),其他和普通函数一样
+"""
 
 if __name__ == '__main__':
     print("[hiviewer主程序启动]:")
