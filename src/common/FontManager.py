@@ -3,6 +3,9 @@ import os
 import sys
 from PyQt5.QtGui import  QFontDatabase, QFont
 
+# 导入自定义装饰器
+from src.utils.decorator import CC_TimeDec
+
 
 """设置根目录"""
 # 通过当前py文件来定位项目主入口路径，向上找两层父文件夹
@@ -21,6 +24,7 @@ class SingleFontManager:
     _initialized = False
 
     @classmethod
+    @CC_TimeDec(tips="SingleFontManager初始化字体管理器")
     def initialize(cls, font_path=None):
         """初始化字体管理器，支持传入字体路径"""
         if not cls._initialized or font_path is not None:
@@ -28,7 +32,7 @@ class SingleFontManager:
                 if font_path is None:
                     font_path = os.path.join(BASE_PATH, "resource", "fonts", "xialu_wenkai.ttf")
                 if not os.path.exists(font_path):
-                    print(f"字体管理类SingleFontManager中: {font_path}不存在,请检查字体文件是否存在")
+                    print(f"[initialize]-->字体管理类SingleFontManager中: {font_path}不存在,请检查字体文件是否存在")
                     
                 font_db = QFontDatabase()
                 font_id = font_db.addApplicationFont(font_path)
@@ -37,10 +41,10 @@ class SingleFontManager:
                     cls._font = QFont(font_family)
                     cls._initialized = True
                 else:
-                    print("字体加载失败，使用系统默认字体")
+                    print("[initialize]-->字体加载失败，使用系统默认字体")
                     cls._font = QFont()
             except Exception as e:
-                print(f"字体初始化错误: {e}")
+                print(f"[initialize]-->字体初始化错误: {e}")
                 cls._font = QFont()
                 cls._initialized = True
 
@@ -61,13 +65,14 @@ class MultiFontManager:
     _default_font_paths = []  # 存储多个默认字体路径
 
     @classmethod
+    @CC_TimeDec(tips="MultiFontManager初始化字体管理器")
     def initialize(cls, font_paths):
         """初始化字体管理器，支持传入多个字体路径"""
         for font_path in font_paths:
             if font_path and (font_path not in cls._default_font_paths or not cls._initialized.get(font_path, False)):
                 try:
                     if not os.path.exists(font_path):
-                        print(f"字体管理类MultiFontManager中: {font_path} 不存在, 请检查字体文件是否存在")
+                        print(f"[initialize]-->字体管理类MultiFontManager中: {font_path} 不存在, 请检查字体文件是否存在")
                         continue
                     
                     font_db = QFontDatabase()
@@ -79,11 +84,11 @@ class MultiFontManager:
                         cls._default_font_paths.append(font_path)
                         cls._initialized[font_path] = True
                     else:
-                        print("字体加载失败，使用系统默认字体")
+                        print("[initialize]-->字体加载失败，使用系统默认字体")
                 except Exception as e:
-                    print(f"字体初始化错误: {e}")
+                    print(f"[initialize]-->字体初始化错误: {e}")
                     cls._initialized[font_path] = True
-        print("多字体类-MultiFontManager--初始化成功")
+        # print("[initialize]-->多字体类-MultiFontManager--初始化成功")
 
     @classmethod
     def get_font(cls, font_family, size=12):

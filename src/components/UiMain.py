@@ -11,10 +11,12 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 # 导入自定义的QComboBox类 & QDragTableWidget类
 from .QComboBox import CustomComboBox
 from .QDragTableWidget import DragTableWidget
+from src.utils.decorator import CC_TimeDec
 
 
 class Ui_MainWindow(object):
     """主窗口UI类"""
+    @CC_TimeDec(tips="设置主窗口界面UI")
     def setupUi(self, MainWindow):
         """设置主窗口"""
         MainWindow.setObjectName("MainWindow")

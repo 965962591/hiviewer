@@ -168,6 +168,8 @@ class MyWidget(QWidget):
         self.comboBox.setCurrentText(color)  # 更新 QComboBox 显示为选中的颜色
         print(f"选中的颜色: {color}")  # 打印选中的颜色或进行其他处理
 
+
+# 程序入口路径
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     widget = MyWidget()

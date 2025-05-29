@@ -1,4 +1,13 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
+# -*- encoding: utf-8 -*-
+'''
+@File         :hiviewer.py
+@Time         :2025/05/29 17:43:40
+@Author       :diamond_cz@163.com
+@Version      :1.0
+@Description  :
+'''
+
 """导入python内置模块"""
 import gc
 import os
@@ -48,7 +57,7 @@ from src.utils.heic import extract_jpg_from_heic                            # �
 from src.utils.video import extract_video_first_frame                       # 导入视频预览工具类
 from src.utils.image import ImageProcessor                                  # 导入图片处理工具类
 from src.utils.sort import sort_by_custom                                   # 导入文件排序工具类
-from src.utils.decorator import timing_decorator                            # 导入自定义装饰器
+from src.utils.decorator import CC_TimeDec                                  # 导入自定义装饰器
 from src.utils.aeboxlink import (check_process_running, urlencode_folder_path, get_api_data)
 
 
@@ -76,14 +85,10 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.version_info = VERSION
         
         # 创建启动画面,启动画面以及相关初始化在self.update_splash_message()函数中
-        try:
-            _start_time = time.time()
-            self.create_splash_screen()
-            print(f"create_splash_screen()--创建启动画面, 耗时: {(time.time()-_start_time):.2f} 秒")
-        except Exception as e:
-            print(f"create_splash_screen()--创建启动画面失败: {e}")
+        self.create_splash_screen()
 
-        
+
+    @CC_TimeDec(tips="初始化所有组件")
     def initialize_components(self):
         """初始化所有组件"""
 
@@ -181,20 +186,22 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     设置动画显示区域开始线
     ---------------------------------------------------------------------------------------------------------------------------------------------
     """
-
+    @CC_TimeDec(tips="创建hiviewer的启动画面")
     def create_splash_screen(self):
         """创建带渐入渐出效果的启动画面"""
         # 加载启动画面图片
         splash_path = os.path.join(BASEICONPATH, "viewer_0.png")
         splash_pixmap = QPixmap(splash_path)
         
+        # 如果启动画面图片为空，则创建一个空白图片
         if splash_pixmap.isNull():
             splash_pixmap = QPixmap(400, 200)
             splash_pixmap.fill(Qt.white)
             
+        # 创建启动画面
         self.splash = QSplashScreen(splash_pixmap)
         
-        # 获取当前屏幕并计算居中位置
+        # 获取当前屏幕并计算居中位置, 移动到该位置
         screen = QApplication.desktop().screenNumber(QApplication.desktop().cursor().pos())
         screen_geometry = QApplication.desktop().screenGeometry(screen)
         x = screen_geometry.x() + (screen_geometry.width() - splash_pixmap.width()) // 2
@@ -223,12 +230,13 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 显示启动画面
         self.splash.show()
         
-        # 启动进度更新定时器
-        self.fla = 0
-        self.splash_progress_timer = QTimer()
+        # 设置进度更新定时器
+        self.fla = 0  # 记录启动画面更新次数
+        self.dots_count = 0  # 记录启动画面更新点
+        self.splash_progress_timer = QTimer()  # 启动进度更新定时器
         self.splash_progress_timer.timeout.connect(self.update_splash_message)  # 连接定时器到更新函数,相关函数变量的初始化
-        self.dots_count = 0
         self.splash_progress_timer.start(10)  # 每10ms更新一次
+
 
     def update_splash_message(self):
         """更新启动画面的加载消息,并在这部分初始化UI界面以及相关变量"""
@@ -246,13 +254,14 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             Qt.AlignCenter | Qt.AlignBottom,
             Qt.white
         )
-        self.fla = self.fla + 1
-        print(f"-------第{self.fla}次进入函数update_splash_message()-------")
-        print(f"当前运行时间: {(time.time()-start_time):.2f} 秒")
+
+        # 更新启动画面更新次数
+        self.fla += 1
+        print(f"----------[第 {self.fla} 次 进入函数update_splash_message], 当前运行时间: {(time.time()-start_time):.2f} 秒----------")
+              
 
         # 检查是否完成初始化, 第三次进入
         if not hasattr(self, 'initialize_three') and hasattr(self, 'initialize_two'):
-            
             # 初始化完成标志位
             self.initialize_three = True
             
@@ -274,16 +283,12 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             y = screen_geometry.y() + (screen_geometry.height() - self.height()) // 2
             self.move(x, y)
 
-
             # 预先检查更新  
             self.pre_update()
 
-            # 显示主窗口
-            # self.show()
-
             # 记录结束时间并计算耗时
             self.preview_label.setText(f"⏰启动耗时: {(time.time()-start_time):.2f} 秒")
-            print(f"-->>--hiviewer启动耗时: {(time.time()-start_time):.2f} 秒, 已关闭启动动画，显示主界面--<<--")
+            print(f"----------[hiviewer主界面启动成功], 共耗时: {(time.time()-start_time):.2f} 秒----------")
 
             # 延时显示主窗口,方便启动画面渐出
             QTimer.singleShot(800, self.show)
@@ -294,31 +299,25 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
         # 初始化其余相关变量, 第二次进入
         if not hasattr(self, 'initialize_two') and hasattr(self, 'drag_flag'):
-            try:
-                _start_time = time.time()
-                self.initialize_two = True
-                self.initialize_components()
-                print(f"initialize_components()--初始化其它组件, 耗时: {(time.time()-_start_time):.2f} 秒")
-            except Exception as e:
-                print(f"initialize_components()--初始化其它组件失败: {e}")
+            self.initialize_two = True
+            self.initialize_components()
+
 
         # 初始化界面UI, 第一次进入
         if not hasattr(self, 'drag_flag'):
-            try:
-                _start_time = time.time()
-                self.drag_flag = True  # 默认设置是图片拖拽模式, self.setupUi(self) 中需要调用
-                self.setupUi(self)
-                print(f"setupUi()--初始化主界面UI, 耗时: {(time.time()-_start_time):.2f} 秒")
-            except Exception as e:
-                print(f"setupUi()--初始化主界面UI失败: {e}")
-
+            self.drag_flag = True  # 默认设置是图片拖拽模式, self.setupUi(self) 中需要调用
+            self.setupUi(self)
 
 
 
     """
-    设置动画显示区域结束线
+    设置hiviewer类中的可重复使用的common私有方法开始线
     ---------------------------------------------------------------------------------------------------------------------------------------------
     """
+
+
+
+
 
 
     """
@@ -506,9 +505,10 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     ---------------------------------------------------------------------------------------------------------------------------------------------
     """
 
+    @CC_TimeDec(tips="设置主界面图标以及标题")
     def set_stylesheet(self):
         """设置主界面图标以及标题"""
-        print("set_stylesheet()--设置主界面相关组件")
+        # print("[set_stylesheet]-->设置主界面相关组件")
 
         icon_path = os.path.join(BASEICONPATH, "viewer_3.ico")
         self.setWindowIcon(QIcon(icon_path))
@@ -894,7 +894,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     """
     def input_enter_action(self):
         # 地址栏输入后按下回车的反馈
-        print("input_enter_action()--在地址栏按下回车/拖拽了文件进来,开始在左侧文浏览器中定位")  # 打印输入内容
+        print("[input_enter_action]-->在地址栏按下回车/拖拽了文件进来,开始在左侧文浏览器中定位")  # 打印输入内容
         self.locate_in_tree_view()
         # 初始化同级文件夹下拉框选项
         self.RT_QComboBox1_init()
@@ -936,7 +936,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         print("setting()-版本按钮被点击")
         check_update()
 
-    @timing_decorator
+    @CC_TimeDec(tips="预更新版本")
     def pre_update(self):
         """预更新版本函数
         检查更新版本信息，并更新状态栏按钮，如果耗时超过2秒，则提示用户更新失败
@@ -1627,12 +1627,12 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     # 在左侧文件浏览器中定位地址栏(RT_QComboBox)中当前显示的目录
     def locate_in_tree_view(self):
         """左侧文件浏览器点击定位函数"""
-        print("locate_in_tree_view()--在左侧文件浏览器中定位地址栏路径")
+        print("[locate_in_tree_view]-->在左侧文件浏览器中定位地址栏路径")
         try:
             current_directory = self.RT_QComboBox.currentText()
             # 检查路径是否有效
             if not os.path.exists(current_directory): 
-                print("locate_in_tree_view()--地址栏路径不存在")
+                print("[locate_in_tree_view]-->地址栏路径不存在")
                 return  
             # 获取当前目录的索引
             index = self.file_system_model.index(current_directory)  
@@ -1648,18 +1648,18 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 # 手动设置水平方向进度条
                 self.Left_QTreeView.horizontalScrollBar().setValue(0)
             
-                print(f"locate_in_tree_view()--定位成功")
+                print(f"[locate_in_tree_view]-->定位成功")
             else:
-                print("locate_in_tree_view()--索引无效-无法定位")
+                print("[locate_in_tree_view]-->索引无效-无法定位")
 
         except Exception as e:
-            print(f"locate_in_tree_view()--定位失败: {e}")
+            print(f"[locate_in_tree_view]-->定位失败: {e}")
             return
 
 
     def update_RB_QTableWidget0_from_list(self, file_infos_list, file_paths, dir_name_list):
         """从当前列表中更新表格，适配从当前列表删除文件功能"""
-        print(f"update_RB_QTableWidget0_from_list()--从当前列表中更新表格")
+        print(f"[update_RB_QTableWidget0_from_list]-->从当前列表中更新表格")
         try:    
             # 取消当前的预加载任务
             self.cancel_preloading()
@@ -1679,130 +1679,104 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 self.start_image_preloading(file_name_paths)
 
         except Exception as e:
-            print(f"update_RB_QTableWidget0_from_list()-error--从当前列表中更新表格任务失败: {e}")
+            print(f"[update_RB_QTableWidget0_from_list]-->error--从当前列表中更新表格任务失败: {e}")
 
 
+    @CC_TimeDec(tips="更新右侧表格功能函数")
     def update_RB_QTableWidget0(self):
         """更新右侧表格功能函数"""
-        print(f"update_RB_QTableWidget0()--更新右侧表格内容:")
-        try:
-            try:    
-                # 取消当前的预加载任务
-                self.cancel_preloading()
-            except Exception as e:
-                print(f"取消预加载任务失败: {e}")
-            
-            try:    
-                # 清空表格和缓存
-                self.RB_QTableWidget0.clear()
-                self.RB_QTableWidget0.setRowCount(0)
-                self.RB_QTableWidget0.setColumnCount(0)
-                self.image_index_max = [] # 清空图片列有效行最大值  
-            except Exception as e:
-                print(f"清空表格和缓存失败: {e}")
-            
-            try:
-                # 收集文件名基本信息以及文件路径，并将相关信息初始化为类中全局变量
-                file_infos_list, file_paths, dir_name_list = self.collect_file_paths()
-                # 初始化文件名及基本信息列表
-                self.files_list = file_infos_list      
-                # 初始化文件路径列表
-                self.paths_list = file_paths          
-                # 初始化选中的同级文件夹列表
-                self.dirnames_list = dir_name_list    
+        
+        # 取消当前的预加载任务
+        self.cancel_preloading()
 
-            except Exception as e:
-                print(f"收集文件路径失败: {e}")
-            
-            try:
-                # 先初始化表格结构和内容，不加载图标,并获取图片列有效行最大值
-                self.image_index_max = self.init_table_structure(file_infos_list, dir_name_list)
-            except Exception as e:
-                print(f"初始化表格结构和内容失败: {e}")
+        # 清空表格和缓存
+        self.RB_QTableWidget0.clear()
+        self.RB_QTableWidget0.setRowCount(0)
+        self.RB_QTableWidget0.setColumnCount(0)
+        self.image_index_max = [] # 清空图片列有效行最大值  
 
-            try:
-                """对file_paths进行转置,实现加载图标按行加载"""
-                file_name_paths = list(chain.from_iterable(zip_longest(*file_paths, fillvalue=None)))
+        
+        # 收集文件名基本信息以及文件路径，并将相关信息初始化为类中全局变量
+        file_infos_list, file_paths, dir_name_list = self.collect_file_paths()
+        self.files_list = file_infos_list      # 初始化文件名及基本信息列表
+        self.paths_list = file_paths           # 初始化文件路径列表
+        self.dirnames_list = dir_name_list     # 初始化选中的同级文件夹列表
 
-                # 初始化预加载图标线程前的问价排列列表
-                self.preloading_file_name_paths = file_name_paths     
 
-            except Exception as e:
-                print(f"处理文件路径失败: {e}")
+        # 先初始化表格结构和内容，不加载图标,并获取图片列有效行最大值
+        self.image_index_max = self.init_table_structure(file_infos_list, dir_name_list)       
 
-            try:    
-                # 开始预加载图标    
-                if file_name_paths:  # 确保有文件路径才开始预加载
-                    self.start_image_preloading(file_name_paths)
-            except Exception as e:
-                print(f"开始预加载图标失败: {e}")
+        # 对file_paths进行转置,实现加载图标按行加载，并初始化预加载图标线程前的问价排列列表
+        file_name_paths = list(chain.from_iterable(zip_longest(*file_paths, fillvalue=None)))
+        self.preloading_file_name_paths = file_name_paths 
 
-        except Exception as e:
-            # 返回错误信息
-            print(f"update_RB_QTableWidget0()-error--更新右侧表格失败！\n错误信息: {e}")
-            return
+        # 开始预加载图标    
+        if file_name_paths:  # 确保有文件路径才开始预加载
+            self.start_image_preloading(file_name_paths)
 
 
     def init_table_structure(self, file_name_list, dir_name_list):
         """初始化表格结构和内容，不包含图标"""
+        try:
+            # 设置表格的列数
+            self.RB_QTableWidget0.setColumnCount(len(file_name_list))
+            # 设置列标题为当前选中的文件夹名，设置列名为文件夹名
+            self.RB_QTableWidget0.setHorizontalHeaderLabels(dir_name_list)  
 
-        # 设置表格的列数
-        self.RB_QTableWidget0.setColumnCount(len(file_name_list))
-        # 设置列标题为当前选中的文件夹名，设置列名为文件夹名
-        self.RB_QTableWidget0.setHorizontalHeaderLabels(dir_name_list)  
+            # 判断是否存在文件
+            if not file_name_list or not file_name_list[0]:
+                return []  
+            
+            # 设置表格的行数
+            max_cols = max(len(row) for row in file_name_list) 
+            self.RB_QTableWidget0.setRowCount(max_cols)  
+            self.RB_QTableWidget0.setIconSize(QSize(48, 48))  
 
-        # 判断是否存在文件
-        if not file_name_list or not file_name_list[0]:
-            return []  
-        
-        # 设置表格的行数
-        max_cols = max(len(row) for row in file_name_list) 
-        self.RB_QTableWidget0.setRowCount(max_cols)  
-        self.RB_QTableWidget0.setIconSize(QSize(48, 48))  
+            pic_num_list = [] # 用于记录每列的图片数量
+            flag_ = 0 # 用于记录是否需要设置固定行高
+            # 填充 QTableWidget,先填充文件名称，后填充图标(用多线程的方式后加载图标)
+            for col_index, row in enumerate(file_name_list):
+                pic_num_list.append(len(row))
+                for row_index, value in enumerate(row):
+                    if value[4][0] is None and value[4][1] is None:
+                        resolution = " "
+                    else:
+                        resolution = f"{value[4][0]}x{value[4][1]}"
+                    if value[5] is None:
+                        exposure_time = " "
+                    else:
+                        exposure_time = value[5]
+                    if value[6] is None:
+                        iso = " "
+                    else: 
+                        iso = value[6]
+                    # 文件名称、分辨率、曝光时间、ISO
+                    if resolution == " " and exposure_time == " " and iso == " ": 
+                        item_text = value[0]
+                        flag_ = 0 
+                    else:
+                        item_text = value[0] + "\n" + f"{resolution} {exposure_time} {iso}"
+                        flag_ = 1 # 设置flag_为1，设置行高
+                    item = QTableWidgetItem(item_text)
+                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # 禁止编辑
+                    self.RB_QTableWidget0.setItem(row_index, col_index, item)  # 设置单元格项
+                ###############################    列  ,     行   ，内容    ######################
 
-        pic_num_list = [] # 用于记录每列的图片数量
-        flag_ = 0 # 用于记录是否需要设置固定行高
-        # 填充 QTableWidget,先填充文件名称，后填充图标(用多线程的方式后加载图标)
-        for col_index, row in enumerate(file_name_list):
-            pic_num_list.append(len(row))
-            for row_index, value in enumerate(row):
-                if value[4][0] is None and value[4][1] is None:
-                    resolution = " "
-                else:
-                    resolution = f"{value[4][0]}x{value[4][1]}"
-                if value[5] is None:
-                    exposure_time = " "
-                else:
-                    exposure_time = value[5]
-                if value[6] is None:
-                    iso = " "
-                else: 
-                    iso = value[6]
-                # 文件名称、分辨率、曝光时间、ISO
-                if resolution == " " and exposure_time == " " and iso == " ": 
-                    item_text = value[0]
-                    flag_ = 0 
-                else:
-                    item_text = value[0] + "\n" + f"{resolution} {exposure_time} {iso}"
-                    flag_ = 1 # 设置flag_为1，设置行高
-                item = QTableWidgetItem(item_text)
-                item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # 禁止编辑
-                self.RB_QTableWidget0.setItem(row_index, col_index, item)  # 设置单元格项
-            ###############################    列  ,     行   ，内容    ######################
+            # 设置单元格行高固定为60,如果flag_为0，则不设置行高
+            if flag_:
+                for row in range(self.RB_QTableWidget0.rowCount()):
+                    self.RB_QTableWidget0.setRowHeight(row, 60)
+            else:
+                for row in range(self.RB_QTableWidget0.rowCount()):
+                    self.RB_QTableWidget0.setRowHeight(row, 52)
 
-        # 设置单元格行高固定为60,如果flag_为0，则不设置行高
-        if flag_:
-            for row in range(self.RB_QTableWidget0.rowCount()):
-                self.RB_QTableWidget0.setRowHeight(row, 60)
-        else:
-            for row in range(self.RB_QTableWidget0.rowCount()):
-                self.RB_QTableWidget0.setRowHeight(row, 52)
+            # # 更新标签显示  
+            self.statusbar_label0.setText(f"📢:当前选中的文件夹中包含 {pic_num_list} 张图")  
 
-
-        # # 更新标签显示  
-        self.statusbar_label0.setText(f"📢:当前选中的文件夹中包含 {pic_num_list} 张图")  
-
-        return pic_num_list
+            return pic_num_list
+        except Exception as e:
+            print(f"[init_table_structure]-->初始化表格结构和内容失败: {e}")
+            return []
 
         
     def collect_file_paths(self):
@@ -1921,12 +1895,12 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def start_image_preloading(self, file_paths):
         """开始预加载图片"""
         if self.preloading:
-            print("start_image_preloading()--预加载已启动, 跳过")
+            print("[start_image_preloading]-->预加载已启动, 跳过")
             return
         
         # 设置预加载状态
         self.preloading = True
-        print("start_image_preloading()--开始预加载图标, 启动预加载线程")
+        print("[start_image_preloading]-->开始预加载图标, 启动预加载线程")
 
         self.start_time_image_preloading = time.time()
         
@@ -1941,9 +1915,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # 启动预加载
             self.threadpool.start(self.current_preloader)
         except Exception as e:
-            print(f"start_image_preloading()--开始预加载图标, 启动预加载线程失败: {e}")
+            print(f"[start_image_preloading]-->开始预加载图标, 启动预加载线程失败: {e}")
 
-        
+    @CC_TimeDec(tips="取消当前预加载任务", show_time=False)
     def cancel_preloading(self):
         """取消当前预加载任务"""
         try:
@@ -1988,24 +1962,24 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         
     def on_preload_finished(self):
         """处理预加载完成"""
-        print("on_preload_finished()--图标预加载完成")
+        print("[on_preload_finished]-->图标预加载完成")
         # 更新状态栏信息显示
         self.statusbar_label1.setText(f"🔉: 图标已全部加载-^-耗时：{time.time()-self.start_time_image_preloading:.2f}秒🍃")
         gc.collect()
         
     def on_preload_error(self, error):
         """处理预加载错误"""
-        print(f"on_preload_error()--图标预加载错误: {error}")
+        print(f"[on_preload_error]-->图标预加载错误: {error}")
 
     def RT_QComboBox1_init(self):
         """自定义RT_QComboBox1, 添加复选框选项"""
-        print("RT_QComboBox1_init()--开始添加地址栏文件夹的同级文件夹到下拉复选框中")
+        print("[RT_QComboBox1_init]-->开始添加地址栏文件夹的同级文件夹到下拉复选框中")
         try:
             # 获取地址栏当前路径    
             current_directory = self.RT_QComboBox.currentText()
             # 检查路径是否有效
             if not os.path.exists(current_directory): 
-                print("RT_QComboBox1_init()--地址栏路径不存在")
+                print("[RT_QComboBox1_init]-->地址栏路径不存在")
                 return  
             # 获取父目录中的文件夹列表
             sibling_folders = self.getSiblingFolders(current_directory)  
@@ -2018,27 +1992,27 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # 禁用右键菜单
             self.RT_QComboBox1.setContextMenuPolicy(Qt.NoContextMenu)  
         except Exception as e:
-            print(f"RT_QComboBox1_init()--初始化失败: {e}")
+            print(f"[RT_QComboBox1_init]-->初始化失败: {e}")
 
     def handleComboBoxPressed(self, index):
         """处理复选框选项被按下时的事件。"""
-        print("handleComboBoxPressed()-ComboBox1--<1>更新复选框状态")
+        print("[handleComboBoxPressed]-->更新复选框状态")
         try:
             if not index.isValid():
-                print("handleComboBoxPressed()--下拉复选框点击无效")
+                print("[handleComboBoxPressed]-->下拉复选框点击无效")
                 return
             self.model.setChecked(index)  # 更新复选框的状态
         except Exception as e:
-            print(f"handleComboBoxPressed()--更新复选框状态失败: {e}")
+            print(f"[handleComboBoxPressed]-->更新复选框状态失败: {e}")
 
     def handleComboBox0Pressed(self):
         """处理（显示图片视频所有文件）下拉框选项被按下时的事件。"""
-        print("handleComboBox0Pressed()-ComboBox0--更新（显示图片视频所有文件）下拉框状态")
+        print("[handleComboBox0Pressed]-->更新（显示图片视频所有文件）下拉框状态")
         self.update_RB_QTableWidget0() # 更新右侧RB_QTableWidget0表格
 
     def updateComboBox1Text(self):
         """更新 RT_QComboBox1 的显示文本。"""    
-        print("updateComboBox1Text()-ComboBox1--<2>更新显示文本")
+        print("[updateComboBox1Text]-->更新显示文本")
         try:
             selected_folders = self.model.getCheckedItems()  # 获取选中的文件夹
             current_text = '; '.join(selected_folders) if selected_folders else "(请选择)"
@@ -2046,11 +2020,11 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # 更新表格内容
             self.update_RB_QTableWidget0()  
         except Exception as e:
-            print(f"updateComboBox1Text()--更新显示文本失败: {e}")
+            print(f"[updateComboBox1Text]-->更新显示文本失败: {e}")
 
     def getSiblingFolders(self, folder_path):
         """获取指定文件夹的同级文件夹列表。"""
-        print(f"getSiblingFolders()--获取{folder_path}的同级文件夹列表")
+        print(f"[getSiblingFolders]-->获取{folder_path}的同级文件夹列表")
         try:
             parent_folder = os.path.dirname(folder_path)  # 获取父文件夹路径
             return [
@@ -2058,7 +2032,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     if os.path.isdir(os.path.join(parent_folder, name)) and name != os.path.basename(folder_path)  # 过滤出同级文件夹，不包括当前选择的文件夹
                 ]
         except Exception as e:
-            print(f"getSiblingFolders()--获取同级文件夹列表失败: {e}")
+            print(f"[getSiblingFolders]-->获取同级文件夹列表失败: {e}")
             return []
 
 
@@ -2070,7 +2044,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # 获取选中文件的路径
             file_paths = self.get_selected_file_path() 
             if not file_paths:
-                print("handle_table_selection()--无法获取文件路径")
+                print("[handle_table_selection]-->无法获取文件路径")
                 return
             # 只需要第一个选中文件的路径
             preview_path = file_paths[0]
@@ -2110,7 +2084,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.statusbar_label.setText(f"[{len(file_paths)}]已选择")
 
         except Exception as e:
-            print(f"handle_table_selection()--处理表格选中事件失败: {e}")
+            print(f"[handle_table_selection]-->处理表格选中事件失败: {e}")
 
 
     def clear_preview_layout(self):
@@ -2122,7 +2096,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 if widget:
                     widget.deleteLater()
         except Exception as e:
-            print(f"clear_preview_layout()--清空预览区域失败: {e}")
+            print(f"[clear_preview_layout]-->清空预览区域失败: {e}")
 
     def create_image_preview(self, path):
         """创建图片预览"""
@@ -2139,7 +2113,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.Left_QFrame.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
         except Exception as e:
-            print(f"图片预览失败: {e}")
+            print(f"[create_image_preview]-->图片预览失败: {e}")
             self.show_preview_error("图片预览不可用")
 
 
@@ -2155,7 +2129,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
     def handle_sort_option(self):
         """处理排序选项"""
-        print("handle_sort_option()--处理排序选项")
+        print("[handle_sort_option]-->处理排序选项")
         try:
             sort_option = self.RT_QComboBox2.currentText()
             if self.simple_mode:
@@ -2173,12 +2147,12 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # 更新右侧表格
             self.update_RB_QTableWidget0()  
         except Exception as e:
-            print(f"handle_sort_option()--处理排序选项失败: {e}")
+            print(f"[handle_sort_option]-->处理排序选项失败: {e}")
 
     def handle_theme_selection(self):
         """处理下拉框选择"""
         # 获取下拉框的当前选择
-        print("handle_theme_selection()--处理下拉框选择")
+        print("[handle_theme_selection]-->处理下拉框选择")
         try:
             selected_theme = self.RT_QComboBox3.currentText()
             if selected_theme == "默认主题":
@@ -2189,11 +2163,11 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # 更新主题
             self.apply_theme()
         except Exception as e:
-            print(f"handle_theme_selection()--处理下拉框选择失败: {e}")
+            print(f"[handle_theme_selection]-->处理下拉框选择失败: {e}")
 
     def toggle_theme(self):
         """切换主题"""
-        print("toggle_theme()--切换主题")
+        print("[toggle_theme]-->切换主题")
         try:
             if self.current_theme == "默认主题":
                 self.current_theme = "暗黑主题"
@@ -2203,18 +2177,18 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # 更新主题
             self.apply_theme()
         except Exception as e:
-            print(f"toggle_theme()--切换主题失败: {e}")
+            print(f"[toggle_theme]-->切换主题失败: {e}")
 
     def apply_theme(self):
         """初始化主题"""
-        print("apply_theme()--更新当前主题")
+        print("[apply_theme]-->更新当前主题")
         try:
             if self.current_theme == "暗黑主题":
                 self.setStyleSheet(self.dark_style())     # 暗黑主题
             else:
                 self.setStyleSheet(self.default_style())  # 默认主题
         except Exception as e:
-            print(f"apply_theme()--应用当前主题失败: {e}")
+            print(f"[apply_theme]-->应用当前主题失败: {e}")
 
 
     def default_style(self):
@@ -2854,7 +2828,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     """缓存文件路径列表，避免重复加载"""
     def load_settings(self):
         """从JSON文件加载设置"""
-        print("load_settings()--从JSON文件加载之前的设置")
+        print("[load_settings]-->从JSON文件加载之前的设置")
         try:
             settings_path = os.path.join(os.path.dirname(__file__), "config", "basic_settings.json")
             if os.path.exists(settings_path):
@@ -2919,7 +2893,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 self.apply_theme()
 
         except Exception as e:
-            print(f"加载设置时出错: {e}")
+            print(f"[load_settings]-->加载设置时出错: {e}")
             return
 
     def save_settings(self):
@@ -2965,7 +2939,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 json.dump(settings, f, ensure_ascii=False, indent=4)
 
         except Exception as e:
-            print(f"保存设置时出错: {e}")
+            print(f"[save_settings]-->保存设置时出错: {e}")
 
 
     def press_space_and_b_get_selected_file_paths(self, key_type):
@@ -2975,7 +2949,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             if not selected_items:
                 # 弹出提示框
                 show_message_box("没有选中的项！", "提示", 500)
-                print("press_space_and_b_get_selected_file_paths()-没有检测到选中项！")
+                print("[press_space_and_b_get_selected_file_paths]-->没有检测到选中项！")
                 return [], []
             
 
@@ -3050,7 +3024,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             
             return file_paths, current_image_index  # 返回文件路径列表
         except Exception as e:
-            print(f"press_space_and_b_get_selected_file_paths()-error--处理键盘按下事件时发生错误: {e}")
+            print(f"[press_space_and_b_get_selected_file_paths]-->处理键盘按下事件时发生错误: {e}")
             return [], []
     
     def on_f1_pressed(self):
@@ -3058,7 +3032,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         try:
             self.open_mipi2raw_tool()
         except Exception as e:
-            print(f"on_f1_pressed()-error--处理F1键按下事件失败: {e}")
+            print(f"[on_f1_pressed]-->处理F1键按下事件失败: {e}")
             return
 
 
@@ -3109,7 +3083,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 self.open_rename_tool(current_folder)
 
         except Exception as e:
-            print(f"on_f2_pressed()-error--处理F2键按下事件失败: {e}")
+            print(f"[on_f2_pressed]-->处理F2键按下事件失败: {e}")
             return
 
 
@@ -3121,7 +3095,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             try:
                 self.open_rename_tool(current_folder)
             except Exception as e:
-                print(f"on_f4_pressed()-error--处理F4键按下事件失败: {e}")
+                print(f"[on_f4_pressed]-->处理F4键按下事件失败: {e}")
                 return
         else:
             # 弹出提示框    
@@ -3147,7 +3121,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.update_RB_QTableWidget0()
 
         except Exception as e:
-            print(f"on_f5_pressed()-error--刷新表格&清除缓存失败: {e}")
+            print(f"[on_f5_pressed]-->刷新表格&清除缓存失败: {e}")
             return
 
     def on_f12_pressed(self):
@@ -3162,18 +3136,18 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 
                 # 等待5秒确保程序启动
                 time.sleep(3)  
-                print(f"已启动程序: hiviewer.exe")
+                print(f"[on_f12_pressed]-->已启动程序: hiviewer.exe")
                 
                 return True
             else:
-                print(f"程序文件不存在: {program_path}")
+                print(f"[on_f12_pressed]-->程序文件不存在: {program_path}")
                 return False
         except Exception as e:
-            print(f"启动程序失败: {e}")
+            print(f"[on_f12_pressed]-->启动程序失败: {e}")
             return False
 
     def on_escape_pressed(self):
-        print("escape被按下了")
+        print("[on_escape_pressed]-->escape被按下了")
         self.close()  # 关闭主界面
         self.save_settings()
 
@@ -3187,7 +3161,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
     def on_p_pressed(self):
         """处理P键按下事件"""
-        print("on_p_pressed()-切换主题--P键已按下, 更新下拉框选项")
+        print("[on_p_pressed]-->切换主题--P键已按下, 更新下拉框选项")
         try:
             if self.current_theme == "默认主题":
                 self.RT_QComboBox3.setCurrentIndex(self.RT_QComboBox3.findText("暗黑主题"))
@@ -3197,7 +3171,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # 更新主题
             self.toggle_theme()
         except Exception as e:
-            print(f"on_p_pressed()--切换主题失败: {e}")
+            print(f"[on_p_pressed]-->切换主题失败: {e}")
                 
 
     def on_i_pressed(self):
@@ -3255,7 +3229,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             dialog = None
 
         except Exception as e:
-            print(f"on_i_pressed()-error--处理i键按下事件失败: {e}")
+            print(f"[on_i_pressed]-->处理i键按下事件失败: {e}")
             return
 
 
@@ -3266,15 +3240,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 # 解析xml文件将其保存到excel中去
                 save_excel_data(images_path)
                 # 提示
-                show_message_box("后台解析图片成功！", "提示", 1000)
-                print(f"高通工具后台解析图片成功！")
+                show_message_box("高通工具后台解析图片成功！", "提示", 1000)
+                print(f"[on_command_finished]-->高通工具后台解析图片成功！")
             else:
                 show_message_box(f"高通工具后台解析图片失败: {error_message}", "提示", 2000)
-                print(f"高通工具后台解析图片失败: {error_message}")
+                print(f"[on_command_finished]-->高通工具后台解析图片失败: {error_message}")
 
         except Exception as e:
             show_message_box(f"高通工具后台解析图片失败: {error_message}", "提示", 2000)
-            print(f"on_command_finished()-error--高通工具后台解析图片成功失败: {e}")
+            print(f"[on_command_finished]-->高通工具后台解析图片成功失败: {e}")
             return
 
 
@@ -3312,7 +3286,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.open_image_process_window(full_path)
 
         except Exception as e:
-            error_msg = f"打开图片失败: {str(e)}"
+            error_msg = f"[on_l_pressed]-->打开图片失败: {str(e)}"
             show_message_box(error_msg, "错误", 1000)
 
     def on_ctrl_h_pressed(self):
@@ -3350,7 +3324,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         if hasattr(self, 'help_dialog'):
             # 强制删除
             del self.help_dialog
-            print("成功销毁对话框")
+            print("[close_helpinfo]-->成功销毁对话框")
 
 
     def on_b_pressed(self):
@@ -3409,7 +3383,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             # 恢复第一次按下键盘空格键或B键
             self.last_key_press = False 
-            print(f"on_b_pressed()-主界面--处理B键时发生错误: {e}")
+            print(f"[on_b_pressed]-->主界面--处理B键时发生错误: {e}")
             
 
     def on_space_pressed(self):
@@ -3473,7 +3447,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             # 恢复第一次按下键盘空格键或B键
             self.last_key_press = False 
-            print(f"on_space_pressed()-主界面--处理B键时发生错误: {e}")
+            print(f"[on_space_pressed]-->主界面--处理B键时发生错误: {e}")
 
 
     def create_compare_window(self, selected_file_paths, image_indexs):
@@ -3488,10 +3462,10 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
             # 初始化看图子界面
             if not self.compare_window:
-                print("create_compare_window()-主界面--初始化看图子界面")
+                print("[create_compare_window]-->主界面--初始化看图子界面")
                 self.compare_window = SubMainWindow(selected_file_paths, image_indexs, self)
             else:
-                print("create_compare_window()-主界面--看图子界面已存在，传入图片及索引列表")
+                print("[create_compare_window]-->主界面--看图子界面已存在，传入图片及索引列表")
                 self.compare_window.set_images(selected_file_paths, image_indexs)
                 self.compare_window.show()
 
@@ -3502,7 +3476,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
             # self.hide()  # modify by diamond_cz 20250217 不隐藏主界面
         except Exception as e:
-            print(f"create_compare_window()-主界面--创建看图子窗口时发生错误: {e}")
+            print(f"[create_compare_window]-->主界面--创建看图子窗口时发生错误: {e}")
             return
 
     def on_compare_window_closed(self):
@@ -3510,7 +3484,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
         # self.show() # self.hide()  # modify by diamond_cz 20250217 不隐藏主界面
         if self.compare_window:
-            print("主界面触发子窗口关闭事件,接受关闭")
+            print("[on_compare_window_closed]-->主界面触发子窗口关闭事件,接受关闭")
             # self.compare_window.close()
             self.compare_window.hide()
             self.statusbar_label1.setText(f"🔉: 看图子界面关闭成功")
@@ -3537,13 +3511,13 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """暂停预加载"""
         if self.current_preloader and self.preloading:
             self.current_preloader.pause()
-            print("预加载已暂停")
+            print("[pause_preloading]-->预加载已暂停")
 
     def resume_preloading(self):
         """恢复预加载"""
         if self.current_preloader and self.preloading:
             self.current_preloader.resume()
-            print("预加载已恢复")
+            print("[resume_preloading]-->预加载已恢复")
 
     def create_video_player(self, selected_file_paths, image_indexs):
         """创建视频播放器的统一方法"""
@@ -3670,7 +3644,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
 
 if __name__ == '__main__':
-    print("main()--主界面程序启动")
+    print("[hiviewer主程序启动]:")
 
     # 记录程序启动的开始时间
     start_time = time.time()

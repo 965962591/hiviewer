@@ -81,14 +81,14 @@ class Updater:
                         download_url = f"{self.proxy_prefix}{asset['browser_download_url']}"
                         return download_url, self.latest_version
                 # 如果没有找到zip文件，返回None
-                print("check_for_updates()--未找到可下载的zip文件")
+                print("[check_for_updates]-->未找到可下载的zip文件")
                 return None, None
             else:
-                print("check_for_updates()--当前已是最新版本")
+                print("[check_for_updates]-->当前已是最新版本")
                 return None, None
                 
         except requests.RequestException as e:
-            print(f"检查更新失败: {e}")
+            print(f"[check_for_updates]-->检查更新失败: {e}")
             return None, None
 
     def download_update(self, download_url):
@@ -286,7 +286,7 @@ def download_with_progress(zip_path, response, total_size, progress_dialog):
 def pre_check_update():
     """预检查更新函数，供主程序调用"""
     try:
-        print("pre_check_update()--开始检查更新...")
+        print("[pre_check_update]-->开始检查更新...")
         updater = Updater()
         download_url, version = updater.check_for_updates()
         if download_url:
