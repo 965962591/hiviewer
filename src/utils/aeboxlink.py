@@ -42,13 +42,13 @@ def get_api_data(url='https://api.example.com/data', timeout=5):
             # print("请求成功！")
             return response.text
         else:
-            print(f"请求失败，状态码：{response.status_code}")
+            print(f"[get_api_data]-->请求失败，状态码：{response.status_code}")
             return None
     except requests.exceptions.Timeout:
-        print("请求超时！")
+        print("[get_api_data]-->请求超时！")
         return None
     except requests.exceptions.RequestException as e:
-        print(f"请求失败：{e}")
+        print(f"[get_api_data]-->请求失败：{e}")
         return None
 
 
@@ -74,16 +74,16 @@ def check_process_running(process_name: str) -> bool:
         target_process_name = os.path.basename(aebox_path).lower() if is_path else process_name.lower()
 
         if any(p.name().lower() == target_process_name for p in psutil.process_iter()):
-            print(f"✅ {target_process_name} 进程已在运行")
+            print(f"✅ [check_process_running]-->{target_process_name} 进程已在运行")
             return True
         else:
-            print(f"❌ 未找到运行中的进程 [{process_name}]")
+            print(f"❌ [check_process_running]-->未找到运行中的进程 [{process_name}]")
             return False
 
     except (psutil.NoSuchProcess, PermissionError):
         return False
     except Exception as e:
-        print(f"⚠️ 进程检查异常: {str(e)}")
+        print(f"❌ [check_process_running]-->进程检查异常: {str(e)}")
         return False
 
 

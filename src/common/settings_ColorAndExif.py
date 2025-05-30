@@ -5,10 +5,7 @@
 """
 """导入python内置模块"""
 import json
-import time
 import pathlib
-
-
 
 
 def load_exif_settings():
@@ -72,15 +69,12 @@ def load_exif_settings():
                     return settings
 
         except Exception as e:
-            print(f"./utils/setting.py--加载EXIF信息配置失败: {e}, 使用默认配置")
+            print(f"[load_exif_settings]-->加载EXIF信息配置失败: {e}, 使用默认配置")
             return settings
 
 
 def load_color_settings():
     """加载颜色设置"""
-    # 设置初始时间锚点
-    _start_time = time.time()
-    
     try:
         # 确保cache目录存在
         config_dir = pathlib.Path("./config")
@@ -90,54 +84,49 @@ def load_color_settings():
         if settings_file.exists():
             with open(settings_file, 'r', encoding='utf-8', errors='ignore') as f:
                 return json.load(f)
-        else: #设置默认颜色设置
-            try:
-                print(f"颜色设置文件不存在: {settings_file}, 设置默认颜色设置")
-                
-                # 基础颜色设置
-                basic_color_settings = {
-                    "background_color_default": "rgb(173,216,230)",   # 深色背景色_好蓝
-                    "background_color_table": "rgb(127, 127, 127)",   # 表格背景色_18度灰
-                    "font_color_default": "rgb(0, 0, 0)",             # 默认字体颜色_纯黑色
-                    "font_color_exif": "rgb(255, 255, 255)"           # Exif字体颜色_纯白色
-                }
+        # 设置默认颜色设置
+        else: 
+            print(f"[load_color_settings]-->warning: 颜色设置文件{settings_file}不存在, 设置默认颜色设置")
+            
+            # 基础颜色设置
+            basic_color_settings = {
+                "background_color_default": "rgb(173,216,230)",   # 深色背景色_好蓝
+                "background_color_table": "rgb(127, 127, 127)",   # 表格背景色_18度灰
+                "font_color_default": "rgb(0, 0, 0)",             # 默认字体颜色_纯黑色
+                "font_color_exif": "rgb(255, 255, 255)"           # Exif字体颜色_纯白色
+            }
 
-                # 设置rgb颜色值
-                rgb_color_settings = {
-                    "18度灰": "rgb(127,127,127)",
-                    "石榴红": "rgb(242,12,0)",
-                    "乌漆嘛黑": "rgb(22, 24, 35)",
-                    "铅白": "rgb(240,240,244)", 
-                    "水色": "rgb(136,173,166)",   
-                    "石青": "rgb(123,207,166)",           
-                    "茶色": "rgb(242,12,0)",
-                    "天际": "rgb(236,237,236)",   
-                    "晴空": "rgb(234,243,244)",  
-                    "苍穹": "rgb(220,230,247)", 
-                    "湖光": "rgb(74,116,171)", 
-                    "曜石": "rgb(84, 99,125)", 
-                    "天际黑": "rgb(8,8,6)",   
-                    "晴空黑": "rgb(45,53,60)",  
-                    "苍穹黑": "rgb(47,51,68)", 
-                    "湖光黑": "rgb(49,69,96)", 
-                    "曜石黑": "rgb(57,63,78)", 
-                }
+            # 设置rgb颜色值
+            rgb_color_settings = {
+                "18度灰": "rgb(127,127,127)",
+                "石榴红": "rgb(242,12,0)",
+                "乌漆嘛黑": "rgb(22, 24, 35)",
+                "铅白": "rgb(240,240,244)", 
+                "水色": "rgb(136,173,166)",   
+                "石青": "rgb(123,207,166)",           
+                "茶色": "rgb(242,12,0)",
+                "天际": "rgb(236,237,236)",   
+                "晴空": "rgb(234,243,244)",  
+                "苍穹": "rgb(220,230,247)", 
+                "湖光": "rgb(74,116,171)", 
+                "曜石": "rgb(84, 99,125)", 
+                "天际黑": "rgb(8,8,6)",   
+                "晴空黑": "rgb(45,53,60)",  
+                "苍穹黑": "rgb(47,51,68)", 
+                "湖光黑": "rgb(49,69,96)", 
+                "曜石黑": "rgb(57,63,78)", 
+            }
 
-                settings = {
-                    "basic_color_settings":basic_color_settings,
-                    "rgb_color_settings":rgb_color_settings
-                }
+            settings = {
+                "basic_color_settings":basic_color_settings,
+                "rgb_color_settings":rgb_color_settings
+            }
 
-                # 写入到json文件中
-                with open(settings_file, 'w', encoding='utf-8', errors='ignore') as f:
-                    json.dump(settings, f, indent=4, ensure_ascii=False)
-                    return settings
-                
-            except Exception as e:
-                print(f"默认颜色设置失败: {e}")
-
-        print(f"load_color_settings()--加载颜色设置, 耗时: {(time.time()-_start_time):.2f} 秒")
-
+            # 写入到json文件中
+            with open(settings_file, 'w', encoding='utf-8', errors='ignore') as f:
+                json.dump(settings, f, indent=4, ensure_ascii=False)
+                return settings
+            
     except Exception as e:
-        print(f"./utils/setting.py--加载颜色设置失败: {e}, 使用默认颜色配置")
+        print(f"[load_color_settings]-->error: 加载颜色设置失败: {e}, 使用默认颜色配置")
     return settings

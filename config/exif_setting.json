@@ -1,6 +1,6 @@
 {
     "label_visable_settings": {
-        "histogram_info": true,
+        "histogram_info": false,
         "exif_info": true,
         "roi_info": true,
         "ai_tips": false,
@@ -23,7 +23,7 @@
         "HDR": true,
         "Zoom": true,
         "Lux": true,
-        "CCT": false,
+        "CCT": true,
         "FaceSA": true,
         "DRCgain": true,
         "Awb_sa": false,

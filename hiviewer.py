@@ -43,7 +43,7 @@ from src.components.custom_qdialog_rename import SingleFileRenameDialog         
 from src.components.custom_adialog_progress import ProgressDialog, CompressWorker           # 导入自定义压缩进度对话框类
 from src.common.font_manager import SingleFontManager, MultiFontManager     # 字体管理器
 from src.common.version_Init import version_init                            # 版本号初始化
-from src.common.settings_init import load_color_settings                    # 导入自定义json配置文件
+from src.common.settings_ColorAndExif import load_color_settings            # 导入自定义json配置文件
 from src.common.log_files import setup_logging                              # 导入日志文件初始化
 from src.qpm.qualcom import CommandThread                                   # 导入高通图片解析工具独立线程类
 from src.utils.raw2jpg import Mipi2RawConverterApp                          # 导入MIPI RAW文件转换为JPG文件的类
@@ -82,16 +82,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """self.update_splash_message()函数中初始化UI界面self.setupUi(self)和变量初始化函数self.initialize_components()"""
         # 设置版本信息,读取本地配置文件./config/version.ini中的版本信息,没有则默认为release-v2.3.2
         self.new_version_info = False
-        self.version_info = VERSION
+        self.version_info = version_init()
         
         # 创建启动画面,启动画面以及相关初始化在self.update_splash_message()函数中
         self.create_splash_screen()
 
 
-    @CC_TimeDec(tips="初始化所有组件")
+    @CC_TimeDec(tips="所有组件初始化完成")
     def initialize_components(self):
         """初始化所有组件"""
-
         # 初始化相关变量及配置文件
         self.init_variable()
 
@@ -100,20 +99,21 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
         # 加载之前的设置    
         self.load_settings()  
-        # 初始化主题，暂时移除，在load_settings() 中初始化
-        # self.apply_theme()
 
         # 设置快捷键
         self.set_shortcut()
 
-        # 设置左侧文件浏览器和右侧表格区域的右键菜单
+        # 设置右侧表格区域的右键菜单
         self.setup_context_menu()  
+
+        # 设置左侧文件浏览器的右键菜单
         self.setup_treeview_context_menu()
 
         # 模仿按下回车
         self.input_enter_action()  
 
-        # 显示主窗口,在self.update_splash_message()函数中显示
+        # 迁移到函数update_splash_message()中，modify by diamond_cz
+        # 显示主窗口
         # self.show()
 
 
@@ -136,15 +136,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.selected_folders_history = False # 记录是否有效点击复选框，避免self.RT_QComboBox1的press事件出现重复连接信号的情况
         self.left_tree_file_display = False   # 设置左侧文件浏览器初始化标志位，只显示文件夹
         self.simple_mode = True               # 设置默认模式为简单模式，同EXIF信息功能
-        self.current_theme = "默认主题"       # 设置初始主题为默认主题
+        self.current_theme = "默认主题"        # 设置初始主题为默认主题
 
         # 添加预加载相关的属性初始化
         self.current_preloader = None  # 当前预加载器引用
         self.preloading = False        # 预加载状态
         self.preload_queue = Queue()   # 预加载队列
 
-        self.media_player = None     # 在__init__方法中添加
-        self.compare_window = None   # 初始化看图子界面的窗口应用
+        self.media_player = None       # 在__init__方法中添加
+        self.compare_window = None     # 初始化看图子界面的窗口应用
 
         # 初始化线程池
         self.threadpool = QThreadPool()
@@ -155,7 +155,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.compress_worker = None
 
         """加载颜色相关设置""" # 设置背景色和字体颜色，使用保存的设置或默认值
-        basic_color_settings = COLORSETTING.get('basic_color_settings',{})
+        basic_color_settings = load_color_settings().get('basic_color_settings',{})
         self.background_color_default = basic_color_settings.get("background_color_default", "rgb(173,216,230)")  # 深色背景色_好蓝
         self.background_color_table = basic_color_settings.get("background_color_table", "rgb(127, 127, 127)")    # 表格背景色_18度灰
         self.font_color_default = basic_color_settings.get("font_color_default", "rgb(0, 0, 0)")                  # 默认字体颜色_纯黑色
@@ -173,13 +173,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.custom_font_jetbrains_medium = MultiFontManager.get_font(font_family="JetBrains Maple Mono", size=11)
         self.custom_font_jetbrains_small = MultiFontManager.get_font(font_family="JetBrains Maple Mono", size=10)
         self.custom_font = self.custom_font_jetbrains
-        if False: # 暂时移除，使用MultiFontManager.get_font()方法
-            # 单个字体管理器，两种导入方式:
-            # 第一种，直接使用字体管理器默认字体，只是恶
-            self.custom_font = SingleFontManager.get_font(12)
-            # 第二种，使用字体管理器初始化方法，传入字体路径    
-            font_path_jetbrains = os.path.join(os.path.dirname(os.path.abspath(__file__)), "resource", "fonts", "JetBrainsMapleMono_Regular.ttf")
-            self.custom_font = SingleFontManager.get_font(size=12, font_path=font_path_jetbrains)  
 
 
     """
@@ -813,20 +806,18 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 command = f'start explorer /select,{win_path}'
                 # 移除check=True参数避免误报
                 subprocess.run(command, shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
-
             elif sys.platform == 'darwin':
                 # 使用open命令直接定位文件
                 subprocess.run(['open', '-R', str(full_path)], check=True)
-
-            else:  # Linux/Unix
+            else:  
+                # Linux/Unix
                 subprocess.run(['xdg-open', str(full_path.parent)], check=True)
-
         except subprocess.CalledProcessError as e:
-            show_message_box(f"定位命令执行失败: {str(e)}", "错误", 2000)
+            show_message_box(f"[open_file_location]-->定位命令执行失败: {str(e)}", "错误", 2000)
         except FileNotFoundError:
-            show_message_box("找不到系统命令，请检查系统环境", "错误", 2000)
+            show_message_box("[open_file_location]-->找不到系统命令，请检查系统环境", "错误", 2000)
         except Exception as e:
-            show_message_box(f"定位文件失败: {str(e)}", "错误", 2000)
+            show_message_box(f"[open_file_location]-->定位文件失败: {str(e)}", "错误", 2000)
 
 
     def copy_file_path(self, path): 
@@ -849,12 +840,12 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 # 发送请求通信到aebox
                 response = get_api_data(url=image_path_url, timeout=3)
                 if response:
-                    print("send_file_path_to_aebox():发送文件夹成功")
+                    print(f"[send_file_path_to_aebox]-->发送文件夹成功")
                 else:
-                    print("send_file_path_to_aebox():发送文件夹失败")
+                    print(f"[send_file_path_to_aebox]-->发送文件夹失败")
             
         except Exception as e:
-            show_message_box(f"将文件夹路径发送到aebox失败: {str(e)}", "错误", 1000)
+            show_message_box(f"[send_file_path_to_aebox]-->将文件夹路径发送到aebox失败: {str(e)}", "错误", 1000)
 
 
     def rename_file(self, path):
@@ -1197,7 +1188,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # 获取选中的项
             selected_items = self.RB_QTableWidget0.selectedItems() 
             if not selected_items:
-                print("get_selected_file_path()--没有选中的项")
+                print("[get_selected_file_path]-->warning: 没有选中的项")
                 return []
             
             # 用于存储所有选中的文件路径
@@ -1220,7 +1211,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 return file_paths
 
             except Exception as e:
-                print(f"get_selected_file_path()-error--获取文件路径失败: {e}")
+                print(f"[get_selected_file_path]-->error: 获取文件路径失败: {e}")
                 return []
 
 
@@ -1662,7 +1653,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 # 手动设置水平方向进度条
                 self.Left_QTreeView.horizontalScrollBar().setValue(0)
             
-                print(f"[locate_in_tree_view]-->定位成功")
             else:
                 print("[locate_in_tree_view]-->索引无效-无法定位")
 
@@ -1696,7 +1686,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             print(f"[update_RB_QTableWidget0_from_list]-->error--从当前列表中更新表格任务失败: {e}")
 
 
-    @CC_TimeDec(tips="更新右侧表格功能函数")
+    @CC_TimeDec(tips="更新右侧表格功能函数",show_time=False)
     def update_RB_QTableWidget0(self):
         """更新右侧表格功能函数"""
         
@@ -1708,14 +1698,12 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.RB_QTableWidget0.setRowCount(0)
         self.RB_QTableWidget0.setColumnCount(0)
         self.image_index_max = [] # 清空图片列有效行最大值  
-
         
         # 收集文件名基本信息以及文件路径，并将相关信息初始化为类中全局变量
         file_infos_list, file_paths, dir_name_list = self.collect_file_paths()
         self.files_list = file_infos_list      # 初始化文件名及基本信息列表
         self.paths_list = file_paths           # 初始化文件路径列表
         self.dirnames_list = dir_name_list     # 初始化选中的同级文件夹列表
-
 
         # 先初始化表格结构和内容，不加载图标,并获取图片列有效行最大值
         self.image_index_max = self.init_table_structure(file_infos_list, dir_name_list)       
@@ -1860,39 +1848,25 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 if entry.is_file():
                     if selected_option == "显示图片文件":
                         if entry.name.lower().endswith(self.IMAGE_FORMATS):
-                            # 获取图片的分辨率
-                            if self.simple_mode:       # 极简模式下不获取图片的分辨率
-                                width = None           # 宽度  
-                                height = None          # 高度
-                                exposure_time = None   # 曝光时间
-                                iso = None             # ISO
-                                
-                            else:   
-                                # 获取图片的分辨率、曝光时间、ISO
+                            # 非极简模式下通过PIL获取图片的宽度、高度、曝光时间、ISO
+                            if not self.simple_mode: 
                                 with ImageProcessor(entry.path) as img:
-                                    width, height = img.width, img.height
-                                    exposure_time = img.exposure_time
-                                    iso = img.iso
-
+                                    width, height, exposure_time, iso = img.width, img.height, img.exposure_time, img.iso
+                            # 获取图片的分辨率，极简模式下不获取图片的宽度、高度、曝光时间、ISO
+                            else:   
+                                width, height, exposure_time, iso = None, None, None, None
                             # 文件名称、创建时间、修改时间、文件大小、分辨率、曝光时间、ISO、文件路径
-                            files_and_dirs_with_mtime.append((entry.name, entry.stat().st_ctime, entry.stat().st_mtime, 
-                                                          entry.stat().st_size, (width, height), 
-                                                          exposure_time, iso, entry.path))
-                        else:
-                            continue
+                            files_and_dirs_with_mtime.append((entry.name, entry.stat().st_ctime, entry.stat().st_mtime, entry.stat().st_size,
+                                                           (width, height), exposure_time, iso, entry.path))
                     elif selected_option == "显示视频文件":
                         if entry.name.lower().endswith(self.VIDEO_FORMATS):     
                             # 文件名称、创建时间、修改时间、文件大小、分辨率、曝光时间、ISO、文件路径
-                            files_and_dirs_with_mtime.append((entry.name, entry.stat().st_ctime, entry.stat().st_mtime, 
-                                                          entry.stat().st_size, (None, None), 
-                                                          None, None, entry.path))
-                        else:
-                            continue
+                            files_and_dirs_with_mtime.append((entry.name, entry.stat().st_ctime, entry.stat().st_mtime, entry.stat().st_size,
+                                                           (None, None), None, None, entry.path))
                     elif selected_option == "显示所有文件":
                             # 文件名称、创建时间、修改时间、文件大小、分辨率、曝光时间、ISO、文件路径
-                            files_and_dirs_with_mtime.append((entry.name, entry.stat().st_ctime, entry.stat().st_mtime, 
-                                                          entry.stat().st_size, (None, None), 
-                                                          None, None, entry.path))
+                            files_and_dirs_with_mtime.append((entry.name, entry.stat().st_ctime, entry.stat().st_mtime, entry.stat().st_size,
+                                                           (None, None), None, None, entry.path))
                     else: # 没有选择任何选项就跳过
                         print("filter_files函数:selected_option没有选择任何选项,跳过")
                         continue
@@ -1976,7 +1950,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         
     def on_preload_finished(self):
         """处理预加载完成"""
-        print("[on_preload_finished]-->图标预加载完成")
+        # 打印提示信息
+        print(f"[on_preload_finished]-->所有图标预加载完成,耗时：{time.time()-self.start_time_image_preloading:.2f}秒")
         # 更新状态栏信息显示
         self.statusbar_label1.setText(f"🔉: 图标已全部加载-^-耗时：{time.time()-self.start_time_image_preloading:.2f}秒🍃")
         gc.collect()
@@ -3498,7 +3473,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
         # self.show() # self.hide()  # modify by diamond_cz 20250217 不隐藏主界面
         if self.compare_window:
-            print("[on_compare_window_closed]-->主界面触发子窗口关闭事件,接受关闭")
+            print("[on_compare_window_closed]-->主界面,接受看图子窗口关闭事件")
             # self.compare_window.close()
             self.compare_window.hide()
             self.statusbar_label1.setText(f"🔉: 看图子界面关闭成功")
@@ -3512,12 +3487,10 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.background_color_table = self.compare_window.background_color_table
             self.font_color_exif = self.compare_window.font_color_exif
             self.font_color_default = self.compare_window.font_color_default
-
         
             # 更新主题
             self.apply_theme()
         
-
         # 恢复第一次按下键盘空格键或B键
         self.last_key_press = False  
 
@@ -3674,12 +3647,9 @@ if __name__ == '__main__':
     # 记录程序启动的开始时间
     start_time = time.time()
 
-    # 读取全局颜色配置、版本信息以及图标路径
+    # 读取全局颜色配置
     BASEICONPATH = os.path.join(os.path.dirname(__file__), "resource", "icons")
-    COLORSETTING = load_color_settings()
-    VERSION = version_init()
     
-
     # 初始化日志文件
     # setup_logging()  
 
@@ -3690,5 +3660,4 @@ if __name__ == '__main__':
 
     # 设置主界面
     window = HiviewerMainwindow()
-
     sys.exit(app.exec_())

@@ -19,7 +19,7 @@ from PyQt5.QtWidgets import (
 
 """导入自定义模块"""
 from src.common.font_manager import SingleFontManager 
-from src.common.settings_init import load_color_settings 
+from src.common.settings_ColorAndExif import load_color_settings 
 
 """设置本项目的入口路径,全局变量BasePath"""
 # 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块

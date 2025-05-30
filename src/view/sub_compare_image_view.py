@@ -32,7 +32,7 @@ from PyQt5.QtWidgets import (
 """导入自定义模块"""
 from src.components.ui_sub_image import Ui_MainWindow                              # 看图子界面，导入界面UI
 from src.components.custom_qmessagebox import show_message_box                     # 导入消息框类
-from src.common.settings_init import load_exif_settings,load_color_settings   # 导入json配置模块
+from src.common.settings_ColorAndExif import load_exif_settings,load_color_settings   # 导入json配置模块
 from src.common.font_manager import SingleFontManager                        # 看图子界面，导入字体管理器
 from src.utils.aitips import CustomLLM_Siliconflow                          # 看图子界面，AI提示看图复选框功能模块
 from src.utils.hisnot import WScreenshot                                    # 看图子界面，导入自定义截图的类
@@ -2321,7 +2321,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         try:
             # 预检查程序aebox是否启动
             if not check_process_running("aebox.exe"):
-                print("❌ sync_image_index_with_aebox()--同步当前图片索引到aebox应用失败--aebox应用未启动")
+                print("❌ [sync_image_index_with_aebox]-->同步当前图片索引到aebox应用失败--aebox应用未启动")
                 return False
 
             # 新增配置文件读取
@@ -2331,7 +2331,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             # 发送初始索引
             select_url = f"{host}/select_image/{index_list[0].split('/')[0]}"
             if not get_api_data(url=select_url, timeout=3):
-                print("❌ sync_image_index_with_aebox()--初始索引发送失败")
+                print("❌ [sync_image_index_with_aebox]-->初始索引发送失败")
                 return False
 
             # 获取aebox当前图片信息
@@ -2342,7 +2342,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             current_name = current_data.get('filename', '')
 
             if current_name and current_name in origin_image_names:
-                print(f"✅ sync_image_index_with_aebox()--初始索引发送成功匹配: {current_name}")
+                print(f"✅ [sync_image_index_with_aebox]-->初始索引发送成功匹配: {current_name}")
                 return True
 
             # 执行图片列表匹配
@@ -2359,14 +2359,14 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             if len(matching_indices) == 1:
                 new_index = matching_indices[0] + 1
                 if get_api_data(f"{host}/select_image/{new_index}", timeout=3):
-                    print(f"✅ sync_image_index_with_aebox()--成功同步图片到aebox: {aebox_images[matching_indices[0]]}")
+                    print(f"✅ [sync_image_index_with_aebox]-->成功同步图片到aebox: {aebox_images[matching_indices[0]]}")
                     return True
 
-            print("❌ sync_image_index_with_aebox()--未找到唯一匹配的图片")
+                print("⭕ [sync_image_index_with_aebox]-->warning: 未找到唯一匹配的图片")
             return False
 
         except Exception as e:
-            print(f"❌ sync_image_index_with_aebox()--同步索引异常: {str(e)}")
+            print(f"❌ [sync_image_index_with_aebox]-->error: 同步索引异常: {str(e)}")
             return False
 
 
@@ -2395,7 +2395,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             return '\n'.join(result)
 
         except Exception as e:
-            print(f"处理EXIF信息时发生错误: {e}")
+            print(f"❌ [process_exif_info]-->处理EXIF信息时发生错误: {e}")
             return ""  # 返回空字符串或其他适当的默认值
 
 
@@ -2453,7 +2453,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             gc.collect()
             
         except Exception as e:
-            print(f"清理资源时发生错误: {e}")
+            print(f"❌ [cleanup]-->清理资源时发生错误: {e}")
 
 
     def show_menu_combox1(self, index):
@@ -2463,7 +2463,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         """
         try:
             if not index:     # index == 0 颜色设置，不做任何操作
-                print("show_menu_combox1()-看图子界面--点击了颜色配置选项")
+                print("[show_menu_combox1]-->看图子界面--点击了颜色配置选项")
                 # 从json文件加载配置
                 self.load_settings()
                 # 更新样式表
@@ -2514,7 +2514,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 # 弹出 QMenu
                 self.menu_1.exec_(global_pos)
         except Exception as e:
-            print(f"self.comboBox_1()--处理下拉框选项时发生未知错误: {e}")
+            print(f"❌ [show_menu_combox1]-->处理下拉框选项时发生未知错误: {e}")
         
 
     def on_comboBox_1_changed(self, color, index):
@@ -2625,21 +2625,21 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     view.scene().setBackgroundBrush(QtGui.QBrush(qcolor))
                     
                 except Exception as e:
-                    print(f"on_comboBox_2_changed()-色彩空间转换失败: {str(e)}")
+                    print(f"❌ [on_comboBox_2_changed]-->色彩空间转换失败: {str(e)}")
         # 更新UI
         self.update()
         QApplication.processEvents() 
                 
                 
     def toggle_exif_info(self, state):
-        print(f"切换 EXIF 信息: {'显示' if state == Qt.Checked else '隐藏'}")
+        print(f"[toggle_exif_info]-->切换 EXIF 信息: {'显示' if state == Qt.Checked else '隐藏'}")
         try:
             for view, exif_text in zip(self.graphics_views, self.exif_texts):
                 if exif_text:
                     # 传入字体颜色参数
                     view.set_exif_visibility(state == Qt.Checked, self.font_color_exif)
         except Exception as e:
-            print(f"处理toggle_exif_info函数时发生错误: {e}")
+            print(f"❌ [toggle_exif_info]-->处理toggle_exif_info函数时发生错误: {e}")
 
 
     def toggle_histogram_info(self, state):
@@ -2649,7 +2649,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 if histogram:
                     view.set_histogram_visibility(state == Qt.Checked)
         except Exception as e:
-            print(f"处理toggle_histogram_info函数时发生错误: {e}")
+            print(f"❌ [toggle_histogram_info]-->处理toggle_histogram_info函数时发生错误: {e}")
 
     def ai_tips_info(self, state):
         try:    
@@ -2662,7 +2662,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 self.is_updating = False
                 self.label_bottom.setText(f"📢:选中ROI信息复选框选后, 按下P键即可调出矩形框(矩形框移动逻辑同图片移动逻辑); 选中AI提示看图复选框选后, 按下P键即可发起请求(仅支持两张图);")
         except Exception as e:
-            print(f"处理ai_tips_info函数时发生错误: {e}")
+            print(f"❌ [ai_tips_info]-->处理ai_tips_info函数时发生错误: {e}")
 
     """modify by diamond_cz 20250218 移除该函数，使用更加高效的opencv方法实现
     def calculate_brightness_histogram(self, path):
@@ -2685,7 +2685,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 # 转换PIL图像到OpenCV格式
                 pass
             else:
-                print(f"calculate_image_stats无法加载图像")
+                print(f"❌ [calculate_brightness_histogram]-->无法加载图像")
                 return None
 
             # 转换为灰度图
@@ -2697,7 +2697,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
             return hist_counts.tolist()
         except Exception as e:
-            print(f"calculate_brightness_histogram计算直方图失败\n错误: {e}")
+            print(f"❌ [calculate_brightness_histogram]-->计算直方图失败\n错误: {e}")
             return None
         
     """modify by diamond_cz 20250218 移除该函数， 在类ImageTransform中实现图片基础信息的获取， 减少使用Image.open
@@ -2806,7 +2806,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             exif_info = exif_info + '\n'
             return exif_info
         except Exception as e:
-            return f"无法读取EXIF信息:{os.path.basename(path)}\n错误: {e}"
+            return f"❌ [get_exif_info]-->无法读取EXIF信息:{os.path.basename(path)}\n错误: {e}"
 
 
     def wheelEvent(self, event: QEvent):
@@ -2814,17 +2814,17 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         try:
             # 图片还在更新中，不触发鼠标滚轮事件
             if self.is_updating:
-                print("wheelEvent事件: 图片还在更新中,请稍等...") 
+                print("[wheelEvent]-->图片还在更新中,请稍等...") 
                 return
 
             # 确保视图中有值&存在基准缩放比例
             if not self.graphics_views or not self.base_scales:
-                print("wheelEvent事件: 无效的视图或基准缩放比例")
+                print("[wheelEvent]-->无效的视图或基准缩放比例")
                 return
 
             # 确保 self._scales_min 中没有 None 值
             if None in self._scales_min:
-                print("wheelEvent事件: 缩放最小值包含None，重新初始化")
+                print("[wheelEvent]-->缩放最小值包含None，重新初始化")
                 # 使用默认值替换None
                 self._scales_min = [0.2 if x is None else x for x in self._scales_min]
 
@@ -2854,7 +2854,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                         self.graphics_views[i] = view_new
 
         except Exception as e:
-            print(f"处理滚轮事件时发生错误: {e}")
+            print(f"❌ [wheelEvent]-->处理滚轮事件时发生错误: {e}")
       
 
     def _apply_scale_to_view(self, view, zoom_step):
@@ -2879,7 +2879,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             view.centerOn(center)
             
         except Exception as e:
-            print(f"应用缩放时发生错误: {e}")
+            print(f"❌ [_apply_scale_to_view]-->应用缩放时发生错误: {e}")
         finally:
             return view
         
@@ -2906,20 +2906,20 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                         item.widget().setVisible(True)
                 self.showMaximized()   # 最大化
         except Exception as e:
-            print(f"应用F11切换全屏时发生错误: {e}")
+            print(f"❌ [toggle_fullscreen]-->应用F11切换全屏时发生错误: {e}")
 
 
     def rotate_left(self):
         try:
             self.rotate_image(-90)
         except Exception as e:
-            print(f"旋转图片时发生错误: {e}")
+            print(f"❌ [rotate_left]-->旋转图片时发生错误: {e}")
 
     def rotate_right(self):
         try:
             self.rotate_image(90)
         except Exception as e:
-            print(f"旋转图片时发生错误: {e}")
+            print(f"❌ [rotate_right]-->旋转图片时发生错误: {e}")
 
     def rotate_image(self, angle):
         """旋转图片函数，接受角度进行旋转图片"""
@@ -3022,7 +3022,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
                     return scaled_pixmap
                 except Exception as e:
-                    print(f"创建统一覆盖图像失败: {str(e)}")
+                    print(f"❌ [create_unified_overlay]-->创建统一覆盖图像失败: {str(e)}")
                     return None
 
             if key == 'q':
@@ -3045,7 +3045,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     target_view.centerOn(target_view.mapToScene(target_view.viewport().rect().center()))
 
         except Exception as e:
-            print(f"覆盖操作失败: {e}")
+            print(f"❌ [handle_overlay]-->覆盖操作失败: {e}")
             
 
     def restore_images(self, key):
@@ -3084,12 +3084,12 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             target_view.pixmap_items[0].setRotation(original_rotation)  
             target_view.centerOn(target_view.mapToScene(target_view.viewport().rect().center()))
         except Exception as e:
-            print(f"恢复图片失败: {e}")
+            print(f"❌ [restore_images]-->恢复图片失败: {e}")
 
             
     def on_v_pressed(self):
         """处理V键事件"""
-        print("按下了v键")
+        print("[on_v_pressed]-->按下了v键")
 
         if False:                            
             # 打印表格的实际尺寸
@@ -3113,12 +3113,12 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             # print(f"新的缩放因子: {self.base_scales}")  # 添加调试信息
 
         except Exception as e:
-            print(f"处理V键事件时发生错误: {e}")
+            print(f"❌ [on_v_pressed]-->处理V键事件时发生错误: {e}")
 
 
     def on_n_pressed(self):
         """处理N键事件"""
-        print("按下了n键")
+        print("[on_n_pressed]-->按下了n键")
 
         try:
             # 设置放大因子为1.005
@@ -3133,12 +3133,12 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             
             # print(f"新的缩放因子: {self.base_scales}")  # 添加调试信息
         except Exception as e:
-            print(f"处理N键事件时发生错误: {e}")
+            print(f"❌ [on_n_pressed]-->处理N键事件时发生错误: {e}")
 
 
     def on_t_pressed(self):
         """处理T键事件"""
-        print("按下了t键")
+        print("[on_t_pressed]-->按下了t键")
 
         # 调用截屏工具
         WScreenshot.run()
@@ -3160,7 +3160,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
     def on_ctrl_t_pressed(self):
         """处理Ctrl+T键事件"""
-        print("按下了t键")
+        print("[on_ctrl_t_pressed]-->按下了t键")
 
         try:
             # 创建并显示自定义对话框,传入图片列表
@@ -3177,7 +3177,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             dialog.deleteLater()
             dialog = None
         except Exception as e:
-            print(f"处理Ctrl+T键事件失败:{e}")
+            print(f"❌ [on_ctrl_t_pressed]-->处理Ctrl+T键事件失败:{e}")
 
     def roi_stats_checkbox(self):
         try:
@@ -3187,7 +3187,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     view.set_stats_visibility(self.stats_visible)
 
         except Exception as e:
-            print(f"显示图片统计信息时发生错误: {e}")
+            print(f"❌ [roi_stats_checkbox]-->显示图片统计信息时发生错误: {e}")
         finally:
             # 延时1秒后更新is_updating为False
             QTimer.singleShot(1000, lambda: setattr(self, 'is_updating', False))
@@ -3233,7 +3233,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 tcp_thread.start()
 
             except Exception as e:
-                print(f"处理P键时发生错误: {e}")
+                print(f"❌ [on_p_pressed]-->处理P键时发生错误: {e}")
                 self.is_updating = False
                 show_message_box("处理P键时发生错误，请重试", "错误", 1000)
         
@@ -3246,7 +3246,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                         view.toggle_selection_rect(self.roi_selection_active)
 
             except Exception as e:
-                print(f"显示图片统计信息时发生错误: {e}")
+                print(f"❌ [on_p_pressed]-->显示图片统计信息时发生错误: {e}")
             finally:
                 # 延时0.01秒后更新is_updating为False
                 QTimer.singleShot(10, lambda: setattr(self, 'is_updating', False))
@@ -3262,10 +3262,10 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         try:
             # 预检查当前状态
             if self.is_updating:
-                print("正在更新图片，请稍后...")
+                print("[on_space_pressed]-->正在更新图片，请稍后...")
                 return
             if not self.parent_window:
-                print("未找到父窗口，无法获取下一组图片")
+                print("[on_space_pressed]-->未找到父窗口，无法获取下一组图片")
                 return
             # 切换图片自动清除ROI信息框
             if self.roi_selection_active: 
@@ -3307,7 +3307,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 raise ValueError(f"这组文件没有包含图片和视频文件，无法调出子界面，获取的文件如下：\n{next_images}")
 
         except Exception as e:
-            print(f"看图子界面-on_space_pressed()--处理空格键时发生错误: {e}")
+            print(f"❌ [on_space_pressed]-->处理空格键时发生错误: {e}")
             # 退出看图界面
             self.is_updating = False
             self.Escape_close()
@@ -3317,10 +3317,10 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         try:
             # 预检查当前状态
             if self.is_updating:
-                print("正在更新图片，请稍后...")
+                print("[on_b_pressed]-->正在更新图片，请稍后...")
                 return
             if not self.parent_window:
-                print("未找到父窗口，无法获取下一组图片")
+                print("[on_b_pressed]-->未找到父窗口，无法获取下一组图片")
                 return
             # 切换图片自动清除ROI信息框
             if self.roi_selection_active: 
@@ -3362,7 +3362,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 raise ValueError(f"这组文件没有包含图片和视频文件，无法调出子界面，获取的文件如下：\n{prev_images}")
 
         except Exception as e:
-            print(f"处理B键时发生错误: {e}")
+            print(f"❌ [on_b_pressed]-->处理B键时发生错误: {e}")
             self.is_updating = False
             self.Escape_close()
             
@@ -3376,10 +3376,10 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     # print(f"获取到下一组图片: {next_images}")
                     return next_images, next_indexs
                 else:
-                    print("获取到的下一组图片无效")
+                    print("[get_next_images]-->获取到的下一组图片无效")
                     return None, None
         except Exception as e:
-            print(f"获取下一组图片时发生错误: {e}")
+            print(f"❌ [get_next_images]-->获取下一组图片时发生错误: {e}")
             return None, None
         return None, None
     
@@ -3392,52 +3392,35 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     # print(f"获取到上一组图片: {prev_images}")
                     return prev_images, prev_indexs
                 else:
-                    print("获取到的上一组图片无效")
+                    print("[get_prev_images]-->获取到的上一组图片无效")
                     return None, None
         except Exception as e:
-            print(f"获取上一组图片时发生错误: {e}")
+            print(f"❌ [get_prev_images]-->获取上一组图片时发生错误: {e}")
             return None, None
         return None, None
 
     def closeEvent(self, event):
         """重写关闭事件处理"""
         # 检查是否应该忽略关闭事件
-        print("closeEvent()-看图子界面--子窗口关闭事件:")
+        print("[closeEvent]-->看图子界面-->触发窗口关闭事件")
         if self.is_updating:
-            print("看图子界面正在更新图片，忽略关闭事件")
+            print("⭕[closeEvent]-->看图子界面-->warning: 看图子界面正在更新图片，忽略关闭事件")
             event.ignore()
             return
-
         try:
             self.save_settings()  # 保存颜色以及EXIF信息设置
             self.cleanup()        # 清理资源
             self.closed.emit()    # 发送关闭信号
             event.accept()
-            print("接受看图子界面关闭事件, 并保存颜色以及EXIF信息设置")
+            print("[closeEvent]-->看图子界面-->接受看图子界面关闭事件, 并保存颜色以及EXIF信息设置")
         except Exception as e:
-            print(f"closeEvent()-看图子界面--关闭窗口时发生错误: {e}")
             event.accept()
 
-        """# 修复关闭事件, 可以正常关闭, modify by diamond_cz 2025-01-14
-        if self.should_close:
-            try:
-                self.cleanup()  # 清理资源
-                self.closed.emit()  # 发送关闭信号
-                event.accept()
-                print("子窗口关闭事件,接受")
-            except Exception as e:
-                print(f"关闭窗口时发生错误: {e}")
-                event.accept()
-        else:
-            # 如果不是预期的关闭（比如快速按键导致的），则忽略关闭事件
-            event.ignore()
-            print("子窗口关闭事件,忽略")
-        """
 
     def Escape_close(self):
         """统一处理窗口关闭逻辑"""
         if self.is_updating:
-            print("正在更新图片，忽略关闭请求")
+            print("⭕[Escape_close]-->看图子界面-->warning: 正在更新图片，忽略关闭请求")
             return
             
         try:
@@ -3447,7 +3430,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             self.closed.emit()  # 发送关闭信号
             super().close()     # 调用父类的close方法
         except Exception as e:
-            print(f"关闭窗口时发生错误: {e}")
+            print(f"❌[Escape_close]-->看图子界面-->warning: 关闭窗口时发生错误: {e}")
             super().close()
 
 
@@ -3487,7 +3470,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             self.ai_tips_flag = self.dict_label_info_visibility.get("ai_tips", False)          
 
         except Exception as e:
-            print(f"self.load_settings()--加载设置失败: {e}")
+            print(f"❌[load_settings]-->error: 加载设置失败: {e}")
         
 
     def save_settings(self):
@@ -3578,7 +3561,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 json.dump(setting, f, indent=4, ensure_ascii=False)
 
         except Exception as e:
-            print(f"save_settings()-看图子界面--保存设置失败: {e}")
+            print(f"❌[save_settings]-->error: 保存设置失败: {e}")
 
 
 
