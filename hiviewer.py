@@ -29,22 +29,22 @@ from PyQt5.QtCore import (
     Qt, QDir, QTimer, QSize, QTimer, QThreadPool, QUrl, QSize, QMimeData, QPropertyAnimation, QItemSelection, QItemSelectionModel)
 
 """导入用户自定义的模块"""
-from src.components.UiMain import Ui_MainWindow                             # 假设你的主窗口类名为Ui_MainWindow
+from src.components.ui_main import Ui_MainWindow                            # 假设你的主窗口类名为Ui_MainWindow
 from src.view.sub_compare_image_view import SubMainWindow                   # 假设这是你的子窗口类名
 from src.view.sub_compare_video_view import VideoWall                       # 假设这是你的子窗口类名 
 from src.view.sub_rename_view import FileOrganizer                          # 添加这行以导入批量重名名类名
 from src.view.sub_image_process_view import SubCompare                      # 确保导入 SubCompare 类
 from src.view.sub_bat_view import LogVerboseMaskApp                         # 导入批量执行命令的类
-from src.components.QMessageBox import show_message_box                     # 导入消息框类
-from src.components.QDialogAbout import AboutDialog                         # 导入关于对话框类,显示帮助信息
-from src.components.QDialogLinkQualcomAebox import Qualcom_Dialog           # 导入自定义对话框的类
-from src.components.QComboBox import CheckBoxListModel, CheckBoxDelegate    # 导入自定义下拉框类中的数据模型和委托代理类
-from src.components.QDialogRename import SingleFileRenameDialog             # 导入自定义重命名对话框类
-from src.components.QDialogProgress import ProgressDialog, CompressWorker   # 导入自定义压缩进度对话框类
-from src.common.FontManager import SingleFontManager, MultiFontManager      # 字体管理器
-from src.common.VersionInit import version_init                             # 版本号初始化
-from src.common.SettingInit import load_color_settings                      # 导入自定义json配置文件
-from src.common.Logfile import setup_logging                                # 导入日志文件初始化
+from src.components.custom_qmessagebox import show_message_box              # 导入消息框类
+from src.components.custom_qdialog_about import AboutDialog                 # 导入关于对话框类,显示帮助信息
+from src.components.custom_qdialog_LinkQualcomAebox import Qualcom_Dialog   # 导入自定义对话框的类
+from src.components.custom_qcombobox_folder import CheckBoxListModel, CheckBoxDelegate      # 导入自定义下拉框类中的数据模型和委托代理类
+from src.components.custom_qdialog_rename import SingleFileRenameDialog                     # 导入自定义重命名对话框类
+from src.components.custom_adialog_progress import ProgressDialog, CompressWorker           # 导入自定义压缩进度对话框类
+from src.common.font_manager import SingleFontManager, MultiFontManager     # 字体管理器
+from src.common.version_Init import version_init                            # 版本号初始化
+from src.common.settings_init import load_color_settings                    # 导入自定义json配置文件
+from src.common.log_files import setup_logging                              # 导入日志文件初始化
 from src.qpm.qualcom import CommandThread                                   # 导入高通图片解析工具独立线程类
 from src.utils.raw2jpg import Mipi2RawConverterApp                          # 导入MIPI RAW文件转换为JPG文件的类
 from src.utils.update import check_update, pre_check_update                 # 导入自动更新检查程序
@@ -308,14 +308,29 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     设置hiviewer类中的可重复使用的common私有方法开始线
     ---------------------------------------------------------------------------------------------------------------------------------------------
     """
-    def __get_screen_geometry(self):
-        """获取当前屏幕的几何信息"""
+    def __get_screen_geometry(self)->tuple:
+        """
+        该函数主要是实现了获取当前鼠标所在屏幕的几何信息的功能.
+        Args:
+            self (object): 当前对象
+        Returns:
+            x (int): 当前屏幕中心的x坐标
+            y (int): 当前屏幕中心的y坐标
+            w (int): 当前屏幕的宽度
+            h (int): 当前屏幕的高度
+        Raises:
+            列出函数可能抛出的所有异常，并描述每个异常的触发条件
+        Example:
+            提供一个或多个使用函数的示例，展示如何调用函数及其预期输出
+        Note:
+            注意事项，列出任何重要的假设、限制或前置条件.
+        """
         screen = QApplication.desktop().screenNumber(QApplication.desktop().cursor().pos())
         screen_geometry = QApplication.desktop().screenGeometry(screen)
         x = screen_geometry.x() + (screen_geometry.width() - self.width()) // 2
         y = screen_geometry.y() + (screen_geometry.height() - self.height()) // 2
-        w = int(screen_geometry.width())
-        h = int(screen_geometry.height())
+        w = screen_geometry.width()
+        h = screen_geometry.height()
         return x, y, w, h
 
 

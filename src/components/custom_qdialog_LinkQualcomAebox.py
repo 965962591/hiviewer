@@ -14,7 +14,7 @@ if is_standalone:
 
 
 """导入自定义的模块"""
-from src.common.FontManager import SingleFontManager
+from src.common.font_manager import SingleFontManager
 from src.utils.aeboxlink import test_aebox_link,launch_aebox,urlencode_folder_path,get_api_data
 
 

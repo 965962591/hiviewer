@@ -30,10 +30,10 @@ from PyQt5.QtWidgets import (
     QGraphicsItem, QDialogButtonBox, QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QCheckBox, QComboBox, QFileDialog)
 
 """导入自定义模块"""
-from src.components.UiSub import Ui_MainWindow                              # 看图子界面，导入界面UI
-from src.components.QMessageBox import show_message_box                     # 导入消息框类
-from src.common.SettingInit import load_exif_settings,load_color_settings   # 导入json配置模块
-from src.common.FontManager import SingleFontManager                        # 看图子界面，导入字体管理器
+from src.components.ui_sub_image import Ui_MainWindow                              # 看图子界面，导入界面UI
+from src.components.custom_qmessagebox import show_message_box                     # 导入消息框类
+from src.common.settings_init import load_exif_settings,load_color_settings   # 导入json配置模块
+from src.common.font_manager import SingleFontManager                        # 看图子界面，导入字体管理器
 from src.utils.aitips import CustomLLM_Siliconflow                          # 看图子界面，AI提示看图复选框功能模块
 from src.utils.hisnot import WScreenshot                                    # 看图子界面，导入自定义截图的类
 from src.utils.aeboxlink import check_process_running,get_api_data          # 导入与AEBOX通信的模块函数

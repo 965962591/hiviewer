@@ -4,7 +4,7 @@ from PyQt5.QtCore import Qt, QSize, QAbstractListModel, QModelIndex, QVariant
 
 # 导入颜色工具函数 & 颜色配置
 from src.utils.color import rgb_str_to_qcolor
-from src.common.SettingInit import load_color_settings  
+from src.common.settings_init import load_color_settings  
 
 
 class CustomComboBox(QComboBox):
