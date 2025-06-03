@@ -221,11 +221,11 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.splash.show()
         
         # 设置进度更新定时器
-        self.fla = 0  # 记录启动画面更新次数
+        self.fla = 0         # 记录启动画面更新次数
         self.dots_count = 0  # 记录启动画面更新点
         self.splash_progress_timer = QTimer()  # 启动进度更新定时器
         self.splash_progress_timer.timeout.connect(self.update_splash_message)  # 连接定时器到更新函数,相关函数变量的初始化
-        self.splash_progress_timer.start(10)  # 每10ms更新一次
+        self.splash_progress_timer.start(10)   # 每10ms更新一次
 
 
     def update_splash_message(self):
@@ -432,7 +432,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.context_menu.addAction(theme_icon, "切换主题(P)", self.on_p_pressed)
         self.context_menu.addAction(image_size_reduce_icon, "图片瘦身(X)", self.jpgc_tool) 
         self.context_menu.addAction(ps_icon, "图片调整(L)", self.on_l_pressed)
-        self.context_menu.addAction(tcp_icon, "截图功能(T)", self.tcp_tool)
+        self.context_menu.addAction(tcp_icon, "截图功能(T)", self.screen_shot_tool)
         self.context_menu.addAction(command_icon, "批量执行命令工具(M)", self.execute_command)
         self.context_menu.addAction(rename_icon, "批量重命名工具(F4)", self.on_f4_pressed)
         self.context_menu.addAction(raw_icon, "RAW转JPG工具(F1)", self.on_f1_pressed)
@@ -679,7 +679,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.z_shortcut.activated.connect(self.compress_selected_files)
         # 添加快捷键 T 打开--局域网传输工具--，改为截图功能
         self.z_shortcut = QShortcut(QKeySequence('t'), self)
-        self.z_shortcut.activated.connect(self.tcp_tool)
+        self.z_shortcut.activated.connect(self.screen_shot_tool)
         # 添加快捷键 X 打开图片体积压缩工具
         self.z_shortcut = QShortcut(QKeySequence('x'), self)
         self.z_shortcut.activated.connect(self.jpgc_tool) 
@@ -794,28 +794,21 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
 
     def open_file_location(self, path):
-        """在资源管理器中打开路径"""
+        """在资源管理器中打开路径(适用于window系统)"""
         try:
             # 跨平台处理优化
             if sys.platform == 'win32':
                 # 转换为Windows风格路径并处理特殊字符
                 win_path = str(path).replace('/', '\\')
-                if ' ' in win_path:  # 自动添加双引号
+                # 自动添加双引号
+                if ' ' in win_path:  
                     win_path = f'"{win_path}"'
                 # 使用start命令更可靠
                 command = f'start explorer /select,{win_path}'
                 # 移除check=True参数避免误报
                 subprocess.run(command, shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
-            elif sys.platform == 'darwin':
-                # 使用open命令直接定位文件
-                subprocess.run(['open', '-R', str(full_path)], check=True)
-            else:  
-                # Linux/Unix
-                subprocess.run(['xdg-open', str(full_path.parent)], check=True)
-        except subprocess.CalledProcessError as e:
-            show_message_box(f"[open_file_location]-->定位命令执行失败: {str(e)}", "错误", 2000)
-        except FileNotFoundError:
-            show_message_box("[open_file_location]-->找不到系统命令，请检查系统环境", "错误", 2000)
+            else:
+                ...
         except Exception as e:
             show_message_box(f"[open_file_location]-->定位文件失败: {str(e)}", "错误", 2000)
 
@@ -1441,24 +1434,11 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             print(f"compress_selected_files()-error--压缩失败: {e}")
             return  
 
-    def tcp_tool(self):
-        """打开TCP工具,移除tcp功能,替换为截图功能"""
+    def screen_shot_tool(self):
+        """截图功能"""
         try:
-            
-            # 调用截图工具
-            WScreenshot.run()
-
-            if False:
-                tcp_path = os.path.join(os.path.join(os.path.dirname(__file__), "tools"), "tcp.exe")
-                if not os.path.isfile(tcp_path):
-                    show_message_box(f"未找到TCP工具: {tcp_path}", "错误", 1500)
-                    return
-                # 使用startfile保持窗口可见（适用于GUI程序）
-                # 该方法只适用于window系统，其余系统（mac,linux）需要通过subprocess实现
-                os.startfile(tcp_path)
-            
+            WScreenshot.run() # 调用截图工具
         except Exception as e:
-            # show_message_box(f"启动TCP工具失败: {str(e)}", "错误", 2000)
             show_message_box(f"启动截图功能失败: {str(e)}", "错误", 2000)
 
     def jpgc_tool(self):
@@ -1480,7 +1460,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
 
     def reveal_in_explorer(self):
-        """在资源管理器中高亮定位选中的文件（跨平台优化版）"""
+        """在资源管理器中高亮定位选中的文件(适用于window系统)"""
         try:
             # 获取首个选中项（优化性能，避免处理多选）
             if not (selected := self.RB_QTableWidget0.selectedItems()):
@@ -1496,8 +1476,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 raise ValueError("无效的列名")
             col_name = self.RB_QTableWidget0.horizontalHeaderItem(item.column()).text()
 
-            # 强化路径处理
-            file_name = item.text().split('\n', 1)[0].strip()  # 移除前后空格
+            # 强化路径处理，移除前后空格
+            file_name = item.text().split('\n', 1)[0].strip() 
             full_path = (current_dir.parent / col_name / file_name).resolve()
 
             if not full_path.exists():
@@ -1515,17 +1495,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 # 移除check=True参数避免误报
                 subprocess.run(command, shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
 
-            elif sys.platform == 'darwin':
-                # 使用open命令直接定位文件
-                subprocess.run(['open', '-R', str(full_path)], check=True)
-
-            else:  # Linux/Unix
-                subprocess.run(['xdg-open', str(full_path.parent)], check=True)
-
-        except subprocess.CalledProcessError as e:
-            show_message_box(f"定位命令执行失败: {str(e)}", "错误", 2000)
-        except FileNotFoundError:
-            show_message_box("找不到系统命令，请检查系统环境", "错误", 2000)
+            else: # ... 可代替 pass ，是一个单例，也是numpy的语法糖
+                ...
         except Exception as e:
             show_message_box(f"定位文件失败: {str(e)}", "错误", 2000)
 
@@ -2399,7 +2370,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             }}
         """        
 
-        # self.custom_font_jetbrains_small   "rgb(234,118, 32)"
+        # self.custom_font_jetbrains_small   "rgb(234, 211, 32)"
         statusbar_style = f"""
             border: none;
             background-color: {GRAY};

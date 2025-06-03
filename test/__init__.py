@@ -1,51 +1,19 @@
-""" 项目结构
-hiviewer_root/
-├── src/ 存在项目主要功能模块
-│   ├── __init__.py
-│   ├── modules/ 存放各个子界面功能模块
-│   │   ├── __init__.py
-│   │   ├── sub_bat.py
-│   │   ├── sub_compare_image_view.py
-│   │   ├── sub_compare_video_view.py
-│   │   ├── sub_image_process.py
-│   │   ├── sub_image_size_reduce.py
-│   │   └── sub_rename_view.py
-│   │
-│   ├── ui/ 存在主界面和看图子界面的UI
-│   │   ├── __init__.py
-│   │   ├── main_ui.py
-│   │   └── sub_ui.py
-│   │
-│   └── utils/ 存放自定义的功能模块
-│       ├── __init__.py
-│       ├── about.py
-│       ├── AI_tips.py
-│       ├── Custom_dialog_class.py
-│       ├── Custom_Font_class.py
-│       ├── hisnot.py
-│       ├── installer.py
-│       ├── mipi2raw.py
-│       └── update.py
-├── test/ 存在测试代码
-│   ├── __init__.py
-│   │
-│   └── test_utils_about.py
-│   
-├── icons/ 存放ico图标
-│   
-├── docs/ 存放说明文档
-│   
-├── fonts/ 存放自定义字体
-│   
-├── tools/ 存放一些exe类工具
-│   
-├── .gitignore 忽略文件
-│   
-├── README.md 说明文档
-│   
-├── requirements.txt 三方库依赖
-│   
-└── hiviewer.py 项目主函数
+# -*- encoding: utf-8 -*-
+'''
+@File         :__init__.py
+@Time         :2025/06/03 15:09:05
+@Author       :diamond_cz@163.com
+@Version      :1.0
+@Description  : 测试文件
+
+usercustomize.py 在python启动时执行, 可以修改python启动时的行为, 比如念一段平安经
+打印用户环境目录:
+    python -c "import site;print(site.getusersitepackages())"
+需要放置在用户环境位置: 
+    windows: C:\Users\用户名\AppData\Roaming\Python\Python310\site-packages\usercustomize.py
+    linux: ~/.local/lib/python3.10/site-packages/usercustomize.py
+当前使用的是win下的anaconda虚拟环境hi, 放置在:
+    D:\Tool_ml\Anaconda\envs\hi\Lib\site-packages\usercustomize.py
 
 
-"""
+'''
