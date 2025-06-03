@@ -15,9 +15,8 @@ import sys
 import time
 import json
 import subprocess
-from queue import Queue
 from pathlib import Path
-from itertools import zip_longest, chain
+from itertools import zip_longest
 
 """导入python第三方模块"""
 from PyQt5.QtGui import (
@@ -41,7 +40,7 @@ from src.components.custom_qdialog_LinkQualcomAebox import Qualcom_Dialog   # �
 from src.components.custom_qcombobox_folder import CheckBoxListModel, CheckBoxDelegate      # 导入自定义下拉框类中的数据模型和委托代理类
 from src.components.custom_qdialog_rename import SingleFileRenameDialog                     # 导入自定义重命名对话框类
 from src.components.custom_adialog_progress import ProgressDialog, CompressWorker           # 导入自定义压缩进度对话框类
-from src.common.font_manager import SingleFontManager, MultiFontManager     # 字体管理器
+from src.common.font_manager import MultiFontManager                        # 字体管理器
 from src.common.version_Init import version_init                            # 版本号初始化
 from src.common.settings_ColorAndExif import load_color_settings            # 导入自定义json配置文件
 from src.common.log_files import setup_logging                              # 导入日志文件初始化
@@ -79,10 +78,11 @@ BASEICONPATH = Path(sys.argv[0]).parent
 class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def __init__(self, parent=None):
         super(HiviewerMainwindow, self).__init__(parent)
-        """self.update_splash_message()函数中初始化UI界面self.setupUi(self)和变量初始化函数self.initialize_components()"""
-        # 设置版本信息,读取本地配置文件./config/version.ini中的版本信息,没有则默认为release-v2.3.2
-        self.new_version_info = False
-        self.version_info = version_init()
+        
+        # 记录程序启动时间；设置图标路径；读取本地版本信息，并初始化新版本信息
+        self.start_time = time.time()        
+        self.base_icon_path = Path(__file__).parent / "resource" / "icons"    
+        self.version_info, self.new_version_info = version_init(), False     
         
         # 创建启动画面,启动画面以及相关初始化在self.update_splash_message()函数中
         self.create_splash_screen()
@@ -125,26 +125,20 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.VIDEO_FORMATS = ('.mp4', '.avi', '.mov', '.wmv', '.mpeg', '.mpg', '.mkv')
 
         # 初始化属性
-        self.files_list = []            # 文件名及基本信息列表
-        self.paths_list = []            # 文件路径列表
-        self.dirnames_list = []         # 选中的同级文件夹列表
-        self.image_index_max = []       # 存储当前选中及复选框选中的，所有图片列有效行最大值
-        self.preloading_file_name_paths = []  # 预加载图标前的文件路径列表
-        self.compare_window = None            # 添加子窗口引用
-        self.task_active = False              # 定时器任务变量
-        self.last_key_press = False           # 记录第一次按下键盘空格键或B键
-        self.selected_folders_history = False # 记录是否有效点击复选框，避免self.RT_QComboBox1的press事件出现重复连接信号的情况
-        self.left_tree_file_display = False   # 设置左侧文件浏览器初始化标志位，只显示文件夹
-        self.simple_mode = True               # 设置默认模式为简单模式，同EXIF信息功能
-        self.current_theme = "默认主题"        # 设置初始主题为默认主题
+        self.files_list = []                    # 文件名及基本信息列表
+        self.paths_list = []                    # 文件路径列表
+        self.dirnames_list = []                 # 选中的同级文件夹列表
+        self.image_index_max = []               # 存储当前选中及复选框选中的，所有图片列有效行最大值
+        self.preloading_file_name_paths = []    # 预加载图标前的文件路径列表
+        self.compare_window = None              # 添加子窗口引用
+        self.last_key_press = False             # 记录第一次按下键盘空格键或B键
+        self.left_tree_file_display = False     # 设置左侧文件浏览器初始化标志位，只显示文件夹
+        self.simple_mode = True                 # 设置默认模式为简单模式，同EXIF信息功能
+        self.current_theme = "默认主题"          # 设置初始主题为默认主题
 
         # 添加预加载相关的属性初始化
         self.current_preloader = None  # 当前预加载器引用
         self.preloading = False        # 预加载状态
-        self.preload_queue = Queue()   # 预加载队列
-
-        self.media_player = None       # 在__init__方法中添加
-        self.compare_window = None     # 初始化看图子界面的窗口应用
 
         # 初始化线程池
         self.threadpool = QThreadPool()
@@ -183,7 +177,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def create_splash_screen(self):
         """创建带渐入渐出效果的启动画面"""
         # 加载启动画面图片
-        splash_path = os.path.join(BASEICONPATH, "viewer_0.png")
+        splash_path = (self.base_icon_path / "viewer_0.png").as_posix()
         splash_pixmap = QPixmap(splash_path)
         
         # 如果启动画面图片为空，则创建一个空白图片
@@ -247,7 +241,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
         # 更新启动画面更新次数
         self.fla += 1
-        print(f"----------[第 {self.fla} 次 进入函数update_splash_message], 当前运行时间: {(time.time()-start_time):.2f} 秒----------")
+        print(f"----------[第 {self.fla} 次 进入函数update_splash_message], 当前运行时间: {(time.time()-self.start_time):.2f} 秒----------")
               
 
         # 检查是否完成初始化, 第三次进入
@@ -274,8 +268,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.pre_update()
 
             # 记录结束时间并计算耗时
-            self.preview_label.setText(f"⏰启动耗时: {(time.time()-start_time):.2f} 秒")
-            print(f"----------[hiviewer主界面启动成功], 共耗时: {(time.time()-start_time):.2f} 秒----------")
+            self.preview_label.setText(f"⏰启动耗时: {(time.time()-self.start_time):.2f} 秒")
+            print(f"----------[hiviewer主界面启动成功], 共耗时: {(time.time()-self.start_time):.2f} 秒----------")
 
             # 延时显示主窗口,方便启动画面渐出
             QTimer.singleShot(800, self.show)
@@ -353,39 +347,39 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """)
 
         # 添加主菜单项并设置图标
-        icon_path = os.path.join(BASEICONPATH, "delete_ico_96x96.ico")
+        icon_path = (self.base_icon_path / "delete_ico_96x96.ico").as_posix()
         delete_icon = QIcon(icon_path) 
-        icon_path = os.path.join(BASEICONPATH, "paste_ico_96x96.ico")
+        icon_path = (self.base_icon_path / "paste_ico_96x96.ico").as_posix()
         paste_icon = QIcon(icon_path) 
-        icon_path = os.path.join(BASEICONPATH, "update_ico_96x96.ico")
+        icon_path = (self.base_icon_path / "update_ico_96x96.ico").as_posix()
         refresh_icon = QIcon(icon_path) 
-        icon_path = os.path.join(BASEICONPATH, "theme_ico_96x96.ico")
+        icon_path = (self.base_icon_path / "theme_ico_96x96.ico").as_posix()
         theme_icon = QIcon(icon_path) 
-        icon_path = os.path.join(BASEICONPATH, "image_size_reduce_ico_96x96.ico")
+        icon_path = (self.base_icon_path / "image_size_reduce_ico_96x96.ico").as_posix()
         image_size_reduce_icon = QIcon(icon_path)
-        icon_path = os.path.join(BASEICONPATH, "ps_ico_96x96.ico")
+        icon_path = (self.base_icon_path / "ps_ico_96x96.ico").as_posix()
         ps_icon = QIcon(icon_path) 
-        icon_path = os.path.join(BASEICONPATH, "cmd_ico_96x96.ico")
+        icon_path = (self.base_icon_path / "cmd_ico_96x96.ico").as_posix()
         command_icon = QIcon(icon_path)
-        icon_path = os.path.join(BASEICONPATH, "exif_ico_96x96.ico")
+        icon_path = (self.base_icon_path / "exif_ico_96x96.ico").as_posix()
         exif_icon = QIcon(icon_path)
-        icon_path = os.path.join(BASEICONPATH, "raw_ico_96x96.ico")
+        icon_path = (self.base_icon_path / "raw_ico_96x96.ico").as_posix()
         raw_icon = QIcon(icon_path)
-        icon_path = os.path.join(BASEICONPATH, "rename_ico_96x96.ico")
+        icon_path = (self.base_icon_path / "rename_ico_96x96.ico").as_posix()
         rename_icon = QIcon(icon_path)
-        icon_path = os.path.join(BASEICONPATH, "about.ico")
+        icon_path = (self.base_icon_path / "about.ico").as_posix()
         help_icon = QIcon(icon_path) 
-        icon_path = os.path.join(BASEICONPATH, "file_zip_ico_96x96.ico")
+        icon_path = (self.base_icon_path / "file_zip_ico_96x96.ico").as_posix()
         zip_icon = QIcon(icon_path)
-        icon_path = os.path.join(BASEICONPATH, "TCP_ico_96x96.ico")
+        icon_path = (self.base_icon_path / "TCP_ico_96x96.ico").as_posix()
         tcp_icon = QIcon(icon_path)
-        icon_path = os.path.join(BASEICONPATH, "rorator_plus_ico_96x96.ico")
+        icon_path = (self.base_icon_path / "rorator_plus_ico_96x96.ico").as_posix()
         rotator_icon = QIcon(icon_path)
-        icon_path = os.path.join(BASEICONPATH, "line_filtrate_ico_96x96.ico")
+        icon_path = (self.base_icon_path / "line_filtrate_ico_96x96.ico").as_posix()
         filtrate_icon = QIcon(icon_path)
-        icon_path = os.path.join(BASEICONPATH, "win_folder_ico_96x96.ico")
+        icon_path = (self.base_icon_path / "win_folder_ico_96x96.ico").as_posix()
         win_folder_icon = QIcon(icon_path)
-        icon_path = os.path.join(BASEICONPATH, "restart_ico_96x96.ico")
+        icon_path = (self.base_icon_path / "restart_ico_96x96.ico").as_posix()
         restart_icon = QIcon(icon_path)
 
 
@@ -519,7 +513,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """设置主界面图标以及标题"""
         # print("[set_stylesheet]-->设置主界面相关组件")
 
-        icon_path = os.path.join(BASEICONPATH, "viewer_3.ico")
+        icon_path = (self.base_icon_path / "viewer_3.ico").as_posix()
         self.setWindowIcon(QIcon(icon_path))
         self.setWindowTitle(f"HiViewer")
 
@@ -1647,8 +1641,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # 先初始化表格结构和内容，不加载图标,并获取图片列有效行最大值
             self.image_index_max = self.init_table_structure(file_infos_list, dir_name_list)
 
-            # 对file_paths进行转置,实现加载图标按行加载
-            file_name_paths = list(chain.from_iterable(zip_longest(*file_paths, fillvalue=None)))
+            # 对file_paths进行转置,实现加载图标按行加载,使用列表推导式
+            file_name_paths = [path for column in zip_longest(*file_paths, fillvalue=None) for path in column if path is not None]
 
             if file_name_paths:  # 确保有文件路径才开始预加载
                 self.start_image_preloading(file_name_paths)
@@ -1680,7 +1674,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.image_index_max = self.init_table_structure(file_infos_list, dir_name_list)       
 
         # 对file_paths进行转置,实现加载图标按行加载，并初始化预加载图标线程前的问价排列列表
-        file_name_paths = list(chain.from_iterable(zip_longest(*file_paths, fillvalue=None)))
+        file_name_paths = [path for column in zip_longest(*file_paths, fillvalue=None) for path in column if path is not None]
         self.preloading_file_name_paths = file_name_paths 
 
         # 开始预加载图标    
@@ -3483,7 +3477,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.video_player.setWindowTitle("多视频播放程序")
         self.video_player.setWindowFlags(Qt.Window) 
         # 设置窗口图标
-        icon_path = os.path.join(BASEICONPATH, "video_icon.ico")
+        icon_path = (self.base_icon_path / "video_icon.ico").as_posix()
         self.video_player.setWindowIcon(QIcon(icon_path))
         self.video_player.closed.connect(self.on_video_player_closed)
         self.video_player.show()
@@ -3497,7 +3491,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 设置窗口最大化
         # self.rename_tool.showMaximized()
         # 设置窗口图标
-        icon_path = os.path.join(BASEICONPATH, "rename_ico_96x96.ico")
+        icon_path = (self.base_icon_path / "rename_ico_96x96.ico").as_posix()
         self.rename_tool.setWindowIcon(QIcon(icon_path))
         # 链接关闭事件
         self.rename_tool.closed.connect(self.on_rename_tool_closed) 
@@ -3512,7 +3506,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 设置窗口最大化
         # self.image_process_window.showMaximized()
         # 设置窗口图标
-        icon_path = os.path.join(BASEICONPATH, "ps_ico_96x96.ico")
+        icon_path = (self.base_icon_path / "ps_ico_96x96.ico").as_posix()
         self.image_process_window.setWindowIcon(QIcon(icon_path))
         # 链接关闭事件
         self.image_process_window.closed.connect(self.on_image_process_window_closed) 
@@ -3524,7 +3518,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.bat_tool = LogVerboseMaskApp()
         self.bat_tool.setWindowTitle("批量执行命令")
         # 设置窗口图标
-        icon_path = os.path.join(BASEICONPATH, "cmd_ico_96x96.ico")
+        icon_path = (self.base_icon_path / "cmd_ico_96x96.ico").as_posix()
         self.bat_tool.setWindowIcon(QIcon(icon_path))
         # 设置窗口最大化
         # self.bat_tool.showMaximized()
@@ -3539,7 +3533,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.mipi2raw_tool.setWindowTitle("MIPI RAW文件转换为JPG文件")
         
         # 设置窗口图标
-        icon_path = os.path.join(BASEICONPATH, "raw_ico_96x96.ico")
+        icon_path = (self.base_icon_path / "raw_ico_96x96.ico").as_posix()
         self.mipi2raw_tool.setWindowIcon(QIcon(icon_path))
 
         # 添加链接关闭事件
@@ -3612,23 +3606,15 @@ python对象命名规范
 私有函数以 __ 开头(2个下划线),其他和普通函数一样
 """
 
+
+
 if __name__ == '__main__':
     print("[hiviewer主程序启动]:")
 
-    # 记录程序启动的开始时间
-    start_time = time.time()
-
-    # 读取全局颜色配置
-    BASEICONPATH = os.path.join(os.path.dirname(__file__), "resource", "icons")
-    
     # 初始化日志文件
     # setup_logging()  
 
     # 设置主程序app
     app = QApplication(sys.argv)
-    app_icon = QIcon(os.path.join(BASEICONPATH, "viewer_3.ico"))
-    app.setWindowIcon(app_icon)
-
-    # 设置主界面
     window = HiviewerMainwindow()
     sys.exit(app.exec_())

@@ -7,7 +7,6 @@
 @Description  :
 '''
 
-
 msg=r"""
  
                     _ooOoo_
@@ -30,6 +29,6 @@ msg=r"""
                     `=---='
  
  .............................................
-          佛祖保佑             永无BUG
+    everything is ok, No bugs in the code. 
 """
 print(msg)
