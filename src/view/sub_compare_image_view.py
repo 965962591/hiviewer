@@ -20,7 +20,7 @@ import numpy as np
 import win32com.client as win32
 import matplotlib.pyplot as plt
 from lxml import etree as ETT
-from PIL import Image, ImageCms
+from PIL import Image, ImageCms, ImageOps   
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtGui import QIcon, QColor, QPixmap, QKeySequence, QPainter, QCursor, QTransform, QImage, QPen
 from PyQt5.QtCore import Qt, QEvent, pyqtSignal, QTimer, QThreadPool, QRunnable
@@ -38,6 +38,7 @@ from src.utils.aitips import CustomLLM_Siliconflow                          # �
 from src.utils.hisnot import WScreenshot                                    # 看图子界面，导入自定义截图的类
 from src.utils.aeboxlink import check_process_running,get_api_data          # 导入与AEBOX通信的模块函数
 from src.utils.heic import extract_jpg_from_heic                            # 导入heic图片转换为jpg图片的模块
+from src.utils.p3_converter import ColorSpaceConverter                      # 导入色彩空间转换配置类
 
 """设置本项目的入口路径,全局变量BasePath"""
 # 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
@@ -81,6 +82,49 @@ def convert_to_dict(exif_string):
     pattern = r'([^:]+): ([^\n]+)'
     matches = re.findall(pattern, exif_string)
     return {key.strip(): value.strip() for key, value in matches}
+
+
+def pil_to_pixmap(pil_image):
+    """
+    将PIL Image转换为QPixmap，并自动处理图像方向信息
+    
+    Args:
+        pil_image (PIL.Image): PIL图像对象
+        
+    Returns:
+        QPixmap: 转换后的QPixmap对象
+    """
+    try:
+        # 使用ImageOps.exif_transpose自动处理EXIF方向信息
+        pil_image = ImageOps.exif_transpose(pil_image)
+        
+        # 将PIL图像转换为RGB模式（如果不是的话）
+        if pil_image.mode != 'RGB':
+            pil_image = pil_image.convert('RGB')
+        
+        # 获取图像尺寸
+        width, height = pil_image.size
+        
+        # 将PIL图像转换为numpy数组
+        image_array = np.array(pil_image)
+        
+        # 创建QImage
+        qimage = QImage(
+            image_array.data,
+            width,
+            height,
+            image_array.strides[0],  # 每行的字节数
+            QImage.Format_RGB888
+        )
+        
+        # 转换为QPixmap
+        pixmap = QPixmap.fromImage(qimage)
+        
+        return pixmap
+        
+    except Exception as e:
+        print(f"PIL图像转换为QPixmap失败: {str(e)}")
+        return None
 
 
 def rgb_str_to_qcolor(rgb_str):
@@ -180,157 +224,7 @@ def calculate_image_stats(image_input, resize_factor=1):
         print(f"calculate_image_stats计算图片统计信息失败, 错误: {e}")
         return None
 
-
-def convert_to_dci_p3(cv_img, source_img, original_pixmap):
-    """将QPixmap转换为DCI-P3色域
-    Args:
-        cv_img: Opencv图像
-        source_img: PIL图像
-        original_pixmap: pixmap原图
-    Returns:
-        转换后的QPixmap对象
-    """
-    try:
-
-        if source_img:
-            color_space, _ = get_color_profile(source_img)
-            print(f"设备识别: {color_space}")
-            
-            # 根据设备选择转换矩阵
-            if "Display P3" in color_space:
-                # Apple Display P3到DCI-P3的转换矩阵
-                matrix = np.array([
-                    [1.2249, -0.2247, 0.0000],
-                    [-0.0420, 1.0419, 0.0000],
-                    [-0.0197, -0.0786, 1.0973]
-                ])
-            elif "Adobe RGB" in color_space:
-                matrix = np.array([
-                    [0.7152, 0.2848, 0.0000],
-                    [0.0000, 1.0000, 0.0000],
-                    [0.0000, 0.0000, 0.9999]
-                ])
-            else:  # 默认sRGB
-                matrix = np.array([
-                    [0.4865, 0.2657, 0.1982],
-                    [0.2289, 0.6917, 0.0793],
-                    [0.0000, 0.0451, 1.0439]
-                ])
-
-        if True:  # 识别设备进行转换
-            # DCI-P3转换矩阵
-            dci_p3_matrix = matrix
-
-            # 确保cv_img是3通道的RGB图像
-            if cv_img.shape[2] == 4:  # 如果是4通道（RGBA）
-                rgb_img = cv2.cvtColor(cv_img, cv2.COLOR_RGBA2RGB)
-            elif cv_img.shape[2] == 1:  # 如果是单通道（灰度）
-                rgb_img = cv2.cvtColor(cv_img, cv2.COLOR_GRAY2RGB)
-            else:  # 假设已经是3通道（RGB）
-                rgb_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
-            
-            # 应用矩阵变换并限制数值范围
-            dci_p3_img = cv2.transform(rgb_img, dci_p3_matrix)
-            dci_p3_img = np.clip(dci_p3_img, 0, 255).astype(np.uint8)
-
-        if False and cv_img is not None:  # 强制转换,效果不佳，待研究
  
-            # 定义 XYZ 到 P3 的转换矩阵
-            xyz_to_p3 = np.array([
-                [1.2249044, -0.2246222, 0.0158858],
-                [-0.0420464, 1.1472752, -0.1052288],
-                [-0.0134924, -0.0346351, 1.0481275]
-            ])
-
-            # 将 sRGB 转换为 XYZ
-            image_xyz = cv2.cvtColor(cv_img, cv2.COLOR_BGR2XYZ)
-
-            # 将 XYZ 转换为 P3
-            dci_p3_img = np.dot(image_xyz, xyz_to_p3.T)
-
-        
-        # 转换回QImage
-        height, width, _ = dci_p3_img.shape
-        bytes_per_line = 3 * width
-        converted_qimage = QImage(
-            dci_p3_img.data, 
-            width, 
-            height,
-            bytes_per_line,
-            QImage.Format_RGB888
-        )
-
-        pixmap = QPixmap.fromImage(converted_qimage)
-
-        return pixmap
-    
-    except Exception as e:
-        print(f"convert_to_dci_p3()-DCI-P3转换失败: {str(e)}")
-        return original_pixmap
-    
-def get_color_profile(img):
-    """增强版色彩空间检测，适配移动设备"""
-    try:
-        # 获取EXIF制造商信息
-        exif = img.getexif()
-        make = exif.get(271, "").strip().lower()  # Make标签
-        model = exif.get(272, "").strip().lower() # Model标签
-
-        # 方法1：优先处理已知设备的特殊逻辑
-        def check_device_space():
-            if 'apple' in make or 'iphone' in model:
-                return "Display P3 (Apple)", True
-            if 'xiaomi' in make or 'mi' in make or '22122' in model:  # 小米14U型号包含22122
-                # 检查专业模式标签（小米特有EXIF）
-                xiaomi_mode = exif.get(0xB001, 0)
-                if xiaomi_mode == 2:  # 专业模式通常使用Adobe RGB
-                    return "Adobe RGB (Xiaomi Pro)", True
-                return "sRGB (Xiaomi)", False
-            return None
-
-        # 方法2：解析ICC配置文件
-        def check_icc_profile():
-            if "icc_profile" in img.info:
-                icc_data = img.info["icc_profile"]
-                icc_file = io.BytesIO(icc_data)
-                try:
-                    profile = ImageCms.getProfile(icc_file)
-                    desc = ImageCms.getProfileDescription(profile).lower()
-                    if 'display p3' in desc:
-                        return "Display P3", True
-                    if 'adobe' in desc:
-                        return "Adobe RGB", True
-                    if 'dci-p3' in desc:
-                        return "DCI-P3", True
-                except Exception as e:
-                    print(f"ICC解析异常: {str(e)}")
-            return None
-
-        # 方法3：EXIF色彩空间标签
-        def check_exif_space():
-            color_space = exif.get(40961, 1)
-            if color_space == 1:
-                return "sRGB", False
-            elif color_space == 2:
-                return "Adobe RGB", False
-            elif color_space == 65535:  # 未校准
-                if 'apple' in make:
-                    return "Display P3 (Uncalibrated)", False
-                return "Uncalibrated", False
-            return None
-
-        # 检测优先级：设备特征 > ICC > EXIF > 默认
-        for checker in [check_device_space, check_icc_profile, check_exif_space]:
-            result = checker()
-            if result: 
-                return result
-                
-        return "sRGB (assumed)", False
-
-    except Exception as e:
-        print(f"get_color_profile()-色彩检测异常: {str(e)}")
-        return "Unknown", False
-    
 def close_excel():
     "强制关闭一个EXCEL表格"
     try:
@@ -1603,6 +1497,9 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.images_path_list = images_path_list
         self.index_list = index_list
 
+        # 初始化p3_converter.py中的ColorSpaceConverter实例
+        self.p3_converter = ColorSpaceConverter()
+
         # 初始化变量
         self.init_variables()
 
@@ -1636,6 +1533,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.graphics_views = []
         self.original_pixmaps = []
         self.gray_pixmaps = []
+        self.p3_pixmaps = []
         self.cv_imgs = []
         self.pil_imgs = []
         self.base_scales = []
@@ -1725,8 +1623,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         
         # 连接下拉列表信号到槽函数
         self.comboBox_1.activated.connect(self.show_menu_combox1) # 连接 QComboBox 的点击事件到显示菜单，self.on_comboBox_1_changed
-        # self.comboBox_2.currentIndexChanged.connect(self.on_comboBox_2_changed)  # 当用户选择不同选项的时候触发
-        self.comboBox_2.activated.connect(self.on_comboBox_2_changed)            # 当用户选择任何选项的时候都会触发 
+        # self.comboBox_2.currentIndexChanged.connect(self.on_comboBox_2_changed)   # 当用户选择不同选项的时候触发
+        self.comboBox_2.activated.connect(self.on_comboBox_2_changed)               # 当用户选择任何选项的时候都会触发 
 
         # 连接底部状态栏按钮信号到槽函数
         self.statusbar_left_button.clicked.connect(self.open_settings_window)
@@ -2068,6 +1966,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             self.graphics_views = [None] * num_images
             self.original_pixmaps = [None] * num_images  
             self.gray_pixmaps = [None] * num_images  
+            self.p3_pixmaps = [None] * num_images
             self.cv_imgs = [None] * num_images 
             self.pil_imgs = [None] * num_images 
             self.base_scales = [None] * num_images
@@ -2089,33 +1988,33 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 try:
                     # 如果图片是heic格式，则转换为jpg格式
                     if path.endswith(".heic"):
-                        if new_path:= extract_jpg_from_heic(path):
+                        if new_path := extract_jpg_from_heic(path):
                             path = new_path
 
                     # 如果图片不存在，则抛出异常
                     if not os.path.exists(path):
                         raise FileNotFoundError(f"❌ 图片不存在: {path}")
 
-                    # 获取isinstance(image_input, Image.Image)格式图像
-                    pil_image = Image.open(path)
-                    iamge_format = pil_image.format
+                    # 获取isinstance(image_input, Image.Image)格式图像；获取p3色域pixmap
+                    with Image.open(path) as img:
+                        # 获取PIL_Image格式图像
+                        pil_image = img
+                        iamge_format = img.format
 
-                    # 获取cv图像，方案一：转换PIL图像到OpenCV格式
-                    if False:
-                        cv_img = np.array(image.convert('RGB'))[:, :, ::-1].copy()
-
-                    # 获取cv图像，方案二：使用 open 函数以二进制模式读取图片数据，使用 OpenCV 的 imdecode 函数解码图片数据
-                    if True:   # 效率更高的方案
+                        # 获取p3色域转换，转换为pixmap
+                        converted_pixmap = self.p3_converter.convert_color_space(img, "Display P3", intent = "Relative Colorimetric")
+                        p3_pixmap = pil_to_pixmap(converted_pixmap)
+                    
+                    # 获取cv图像，使用 open 函数以二进制模式读取图片数据，使用 OpenCV 的 imdecode 函数解码图片数据
+                    if True:
                         with open(path, "rb") as f:
                             image_data = np.asarray(bytearray(f.read()), dtype=np.uint8)
                         # 读取彩色图像
                         cv_img = cv2.imdecode(image_data, cv2.IMREAD_COLOR)
-                        # 转换为灰度图
+                        # 转换为灰度图，先将灰度图转换为QImage; 再将QImage转换为QPixmap
                         gray_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
-                        # 将灰度图转换为QImage
                         height, width = gray_img.shape
                         gray_qimage = QImage(gray_img.data, width, height, width, QImage.Format_Grayscale8)
-                        # 将QImage转换为QPixmap
                         gray_pixmap = QPixmap.fromImage(gray_qimage)
 
                     # 1. 处理图片旋转、基础exif信息获取（PIL）、图片文件格式信息获取
@@ -2157,6 +2056,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     return index, {
                         'pixmap': pixmap,            # 原始pixmap格式图
                         'gray_pixmap':gray_pixmap,   # pixmap格式灰度图
+                        'p3_pixmap':p3_pixmap,       # pixmap格式p3色域图
                         'exif_info': exif_info,      # exif信息
                         'histogram': histogram,      # 直方图信息
                         'stats': stats_text,         # 添加亮度/RGB/LAB等信息
@@ -2230,12 +2130,15 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 if result and result[1]:
                     data = result[1]
 
-                    # 这是原始的彩色图pixmap
+                    # 根据下拉框1判断是否获取原始图pixmap
                     pixmap = data['pixmap']
-                    # 跟根据下拉框2判断是否获取灰度图gray_pixmap
+                    # 根据下拉框2判断是否获取灰度图gray_pixmap
                     if self.comboBox_2.currentIndex() == 1:
                         pixmap = data['gray_pixmap']
-                    
+                    # 根据下拉框2判断是否获取p3色域图
+                    if self.comboBox_2.currentIndex() == 2:
+                        pixmap = data['p3_pixmap']
+
                     # 创建和设置场景
                     qcolor = rgb_str_to_qcolor(self.background_color_table) # 将背景色转换为QColor
                     scene = QGraphicsScene(self)
@@ -2281,6 +2184,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     self.graphics_views[index] = view
                     self.original_pixmaps[index] = data['pixmap']
                     self.gray_pixmaps[index] = data['gray_pixmap']
+                    self.p3_pixmaps[index] = data['p3_pixmap']
                     self.original_rotation[index] = pixmap_item.rotation()
                     self.exif_texts[index] = data['exif_info']
                     self.histograms[index] = data['histogram']
@@ -2599,21 +2503,25 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                         self.clean_color_space()
                         self.srgb_color_space = True
                         self.update_comboBox2()
+
+                        # 调用列表self.original_pixmaps[i]中存储的原始图pixmap
                         converted_pixmap = original_pixmap
                     elif index == 1 and self.gray_pixmaps[i] is not None:  # 灰度图色域
                         # 设置当前启用的图像色彩显示空间
                         self.clean_color_space()
                         self.gray_color_space = True
                         self.update_comboBox2()
+
                         # 调用列表self.gray_pixmaps[i]中存储的灰度图pixmap
                         converted_pixmap = self.gray_pixmaps[i]
-                    elif index == 2 and self.pil_imgs[i] is not None and self.cv_imgs[i] is not None:  # p3色域
+                    elif index == 2 and self.p3_pixmaps[i] is not None:  # p3色域
                         # 设置当前启用的图像色彩显示空间
                         self.clean_color_space()
                         self.p3_color_space = True
                         self.update_comboBox2()
-                        # 调用PIL图像转P3色域图像的方法
-                        converted_pixmap = convert_to_dci_p3(self.cv_imgs[i], self.pil_imgs[i],self.original_pixmaps[i])
+
+                        # 调用列表self.p3_pixmaps[i]中存储的p3色域图pixmap
+                        converted_pixmap = self.p3_pixmaps[i]
 
                     # 更新视图显示
                     view.pixmap_items[0].setPixmap(converted_pixmap)
