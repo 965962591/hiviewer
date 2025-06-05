@@ -2,10 +2,10 @@
 # -*- encoding: utf-8 -*-
 '''
 @File         :hiviewer.py
-@Time         :2025/05/29 17:43:40
+@Time         :2025/06/04
 @Author       :diamond_cz@163.com
-@Version      :1.0
-@Description  :
+@Version      :release-v3.5.1
+@Description  :hiviewer看图工具主界面
 '''
 
 """导入python内置模块"""
@@ -137,8 +137,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.current_theme = "默认主题"          # 设置初始主题为默认主题
 
         # 添加预加载相关的属性初始化
-        self.current_preloader = None  # 当前预加载器引用
-        self.preloading = False        # 预加载状态
+        self.current_preloader = None 
+        self.preloading = False        
 
         # 初始化线程池
         self.threadpool = QThreadPool()
@@ -1990,16 +1990,14 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             return []
 
 
-
     def handle_table_selection(self):
         """处理表格选中事件（新增预览功能）"""
         try:
             # print("handle_table_selection()--处理表格选中事件")
-            # 获取选中文件的路径
-            file_paths = self.get_selected_file_path() 
-            if not file_paths:
-                print("[handle_table_selection]-->无法获取文件路径")
+            if not (file_paths := self.get_selected_file_path()):
+                print("[handle_table_selection]-->warning: 没有获取到文件路径")
                 return
+            
             # 只需要第一个选中文件的路径
             preview_path = file_paths[0]
 
@@ -2906,17 +2904,14 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 print("[press_space_and_b_get_selected_file_paths]-->没有检测到选中项！")
                 return [], []
             
-
             # 获取最大最小的行索引
             row_min, row_max = 0, self.RB_QTableWidget0.rowCount() - 1 
             # 用于存储文件路径和文件索引的列表
             file_paths, current_image_index = [], []  
             # 判断是否是首次按键
             if not self.last_key_press:
-                # 首次按键不移动
-                step_row = 0  
-                # 第二次进入设置为True
-                self.last_key_press = True
+                step_row = 0   # 首次按键不移动
+                self.last_key_press = True # 第二次进入设置为True
             else:
                 # 统计行索引需要移动step
                 if len(set([item.column() for item in selected_items])) == len(selected_items):
@@ -2971,6 +2966,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     pass
                 else:
                     current_image_index.append(f"{row_index+1}/{self.image_index_max[col_index]}")
+
 
             # 将选中的单元格滚动到视图中间位置
             self.RB_QTableWidget0.scrollToItem(item, QAbstractItemView.PositionAtCenter)
@@ -3435,8 +3431,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
     def on_compare_window_closed(self):
         """处理子窗口关闭事件"""
-
-        # self.show() # self.hide()  # modify by diamond_cz 20250217 不隐藏主界面
         if self.compare_window:
             print("[on_compare_window_closed]-->主界面,接受看图子窗口关闭事件")
             # self.compare_window.close()

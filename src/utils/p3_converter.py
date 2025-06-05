@@ -8,8 +8,9 @@
 '''
 
 
-from PIL import ImageCms
+from PIL import ImageCms,Image
 from pathlib import Path
+from io import BytesIO
 
 
 if True:
@@ -28,11 +29,17 @@ class ColorSpaceConverter:
             "DCI-P3": [
                 self.base_path / "resource" / "icc" / "DCI-P3-v4.icc"
             ],
-            "Display P3": [
+            "Display-P3": [
                 self.base_path / "resource" / "icc" / "DisplayP3-v4.icc"
             ],
             "Rec2020": [
                 self.base_path / "resource" / "icc" / "Rec2020-v4.icc"
+            ],
+            "sRGB": [
+                self.base_path / "resource" / "icc" / "sRGB-v4.icc"
+            ],
+            "sGray": [
+                self.base_path / "resource" / "icc" / "sGray-v4.icc"
             ]
         }
         
@@ -88,7 +95,7 @@ class ColorSpaceConverter:
         }
         
         try:
-            # 获取源配置文件（假设为sRGB）
+            # 设置源配置文件（假设为sRGB）
             src_profile = ImageCms.createProfile("sRGB")
             
             # 检查目标配置文件是否可用
@@ -119,6 +126,42 @@ class ColorSpaceConverter:
             print(f"色彩空间转换失败: {str(e)}")
             return pil_image  # 返回原图
 
+
+    def get_pilimg_sRGB(self, pil_image):
+        """
+        该函数主要是实现了一个将pil格式图片转换到sRGB色域空间的功能.
+        Args:
+            pil_image (Image.Image): pil_image = Image.open(path).
+        Returns:
+            Image.Image: 返回转换到sRGB色域的pil_image.
+        """
+        try :
+            # 检查形参是否正确
+            if not pil_image or not isinstance(pil_image, Image.Image):
+                raise ValueError(f"传入的pil_image为None或者格式不对")
+
+            # 尝试读取图片的ICC配置文件并转换到sRGB色域
+            if 'icc_profile' in pil_image.info:
+                # 从图片中获取ICC配置文件
+                icc_profile = pil_image.info['icc_profile']
+                # 创建源色彩空间配置文件
+                src_profile = ImageCms.ImageCmsProfile(BytesIO(icc_profile))
+                # 创建sRGB色彩空间配置文件（作为中间转换空间）
+                srgb_profile = ImageCms.createProfile('sRGB')
+                # 创建从sRGB到源色彩空间的转换器
+                transform = ImageCms.buildTransform(
+                    src_profile,    # 源配置文件（原始ICC）
+                    srgb_profile,   # 目标配置文件（sRGB）
+                    'RGB',          # 输入模式
+                    'RGB'           # 输出模式
+                )
+                # 应用转换
+                pil_image = ImageCms.applyTransform(pil_image, transform)
+
+            return pil_image
+        except Exception as e:
+            print(f"[get_pilimg_sRGB]-->error: {str(e)}")
+            
 
         
         

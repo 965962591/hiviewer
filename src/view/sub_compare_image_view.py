@@ -1,4 +1,13 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
+# -*- encoding: utf-8 -*-
+'''
+@File         :hiviewer.py
+@Time         :2025/06/04
+@Author       :diamond_cz@163.com
+@Version      :release-v3.5.1
+@Description  :hiviewer看图工具看图界面
+'''
+
 """导入python内置模块"""
 import re
 import os
@@ -13,6 +22,7 @@ from multiprocessing import cpu_count
 from concurrent.futures import ThreadPoolExecutor
 
 """导入python第三方模块"""
+
 import cv2
 import piexif
 import openpyxl
@@ -20,20 +30,19 @@ import numpy as np
 import win32com.client as win32
 import matplotlib.pyplot as plt
 from lxml import etree as ETT
-from PIL import Image, ImageCms, ImageOps   
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtGui import QIcon, QColor, QPixmap, QKeySequence, QPainter, QCursor, QTransform, QImage, QPen
-from PyQt5.QtCore import Qt, QEvent, pyqtSignal, QTimer, QThreadPool, QRunnable
+from PIL import Image, ImageOps, ImageCms   
+from PyQt5.QtGui import QIcon, QColor, QPixmap, QKeySequence, QPainter, QCursor, QTransform, QImage, QPen, QBrush
+from PyQt5.QtCore import Qt, QTimer, QEvent, pyqtSignal, QThreadPool, QRunnable
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QLabel, QHeaderView, QShortcut, QGraphicsView, 
-    QGraphicsScene, QGraphicsPixmapItem, QMessageBox, QProgressBar, QGraphicsRectItem, 
+    QApplication, QMainWindow, QLabel, QHeaderView, QShortcut, QGraphicsView, QAction,
+    QGraphicsScene, QGraphicsPixmapItem, QMessageBox, QProgressBar, QGraphicsRectItem, QMenu,
     QGraphicsItem, QDialogButtonBox, QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QCheckBox, QComboBox, QFileDialog)
 
 """导入自定义模块"""
-from src.components.ui_sub_image import Ui_MainWindow                              # 看图子界面，导入界面UI
-from src.components.custom_qmessagebox import show_message_box                     # 导入消息框类
+from src.components.ui_sub_image import Ui_MainWindow                                 # 看图子界面，导入界面UI
+from src.components.custom_qmessagebox import show_message_box                        # 导入消息框类
 from src.common.settings_ColorAndExif import load_exif_settings,load_color_settings   # 导入json配置模块
-from src.common.font_manager import SingleFontManager                        # 看图子界面，导入字体管理器
+from src.common.font_manager import SingleFontManager                       # 看图子界面，导入字体管理器
 from src.utils.aitips import CustomLLM_Siliconflow                          # 看图子界面，AI提示看图复选框功能模块
 from src.utils.hisnot import WScreenshot                                    # 看图子界面，导入自定义截图的类
 from src.utils.aeboxlink import check_process_running,get_api_data          # 导入与AEBOX通信的模块函数
@@ -157,19 +166,15 @@ def imread_chinese(path):
 
 def calculate_image_stats(image_input, resize_factor=1):
     """使用OpenCV计算图片的亮度、RGB、LAB和对比度"""
-    # modify by diamond_cz 20250409 移除LAB计算，添加R/G和B/G计算
     try:
         # 类型判断分支处理，支持传入文件路径和PIL图像
         if isinstance(image_input, str):  # 处理文件路径
-            with open(image_input, 'rb') as f:
-                image_data = np.frombuffer(f.read(), dtype=np.uint8)
-                img = cv2.imdecode(image_data, cv2.IMREAD_COLOR)
+            img = imread_chinese(image_input)
         elif isinstance(image_input, Image.Image):  # 处理PIL图像对象
             # 转换PIL图像到OpenCV格式
             img = np.array(image_input.convert('RGB'))[:, :, ::-1].copy()
-        elif isinstance(image_input, np.ndarray):  # 处理PIL图像对象
+        elif isinstance(image_input, np.ndarray):  # 处理opencv图像对象
             # 传入的是opencv格式图
-            # print("image_input is ok!!!")
             img = image_input
         else:
             print(f"calculate_image_stats无法加载图像, 当前图像格式:{type(image_input)}")
@@ -803,141 +808,6 @@ class CameraTestDialog(QDialog):
             super().keyPressEvent(event)  # 处理其他按键事件
 
 
-class ImageTransform:
-    """图片旋转exif信息调整类"""
-    # 定义EXIF方向值对应的QTransform变换
-    _ORIENTATION_TRANSFORMS = {
-        1: QTransform(),  # 0度 - 正常
-        2: QTransform().scale(-1, 1),  # 水平翻转
-        3: QTransform().rotate(180),  # 180度
-        4: QTransform().scale(1, -1),  # 垂直翻转
-        5: QTransform().rotate(90).scale(-1, 1),  # 顺时针90度+水平翻转
-        6: QTransform().rotate(90),  # 顺时针90度
-        7: QTransform().rotate(-90).scale(-1, 1),  # 逆时针90度+水平翻转
-        8: QTransform().rotate(-90)  # 逆时针90度
-    }
-    @classmethod
-    def pic_size(cls, path, pixmap, index):
-        """获取图片名称、尺寸、大小等基础信息"""
-        pic_name = os.path.basename(path)
-        # pixmap是旋转后的图像，尺寸会更准确
-        width = pixmap.width()
-        height = pixmap.height()
-        file_size = os.path.getsize(path)  # 文件大小（字节）
-        if file_size < 1024:
-            size_str = f"{file_size} B"
-        elif file_size < 1024 ** 2:
-            size_str = f"{file_size / 1024:.2f} KB"
-        else:
-            size_str = f"{file_size / (1024 ** 2):.2f} MB"
-        exif_size_info = f"图片名称: {pic_name}\n图片大小: {size_str}\n图片尺寸: {width} x {height}\n图片张数: {index}"
-        return exif_size_info
-
-    @classmethod
-    def get_orientation(cls, image):
-        """获取图片的EXIF方向信息（优化版）"""
-        try:
-            # 检查是否是支持EXIF的格式
-            if image.format not in ('JPEG', 'TIFF', 'MPO'):
-                return 1
-            
-            # 获取EXIF数据（使用更可靠的获取方式）
-            exif_data = image.info.get('exif')
-            if not exif_data:
-                return 1
-            
-            # 使用piexif的字节加载方式
-            exif_dict = piexif.load(exif_data)
-            return exif_dict['0th'].get(piexif.ImageIFD.Orientation, 1)
-                
-        except (KeyError, AttributeError, ValueError):
-            # 当EXIF数据不包含方向信息时
-            return 1
-        except Exception as e:
-            print(f"get_orientation函数读取EXIF方向信息失败: {str(e)}")
-            return 1
-
-    @classmethod
-    def auto_rotate_image(cls, icon_path: str, index: str , img):
-        """函数功能： icon_path 文件路径, index 文件索引信息
-        1. 获取图片文件的旋转方向信息并旋转图片到正常方向, 返回 pixmap
-        2. 使用PIL(函数pic_size)解析图片文件的基础信息, 返回 basic_info
-        3. 返回图片文件的格式，返回 image.format
-        """
-        try:
-
-            if True: # 低效率方案，为复现TIFF格式QPixmap直接加载失败的问题, 移除该逻辑   
-                # 优先使用PIL打开图片（兼容更多格式）
-                # image = Image.open(icon_path)
-                if isinstance(img, Image.Image):  # 处理PIL图像对象
-                    # 转换PIL图像到OpenCV格式
-                    pass
-                else:
-                    print(f"auto_rotate_image无法加载图像")
-                    return None, None
-
-                # 获取图片文件的格式信息
-                image_format = img.format if img.format else 'None'
-
-                if image_format not in ["TIFF"]: # "JPEG",, "MPO"
-                    # 使用QPixmap(icon_path)直接创建
-                    pixmap = QPixmap(icon_path)
-
-                else:
-                    # 转换为QPixmap（解决TIFF格式QPixmap直接加载失败的问题）
-                    if img.mode == 'RGBA':
-                        # 处理带透明通道的图片
-                        image_ = img.convert("RGBA")
-                        data = image_.tobytes("raw", "RGBA")
-                        qimage = QImage(data, image_.size[0], image_.size[1], QImage.Format_RGBA8888)
-                    else:
-                        # 转换为RGB模式保证兼容性
-                        image_ = img.convert("RGB")
-                        data = image_.tobytes("raw", "RGB")
-                        qimage = QImage(data, image_.size[0], image_.size[1], QImage.Format_RGB888)
-                    pixmap = QPixmap.fromImage(qimage)
-
-            if False:
-                # 使用QPixmap(icon_path)直接创建，TIFF格式QPixmap直接加载会失败, 移除该逻辑
-                pixmap = QPixmap(icon_path)                    
-
-            # 获取EXIF方向信息
-            orientation = cls.get_orientation(img)
-
-            # 应用方向变换
-            transform = cls._ORIENTATION_TRANSFORMS.get(orientation, QTransform())
-            if not transform.isIdentity():  # 只在需要变换时执行
-                pixmap = pixmap.transformed(transform, Qt.SmoothTransformation)
-            
-            # 解析img的hdr相关信息，
-            # {"mirror":false,"sensorType":"rear","Hdr":"auto","OpMode":36869,"smallPicture":false,"AIScene":0,"filterId":66048,"zoomMultiple":1}'
-            ultra_info = None
-            ultra_info_ = None
-            exif_dict = img._getexif()
-            if exif_dict:
-                ultra_info_ = exif_dict.get(39321,None)
-            if ultra_info_ and isinstance(ultra_info_,str):
-                # 将字符串解析为字典
-                data = json.loads(ultra_info_)
-                hdr_value = data.get("Hdr", None)  # 使用get方法获取值
-                # mirror_value = data.get("mirror", None)  # 使用get方法获取值
-                zoom_value = data.get("zoomMultiple", None)  # 使用get方法获取值
-                # 拼接HDR等信息            
-                ultra_info = f"\nHDR: {hdr_value}\nZoom: {zoom_value}"
-            else:
-                ultra_info = f"\nHDR: null\nZoom: null"
-
-            # 获取基本exif信息,少使用一次Image.open
-            basic_info = cls.pic_size(icon_path, pixmap, index)
-            # 如果HDRZOOM信息存在，就更新到basic_info中
-            if ultra_info:
-                basic_info = basic_info + ultra_info
-            
-            return pixmap, basic_info
-            
-        except Exception as e:
-            print(f"处理图片方向变换失败 {icon_path}: {str(e)}")
-            return pixmap
 
 """"继承 QGraphicsRectItem 并重写 itemChange 方法来实现对矩形框变化的监听"""
 class CustomGraphicsRectItem(QGraphicsRectItem):
@@ -954,7 +824,7 @@ class CustomGraphicsRectItem(QGraphicsRectItem):
         if self.change_callback and change in [QGraphicsItem.ItemPositionHasChanged, 
                                              QGraphicsItem.ItemTransformHasChanged]:
             # 使用QTimer.singleShot延迟回调，确保矩形框位置更新完成
-            QtCore.QTimer.singleShot(0, self.change_callback)
+            QTimer.singleShot(0, self.change_callback)
         return super().itemChange(change, value)
     
 
@@ -1489,6 +1359,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
     def __init__(self, images_path_list, index_list=None, parent=None):
         super(SubMainWindow, self).__init__(parent)
+
         # 初始化UI
         self.setupUi(self) 
         
@@ -1496,9 +1367,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.parent_window = parent
         self.images_path_list = images_path_list
         self.index_list = index_list
-
-        # 初始化p3_converter.py中的ColorSpaceConverter实例
-        self.p3_converter = ColorSpaceConverter()
 
         # 初始化变量
         self.init_variables()
@@ -1525,7 +1393,11 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
 
     def init_variables(self):
-        """初始化变量"""
+        """初始化相关类以及变量"""
+
+        # 初始化p3_converter.py中的ColorSpaceConverter实例
+        self.p3_converter = ColorSpaceConverter()
+
         # 初始化SubMainWindow类中的一些列表属性
         self.exif_texts = []
         self.histograms = []
@@ -1542,10 +1414,21 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         # 设置表格的宽高初始大小
         self.table_width_heigth_default = [2534,1376]
 
-        # 初始化一些显示相关的标志位
-        self.roi_selection_active = False  # 初始化roi亮度等信息统计框的显示标志位
-        self.is_fullscreen = False         # 初始化全屏标志位
-        self.is_updating = False           # 设置更新状态标志位
+        # 初始化roi亮度等信息统计框标志位；全屏显示标志位; 看图界面更新状态标志位
+        self.roi_selection_active = False 
+        self.is_fullscreen = False         
+        self.is_updating = False          
+
+        # 初始化颜色空间相关变量，默认设置sRGB优先
+        self.srgb_color_space = True  
+        self.p3_color_space = False   
+        self.gray_color_space = False
+
+        # 设置rgb颜色值字典；exif信息可见性字典; exif信息可见性字典; 均在函数load_settings中配置
+        self.color_rgb_settings = {}
+        self.dict_exif_info_visibility = {} 
+        self.dict_label_info_visibility = {}
+
         
         # 导入主界面的一些设置:字体设置，颜色设置等
         if self.parent_window:
@@ -1560,15 +1443,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             # self.font_color_default = self.parent_window.font_color_default
             # self.font_color_exif = self.parent_window.font_color_exif
 
-        # 设置rgb颜色值
-        # self.color_rgb_settings = {}         
-        # 初始化exif信息可见性字典,支持用户在json配置文件中调整顺序以及是否显示该项
-        # self.dict_exif_info_visibility = {} 
-        # 初始化图像显示色彩空间变量,默认设置srgb显示空间,在load_settings()中初始化
-        # self.dict_label_info_visibility = {}
-        # self.srgb_color_space = True  
-        # self.p3_color_space = False   
-        # self.gray_color_space = False
 
     def set_shortcut(self):
         """设置快捷键和槽函数"""
@@ -1622,9 +1496,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.checkBox_4.stateChanged.connect(self.ai_tips_info)           # 新增AI提示看图
         
         # 连接下拉列表信号到槽函数
-        self.comboBox_1.activated.connect(self.show_menu_combox1) # 连接 QComboBox 的点击事件到显示菜单，self.on_comboBox_1_changed
-        # self.comboBox_2.currentIndexChanged.connect(self.on_comboBox_2_changed)   # 当用户选择不同选项的时候触发
-        self.comboBox_2.activated.connect(self.on_comboBox_2_changed)               # 当用户选择任何选项的时候都会触发 
+        self.comboBox_1.activated.connect(self.show_menu_combox1)          # 连接 QComboBox 的点击事件到显示菜单，self.on_comboBox_1_changed
+        self.comboBox_2.activated.connect(self.on_comboBox_2_changed)      # 连接 QComboBox 的点击事件到显示菜单，self.on_comboBox_2_changed
 
         # 连接底部状态栏按钮信号到槽函数
         self.statusbar_left_button.clicked.connect(self.open_settings_window)
@@ -1651,18 +1524,12 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.setWindowTitle("图片对比界面")
 
         # 获取鼠标所在屏幕，并根据当前屏幕计算界面大小与居中位置，调整大小并移动到该位置
-        screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
-        screen_geometry = QtWidgets.QApplication.desktop().screenGeometry(screen)
-        width = int(screen_geometry.width() * 0.8)
-        height = int(screen_geometry.height() * 0.65)
-        self.resize(width, height)
-        x = screen_geometry.x() + (screen_geometry.width() - self.width()) // 2
-        y = screen_geometry.y() + (screen_geometry.height() - self.height()) // 2
+        x, y, w, h = self.__get_screen_geometry()
+        self.resize(int(w * 0.8), int(h * 0.65))
         self.move(x, y)
 
         # 设置第一排标签
         self.label_0.setText("提示:鼠标左键拖动所有图像,滚轮控制放大/缩小;按住Ctrl+滚轮或者鼠标右键操作单独图像")
-        # self.label_0.setFont(self.custom_font)，移除之前的设置，使用新的字体管理器
         self.label_0.setFont(self.font_manager_jetbrains)
 
         # 设置下拉框选项,会自动进入槽函数self.show_menu_combox1-->on_comboBox_1_changed
@@ -1672,31 +1539,13 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.comboBox_1.setCurrentIndex(0)  # 设置默认显示索引为0
         self.comboBox_1.setFont(self.custom_font)
 
-        """设置下拉框self.comboBox_2"""
-        if False: # 旧版本方案
-            # 设置下拉框选项,会自动进入槽函数on_comboBox_2_changed
-            color_space_list = [self.srgb_color_space, self.gray_color_space, self.p3_color_space]  # 列表中存放三个颜色空间显示标志位
-            _front = {
-                True:"✅",
-                False:"" }
-            _text = [f"{_front.get(color_space_list[0])}sRGB色域", 
-                f"{_front.get(color_space_list[1])}灰度图空间色域", 
-                f"{_front.get(color_space_list[2])}p3色域"]
-            self.comboBox_2.clear()  # 清除已有项
-            self.comboBox_2.addItems([_text[0], _text[1], _text[2]])
-            # 设置默认显示索引为三个颜色空间中为TRUE的那个
-            self.comboBox_2.setCurrentIndex(color_space_list.index(True))  
-            self.comboBox_2.setFont(self.custom_font)
-        
-        # 设置下拉框选项（优化版）
+        # 设置下拉框self.comboBox_2选项（优化版）
         color_space_list = [self.srgb_color_space, self.gray_color_space, self.p3_color_space]  # 列表中存放三个颜色空间显示标志位
-        # 使用列表推导生成选项文本
-        options = [f"{'✅' if state else ''}{name}" for state, name in zip(color_space_list, ["sRGB色域", "灰度图空间色域", "p3色域"])]
-        # 清除并添加选项
+        # 使用列表推导生成选项文本, 并设置默认显示索引为当前激活的颜色空间; 清除self.comboBox_2历史显示内容并添加选项
+        options = [f"{'✅' if state else ''}{name}" for state, name in zip(color_space_list, ["sRGB色域", "sGray色域", "Display-P3色域"])]
         self.comboBox_2.clear(); self.comboBox_2.addItems(options)
-        # 设置默认显示索引为当前激活的颜色空间
-        self.ComBox2Curindex = next(i for i, state in enumerate(color_space_list) if state)
-        self.comboBox_2.setCurrentIndex(self.ComBox2Curindex)
+        # 设置默认显示索引为当前激活的颜色空间, 并设置自定义字体
+        self.comboBox_2.setCurrentIndex(next(i for i, state in enumerate(color_space_list) if state))
         self.comboBox_2.setFont(self.custom_font)
 
         # 设置复选框
@@ -1724,6 +1573,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         header.setFont(self.custom_font)
 
         # 设置底部状态栏组件文本显示
+        # self.statusbar_left_button # 设置按钮
         self.label_bottom.setText("📢:选中ROI信息复选框选后, 按下P键即可调出矩形框(矩形框移动逻辑同图片移动逻辑); 选中AI提示看图复选框选后, 按下P键即可发起请求(仅支持两张图); ")
         self.statusbar_button1.setText("(prev)🔼")
         self.statusbar_button2.setText("🔽(next)")
@@ -1849,7 +1699,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             if view and view.scene():
                 # 更新场景背景色
                 qcolor = rgb_str_to_qcolor(self.background_color_table)
-                view.scene().setBackgroundBrush(QtGui.QBrush(qcolor))
+                view.scene().setBackgroundBrush(QBrush(qcolor))
                 
                 # 更新EXIF标签
                 if hasattr(view, 'exif_label') and hasattr(view, 'exif_text'):
@@ -1976,7 +1826,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             def process_image(args):
                 """
                 图片基础信息处理:
-                (1) 图片旋转处理 (ImageTransform.auto_rotate_image)
+                (1) 图片旋转处理
                 (2) EXIF信息获取 (self.get_exif_info)
                 (3) 直方图计算 (self.calculate_brightness_histogram)
                 (4) 图片亮度统计信息计算 (calculate_image_stats)
@@ -1995,40 +1845,30 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     if not os.path.exists(path):
                         raise FileNotFoundError(f"❌ 图片不存在: {path}")
 
-                    # 获取isinstance(image_input, Image.Image)格式图像；获取p3色域pixmap
+                    # 使用PIL获取isinstance(image_input, Image.Image)格式图像
                     with Image.open(path) as img:
-                        # 获取PIL_Image格式图像
-                        pil_image = img
-                        iamge_format = img.format
+                        # 获取sRGB色域图
+                        pil_image = self.p3_converter.get_pilimg_sRGB(img)
+                        # 获取cv_img
+                        cv_img = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+                        # 转换成pixmap
+                        pixmap = pil_to_pixmap(pil_image)
 
-                        # 获取p3色域转换，转换为pixmap
-                        converted_pixmap = self.p3_converter.convert_color_space(img, "Display P3", intent = "Relative Colorimetric")
-                        p3_pixmap = pil_to_pixmap(converted_pixmap)
+                        # 获取sGray色域图，转换为pixmap
+                        gray_image = pil_image.convert('L')
+                        gray_pixmap = pil_to_pixmap(gray_image)
+
+                        # 获取display-p3色域图，转换为pixmap
+                        converted_pilimg_p3 = self.p3_converter.convert_color_space(pil_image, "Display-P3", intent = "Relative Colorimetric")
+                        p3_pixmap = pil_to_pixmap(converted_pilimg_p3)
                     
-                    # 获取cv图像，使用 open 函数以二进制模式读取图片数据，使用 OpenCV 的 imdecode 函数解码图片数据
-                    if True:
-                        with open(path, "rb") as f:
-                            image_data = np.asarray(bytearray(f.read()), dtype=np.uint8)
-                        # 读取彩色图像
-                        cv_img = cv2.imdecode(image_data, cv2.IMREAD_COLOR)
-                        # 转换为灰度图，先将灰度图转换为QImage; 再将QImage转换为QPixmap
-                        gray_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
-                        height, width = gray_img.shape
-                        gray_qimage = QImage(gray_img.data, width, height, width, QImage.Format_Grayscale8)
-                        gray_pixmap = QPixmap.fromImage(gray_qimage)
-
-                    # 1. 处理图片旋转、基础exif信息获取（PIL）、图片文件格式信息获取
-                    pixmap, basic_info = ImageTransform.auto_rotate_image(path, index_list[index], pil_image)
+                    # 1. 提取图片的基础信息
+                    basic_info = self.get_pic_basic_info(path, img, pixmap, index_list[index])
 
                     # 2. piexf解析曝光时间光圈值ISO等复杂的EXIF信息
-                    exif_info_temp = self.get_exif_info(path, iamge_format)
+                    exif_info = self.get_exif_info(path) + basic_info
 
-                    if exif_info_temp != '\n':
-                        exif_info = exif_info_temp + basic_info
-                    else:
-                        exif_info = basic_info
-
-                    # 检测是否存在同图片路径的xml文件  将lux_index、DRCgain写入到exif信息中去
+                    # 3. 检测是否存在同图片路径的xml文件  将lux_index、DRCgain写入到exif信息中去
                     xml_path = os.path.join(os.path.dirname(path), os.path.basename(path).split('.')[0] + "_new.xml")
                     hdr_flag = False
                     if os.path.exists(xml_path):
@@ -2036,14 +1876,13 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                         exif_info_qpm, hdr_flag = load_xml_data(xml_path)
                         exif_info = exif_info + exif_info_qpm
                         
-
                     # 处理EXIF信息，根据可见性字典更新
                     exif_info = self.process_exif_info(self.dict_exif_info_visibility, exif_info, hdr_flag)
 
-                    # 3. 解析直方图信息
+                    # 4. 解析直方图信息
                     histogram = self.calculate_brightness_histogram(pil_image) 
 
-                    # 4. 计算亮度等统计信息
+                    # 5. 计算亮度等统计信息
                     stats = calculate_image_stats(path, resize_factor=0.1)
                     # 移除LAB显示，替换为R/G和B/G
                     stats_text = f"亮度: {stats['avg_brightness']}\n对比度(L值标准差): {stats['contrast']}\nLAB: {stats['avg_lab']}\nRGB: {stats['avg_rgb']}\nR/G: {stats['R_G']}  B/G: {stats['B_G']}"
@@ -2064,7 +1903,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                         'cv_img':cv_img              # OpenCV图像
                     }
                 except Exception as e:
-                    print(f"处理图片失败 {path}: {e}")
+                    print(f"[process_image]-->error: 处理图片失败 {path}: {e}")
                     return index, None
                     
 
@@ -2142,7 +1981,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     # 创建和设置场景
                     qcolor = rgb_str_to_qcolor(self.background_color_table) # 将背景色转换为QColor
                     scene = QGraphicsScene(self)
-                    scene.setBackgroundBrush(QtGui.QBrush(qcolor)) # 设置场景背景色
+                    scene.setBackgroundBrush(QBrush(qcolor)) # 设置场景背景色
 
                     
                     # 创建图片项
@@ -2382,7 +2221,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 self.update_ui_styles()
             else: 
                 # 创建菜单
-                self.menu_1 = QtWidgets.QMenu(self)
+                self.menu_1 = QMenu(self)
 
                 # 设置菜单项悬停样式
                 hover_bg = self.background_color_default  # 背景颜色
@@ -2405,7 +2244,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
                 # 添加颜色选项到菜单
                 for color in color_options:
-                    action = QtWidgets.QAction(color, self)
+                    action = QAction(color, self)
                     # 传递 color 和 index
                     action.triggered.connect(lambda checked, color=color, index=index: self.on_comboBox_1_changed(color, index))  
                     self.menu_1.addAction(action)
@@ -2467,8 +2306,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         # 定义颜色空间状态列表
         color_spaces = [
             (self.srgb_color_space, "sRGB色域"),
-            (self.gray_color_space, "灰度图空间色域"), 
-            (self.p3_color_space, "p3色域")
+            (self.gray_color_space, "sGray色域"), 
+            (self.p3_color_space, "Display-P3色域")
         ]
         
         # 使用列表推导生成选项文本
@@ -2488,7 +2327,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
     def on_comboBox_2_changed(self, index):
         """图像色彩显示空间下拉框self.comboBox_2内容改变时触发事件
-        ["✅sRGB色域", "✅灰度图色域", "✅p3色域"]
+        ["✅sRGB色域", "✅sGray色域", "✅Display-P3色域"]
         """
         # 更新所有图形视图的场景视图
         for i, view in enumerate(self.graphics_views):
@@ -2530,7 +2369,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     
                     # 更新场景背景色
                     qcolor = rgb_str_to_qcolor(self.background_color_table)
-                    view.scene().setBackgroundBrush(QtGui.QBrush(qcolor))
+                    view.scene().setBackgroundBrush(QBrush(qcolor))
                     
                 except Exception as e:
                     print(f"❌ [on_comboBox_2_changed]-->色彩空间转换失败: {str(e)}")
@@ -2608,54 +2447,70 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             print(f"❌ [calculate_brightness_histogram]-->计算直方图失败\n错误: {e}")
             return None
         
-    """modify by diamond_cz 20250218 移除该函数， 在类ImageTransform中实现图片基础信息的获取， 减少使用Image.open
-    def pic_size(self, path, index):
-        # 获取图片名称、尺寸、大小等基础信息
-        pic_name = os.path.basename(path)
-        image = Image.open(path)
-        width, height = image.size
-        file_size = os.path.getsize(path)  # 文件大小（字节）
-        if file_size < 1024:
-            size_str = f"{file_size} B"
-        elif file_size < 1024 ** 2:
-            size_str = f"{file_size / 1024:.2f} KB"
-        else:
-            size_str = f"{file_size / (1024 ** 2):.2f} MB"
-        exif_size_info = f"图片名称: {pic_name}\n图片大小: {size_str}\n图片尺寸: {width} x {height}\n图片张数: {index}"
-        return exif_size_info, image
-    """
+    
+    def get_pic_basic_info(self, path, pil_img, pixmap, index):
+        """
+        该函数主要是实现了提取图片基础的exif信息的功能.
+        Args:
+            param1 (type): Description of param1.
+            param2 (type): Description of param2.
+        Returns:
+            type: Description of the return value.
+        """
+        try:
+            # 图片名称
+            pic_name = os.path.basename(path)
+
+            # 图片大小
+            file_size = os.path.getsize(path)  # 文件大小（字节）
+            if file_size < 1024:
+                size_str = f"{file_size} B"
+            elif file_size < 1024 ** 2:
+                size_str = f"{file_size / 1024:.2f} KB"
+            else:
+                size_str = f"{file_size / (1024 ** 2):.2f} MB"
+
+            # 图片尺寸，pixmap是旋转后的图像，尺寸会更准确
+            width, height = pixmap.width(), pixmap.height()
+
+            basic_info = f"图片名称: {pic_name}\n图片大小: {size_str}\n图片尺寸: {width} x {height}\n图片张数: {index}"
+
+            # 针对小米相机拍图会写入hdr和zoom增加额外信息
+            ultra_info = ''  # 初始化空字符串
+            if pil_img and (exif_dict := pil_img.getexif()) is not None and (info := exif_dict.get(39321,None)) is not None:
+                if info and isinstance(info,str):
+                    # 使用json将字符串解析为字典，提取hdr和zoom字段
+                    data = json.loads(info)
+                    hdr_value = data.get("Hdr", "Null")  
+                    zoom_value = data.get("zoomMultiple", "Null")
+                    # 拼接HDR等信息            
+                    ultra_info = f"\nHDR: {hdr_value}\nZoom: {zoom_value}"
+                
+            return basic_info + ultra_info
+        except Exception as e:
+            return f"❌ [get_pic_basic_info]-->无法获取图片{os.path.basename(path)}的基础信息:\n报错信息: {e}"
     
     
-    def get_exif_info(self, path, image_format):
+    def get_exif_info(self, path):
         """
         函数功能： 使用piexif解析特定格式（"JPEG", "TIFF", "MPO"）图片的曝光时间、光圈、ISO等详细信息
         输入： path 图片文件路径, image_format图片文件的PIL_image 格式
         输出： exif_info 解析出来的详细信息（exif_tags_id）
         """
         try:
-            # 使用PIL解析基本信息 modify by diamond_cz 20250218 移除该函数， 在类ImageTransform中实现图片基础信息的获取， 减少使用Image.open
-            # exif_size_info, image = self.pic_size(path, index)
-
-            # 检查文件格式，PIL 或 piexif 只能处理 JPEG 或 TIFF 文件
-            if image_format not in ["JPEG", "TIFF", "MPO"]:
-                exif_info = "" 
-                return exif_info
-
-            # 使用piexif读取EXIF信息
-            exif_dict = piexif.load(path)
-            
-            # 如果存在EXIF信息
-            if exif_dict and "0th" in exif_dict:
-
+            # 直接使用 piexif库加载exif信息
+            exif_info = "" 
+            if (exif_dict := piexif.load(path)) and "0th" in exif_dict:
+                
+                # 设置检索关键字; exif_dict["0th"]; 测光模式，需要单独处理
                 exif_tags_id = {
-                    "271": "品牌",  # exif_dict["0th"]
-                    "272": "型号",  # exif_dict["0th"]
+                    "271": "品牌",  
+                    "272": "型号",  
                     "33434": "曝光时间",
                     "33437": "光圈值",
                     "34855": "ISO值",
                     "36867": "原始时间",
-                    # "306": "文件修改时间",   # exif_dict["0th"][306] 移除该项
-                    "37383": "测光模式", # 需要单独处理
+                    "37383": "测光模式", 
                 }
                 
                 # 测光模式映射
@@ -2673,16 +2528,19 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 # 图像旋转信息 exif_dict["0th"][274]
                 exif_info_list = []
                 for tag_id, tag_cn in exif_tags_id.items():
-                    # 根据标签id获取相应数据并解析成需要的数据形式
-                    # 将字符串类型转换为整型
+                    
+                    # 将字符串类型转换为整型, 首先根据标签id获取相应数据并解析成需要的数据形式
                     tag_id = int(tag_id) 
+
                     # 解析Exif
                     if tag_id in exif_dict["Exif"]:
-                        value = exif_dict["Exif"][tag_id]   #.decode('utf-8')
+                        value = exif_dict["Exif"][tag_id]
                         if value:
-                            if isinstance(value, bytes): # 字节类型处理
+                            # 字节类型处理
+                            if isinstance(value, bytes): 
                                 value = value.decode('utf-8')
-                            if tag_id == 33434: # 曝光时间处理
+                            # 曝光时间处理
+                            if tag_id == 33434: 
                                 exp_s = (value[0]/value[1])*1000000
                                 # 设置保留小数点后两位
                                 exp_s = round(exp_s, 2)
@@ -2692,12 +2550,15 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                                 else: # 处理曝光时间分子不为1的情况
                                     value = int(value[1]/value[0])
                                     value = f"1/{value}_({exp_s})"
-                            if tag_id == 33437: # 光圈值处理
+                            # 光圈值处理
+                            if tag_id == 33437: 
                                 value = value[0]/value[1]
                                 value = round(value, 2)
-                            if tag_id == 37383: # 测光模式处理
+                            # 测光模式处理
+                            if tag_id == 37383: 
                                 value = metering_mode_mapping.get(value, "其他")
                             exif_info_list.append(f"{tag_cn}: {value}")
+
                     # 解析0th
                     elif tag_id in exif_dict["0th"]:
                         value = exif_dict["0th"][tag_id]
@@ -2707,15 +2568,13 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                             exif_info_list.append(f"{tag_cn}: {value}")
                         
                 exif_info = "\n".join(exif_info_list)
-            else:
-                exif_info = ""
-                return exif_info
             
-            exif_info = exif_info + '\n'
+            exif_info = exif_info + '\n' if exif_info else ""
+
             return exif_info
         except Exception as e:
-            return f"❌ [get_exif_info]-->无法读取EXIF信息:{os.path.basename(path)}\n错误: {e}"
-
+            print( f"❌ [get_exif_info]-->error: 读取图片{os.path.basename(path)}EXIF信息发生错误:\n报错信息: {e}")
+            return ""
 
     def wheelEvent(self, event: QEvent):
         """鼠标滚轮事件"""
@@ -2775,7 +2634,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             center = view.mapToScene(view.viewport().rect().center())
             
             # 计算并应用新的变换
-            new_transform = QtGui.QTransform()
+            new_transform = QTransform()
             
             # 设置新的变换矩阵
             new_transform.scale(zoom_step, zoom_step)
@@ -3478,6 +3337,31 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.label_bottom.setText(f"📢:AI提示结果:{response}")
         # 延时1秒后更新is_updating为False
         QTimer.singleShot(1000, lambda: setattr(self, 'is_updating', False))
+
+    def __get_screen_geometry(self)->tuple:
+        """
+        该函数主要是实现了获取当前鼠标所在屏幕的几何信息的功能.
+        Args:
+            self (object): 当前对象
+        Returns:
+            x (int): 当前屏幕中心的x坐标
+            y (int): 当前屏幕中心的y坐标
+            w (int): 当前屏幕的宽度
+            h (int): 当前屏幕的高度
+        Raises:
+            列出函数可能抛出的所有异常，并描述每个异常的触发条件
+        Example:
+            提供一个或多个使用函数的示例，展示如何调用函数及其预期输出
+        Note:
+            注意事项，列出任何重要的假设、限制或前置条件.
+        """
+        screen = QApplication.desktop().screenNumber(QApplication.desktop().cursor().pos())
+        screen_geometry = QApplication.desktop().screenGeometry(screen)
+        x = screen_geometry.x() + (screen_geometry.width() - self.width()) // 2
+        y = screen_geometry.y() + (screen_geometry.height() - self.height()) // 2
+        w = screen_geometry.width()
+        h = screen_geometry.height()
+        return x, y, w, h
 
 
 
