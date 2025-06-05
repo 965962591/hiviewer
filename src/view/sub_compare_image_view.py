@@ -48,6 +48,7 @@ from src.utils.hisnot import WScreenshot                                    # �
 from src.utils.aeboxlink import check_process_running,get_api_data          # 导入与AEBOX通信的模块函数
 from src.utils.heic import extract_jpg_from_heic                            # 导入heic图片转换为jpg图片的模块
 from src.utils.p3_converter import ColorSpaceConverter                      # 导入色彩空间转换配置类
+from src.utils.decorator import CC_TimeDec                                  # 导入自定义装饰器
 
 """设置本项目的入口路径,全局变量BasePath"""
 # 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
@@ -105,7 +106,7 @@ def pil_to_pixmap(pil_image):
     """
     try:
         # 使用ImageOps.exif_transpose自动处理EXIF方向信息
-        pil_image = ImageOps.exif_transpose(pil_image)
+        # pil_image = ImageOps.exif_transpose(pil_image)
         
         # 将PIL图像转换为RGB模式（如果不是的话）
         if pil_image.mode != 'RGB':
@@ -162,7 +163,6 @@ def imread_chinese(path):
     except Exception as e:
         print(f"读取图片失败: {e}")
         return None
-
 
 def calculate_image_stats(image_input, resize_factor=1):
     """使用OpenCV计算图片的亮度、RGB、LAB和对比度"""
@@ -1847,20 +1847,25 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
                     # 使用PIL获取isinstance(image_input, Image.Image)格式图像
                     with Image.open(path) as img:
-                        # 获取sRGB色域图
-                        pil_image = self.p3_converter.get_pilimg_sRGB(img)
                         # 获取cv_img
-                        cv_img = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-                        # 转换成pixmap
+                        cv_img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+
+                        # 获取sRGB色域图,转换成pixmap
+                        pil_image = self.p3_converter.get_pilimg_sRGB(img)
                         pixmap = pil_to_pixmap(pil_image)
 
                         # 获取sGray色域图，转换为pixmap
                         gray_image = pil_image.convert('L')
                         gray_pixmap = pil_to_pixmap(gray_image)
+                        
 
                         # 获取display-p3色域图，转换为pixmap
                         converted_pilimg_p3 = self.p3_converter.convert_color_space(pil_image, "Display-P3", intent = "Relative Colorimetric")
                         p3_pixmap = pil_to_pixmap(converted_pilimg_p3)
+                        
+                    
+
+                    print(f"色域转换耗时: {(time.time() - start_time):.2f} 秒")
                     
                     # 1. 提取图片的基础信息
                     basic_info = self.get_pic_basic_info(path, img, pixmap, index_list[index])
@@ -3175,14 +3180,14 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             event.ignore()
             return
         try:
-            self.save_settings()  # 保存颜色以及EXIF信息设置
-            self.cleanup()        # 清理资源
-            self.closed.emit()    # 发送关闭信号
-            event.accept()
-            print("[closeEvent]-->看图子界面-->接受看图子界面关闭事件, 并保存颜色以及EXIF信息设置")
+            self.save_settings()        # 保存设置
+            self.cleanup()              # 清理资源
+            self.closed.emit()          # 发送关闭信号
+            self.closed.disconnect()    # 发送后立即断开连接
+            event.accept()              # 只调用一次 accept
         except Exception as e:
-            event.accept()
-
+            print(f"❌[closeEvent]-->看图子界面-->关闭时发生错误: {e}")
+            event.accept()              # 即使出错也接受关闭事件
 
     def Escape_close(self):
         """统一处理窗口关闭逻辑"""
@@ -3194,7 +3199,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             # 保存颜色设置
             self.save_settings()
             self.cleanup()      # 清理资源
-            self.closed.emit()  # 发送关闭信号
             super().close()     # 调用父类的close方法
         except Exception as e:
             print(f"❌[Escape_close]-->看图子界面-->warning: 关闭窗口时发生错误: {e}")
