@@ -9,6 +9,7 @@ import threading
 
 """导入python第三方模块"""
 import cv2
+from cv2 import VideoCapture
 import numpy as np
 from PyQt5.QtGui import QImage, QPixmap, QCursor, QKeySequence, QIcon, QMovie, QKeySequence
 from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal
@@ -302,11 +303,13 @@ class FrameReader(QThread):
 class VideoPlayer(QWidget):
     def __init__(self, video_path, parent=None):
         super().__init__(parent)
-        self.video_wall = parent  # 保存 VideoWall 的引用
+        
+        # 保存 VideoWall 的引用
+        self.video_wall = parent  
         self.video_path = video_path
 
         # 初始化字体管理器
-        self.font_manager = SingleFontManager.get_font(12)
+        self.font_manager = SingleFontManager.get_font(10)
         self.font_manager_small = SingleFontManager.get_font(10)
         
         try:
@@ -314,15 +317,23 @@ class VideoPlayer(QWidget):
             self.frame_reader = FrameReader(video_path)
             self.frame_reader.frame_ready.connect(self.on_frame_ready)
             
-            # 临时打开视频获取基本信息
-            temp_cap = cv2.VideoCapture(video_path)
-            self.total_frames = int(temp_cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            self.fps = temp_cap.get(cv2.CAP_PROP_FPS)
-            self.duration_ms = int(
-                self.total_frames * (1000 / self.fps)
-            )  # 视频总时长(毫秒)
-            temp_cap.release()
-            
+            # 临时打开视频获取基本信息(总帧数、帧率、尺寸、时长)
+            cap = cv2.VideoCapture(video_path)
+            try:
+                if not cap.isOpened():
+                    raise ValueError(f"无法打开视频文件: {video_path}")
+                # 总帧数、帧率、尺寸
+                self.total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                self.fps = cap.get(cv2.CAP_PROP_FPS)
+                self.size_ = [
+                    int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+                    int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                ]
+                # 视频总时长(毫秒)
+                self.duration_ms = int(self.total_frames * (1000 / self.fps)) 
+            finally:
+                cap.release()
+
             # 初始化相关组件
             self.init_ui()
 
@@ -372,7 +383,7 @@ class VideoPlayer(QWidget):
             
         except Exception as e:
             QMessageBox.critical(parent, "错误", f"无法加载视频 {video_path}: {str(e)}")
-            raise
+            return
 
     def format_time(self, time_ms):
         """将毫秒时间格式化为分:秒.毫秒"""
@@ -578,8 +589,8 @@ class VideoPlayer(QWidget):
 
         # 顶部 文件名标签
         self.filename_label = QLabel(self)
-        _label_temp = f"{(os.path.basename(os.path.dirname(self.video_path))).upper()}: {os.path.basename(self.video_path)}"
-        # _label = f"{_label_temp}(帧率:{self.fps:.2f})"
+        _label_temp = f"{(os.path.basename(os.path.dirname(self.video_path))).upper()}: {os.path.basename(self.video_path)} " \
+                    f"(fps:{self.fps:.2f}) ({self.size_[0]}x{self.size_[-1]})"
         self.filename_label.setText(_label_temp)
         self.filename_label.setStyleSheet(label_style_top)
         self.filename_label.setAlignment(Qt.AlignCenter)
