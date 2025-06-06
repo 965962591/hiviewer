@@ -106,7 +106,7 @@ def pil_to_pixmap(pil_image):
     """
     try:
         # 使用ImageOps.exif_transpose自动处理EXIF方向信息
-        # pil_image = ImageOps.exif_transpose(pil_image)
+        pil_image = ImageOps.exif_transpose(pil_image)
         
         # 将PIL图像转换为RGB模式（如果不是的话）
         if pil_image.mode != 'RGB':

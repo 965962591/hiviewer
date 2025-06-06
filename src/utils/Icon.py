@@ -19,6 +19,7 @@ from PyQt5.QtCore import (QRunnable, QObject, pyqtSignal)
 # 自定义模块
 from src.utils.heic import extract_jpg_from_heic
 from src.utils.video import extract_first_frame_from_video
+from src.view.sub_compare_image_view import pil_to_pixmap
 
 
 """设置本项目的入口路径,全局变量BASEICONPATH"""
@@ -183,12 +184,14 @@ class IconCache:
             return cls.get_default_icon("default_icon.png", (48, 48))
 
 
-
-
     @classmethod
     def _generate_image_icon(cls, file_path):
-        """优化后的图片图标生成
-        优先使用QImageReader高效加载，如果失败则使用QImage作为备选方案
+        """
+        该函数主要是实现了高效生成文件图标的功能.
+        Args:
+            file_path (str): 传入文件绝对路径.
+        Returns:
+            QIcon: 处理后的图标对象
         """
         try:
             # 方案一：使用QImageReader高效加载
@@ -196,7 +199,7 @@ class IconCache:
             reader.setAutoTransform(True)     # 设置自动转换（处理EXIF方向信息）
             reader.setQuality(100)            # 设置高质量缩放
             
-            # 直接设置目标尺寸，QImageReader会自动处理等比例缩放
+            # 直接设置目标尺寸，QImageReader会自动处理等比例缩放，会导致图像比例失调，移除
             # reader.setScaledSize(QtCore.QSize(48, 48))
 
             if True:
@@ -218,48 +221,18 @@ class IconCache:
                     reader.setScaledSize(QtCore.QSize(new_width, new_height))
             
             # 尝试读取图像
-            image = reader.read()
-            if not image.isNull():
-                pixmap = QPixmap.fromImage(image)
-                # pixmap = pixmap.scaled(48, 48, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)  # 低效缩放，暂时注释
+            if bool(img := reader.read()):
+                pixmap = QPixmap.fromImage(img)
                 return QIcon(pixmap)
             
-            # 方案二：如果QImageReader失败，使用QImage作为备选
-            image = QImage(file_path)
-            if not image.isNull():
-                # 使用高质量缩放
-                pixmap = QPixmap.fromImage(image.scaled(
-                    48, 48, 
-                    QtCore.Qt.KeepAspectRatio, 
-                    QtCore.Qt.SmoothTransformation
-                ))
-                return QIcon(pixmap)
-            
-            # 方案三：如果都失败了，使用PIL作为最后的备选
-            return cls._generate_fallback_icon(file_path)
-            
+            # 方案二：使用PIL 加载，ImageOps.exif_transpose自动处理EXIF方向信息
+            with Image.open(file_path) as img:
+                if bool(pixmap := pil_to_pixmap(img)):
+                    return QIcon(pixmap)
+
         except Exception as e:
             print(f"图片文件生成图标失败: {e}")
             return cls.get_default_icon("image_icon.png", (48, 48))
-
-
-    @classmethod
-    def _generate_fallback_icon(cls, file_path):
-        """备用的高质量生成方式"""
-        try:
-            # 使用PIL进行渐进式加载
-            with Image.open(file_path) as img:
-                img.thumbnail((48, 48))
-                buffer = BytesIO()
-                img.save(buffer, format='PNG')
-                
-                # 转换为QPixmap并缩放
-                pixmap = QPixmap()
-                pixmap.loadFromData(buffer.getvalue())
-                return QIcon(pixmap)
-        except Exception as e:
-            print(f"备用图标生成失败: {e}")
-            return cls.get_default_icon("default_icon.png", (48, 48))
 
 
     @classmethod
@@ -413,10 +386,8 @@ class IconCache:
     def clear_cache(cls):
         """清理本地中的缓存"""
         try:
-
             # 清除lru_cache的缓存
             cls.get_icon.cache_clear()  
-
 
             # 清理内存缓存
             cls._cache.clear()
@@ -424,7 +395,6 @@ class IconCache:
             # 清理文件缓存
             if cls._cache_base_dir.exists():
                 shutil.rmtree(cls._cache_base_dir)
-
 
         except Exception as e:
             print(f"清理缓存失败: {e}")
