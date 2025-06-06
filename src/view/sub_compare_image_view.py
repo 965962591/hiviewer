@@ -64,34 +64,42 @@ if False: # 暂时禁用，不支持单独运行该模块
 """
 
 def convert_to_dict(exif_string):
-    """将字符串转换为字典
-    Args:
-        exif_string: str,
-            '曝光时间: 1/100_(10000.0ms)\nISO值: 75\n图片名称: IMG_20250325_053138.jpg\n图片尺寸: 2448 x 3264\n
-            图片张数: 3/9\nHDR: off\nZoom: 1\nLux: 174.8547\nCCT: 5110.869\nDRCgain: 1.411515 / 0.9743042 = 1.45\n
-            Awb_sa: indoor yellow0319,FACE Assist\nTriangle_index: 5\nR_gain: 1.792648, B_gain: 1.619696\n
-            Safe_gain: 2.268417, Short_gain: 1.499691, Long_gain: 2.268417'
-
-        return: dict ,
-            '曝光时间' ='1/100_(10000.0ms)'
-            'ISO值' ='75'
-            '图片名称' ='IMG_20250325_053138.jpg'
-            '图片尺寸' ='2448 x 3264'
-            '图片张数' ='3/9'
-            'HDR' ='off'
-            'Zoom' ='1'
-            'Lux' ='174.8547'
-            'CCT' ='5110.869'
-            'DRCgain' ='1.411515 / 0.9743042 = 1.45'
-            'Awb_sa' ='indoor yellow0319,FACE Assist'
-            'Triangle_index' ='5'
-            'R_gain' ='1.792648, B_gain: 1.619696'
-            'Safe_gain' ='2.268417, Short_gain: 1.499691, Long_gain: 2.268417'
     """
-    # 使用正则表达式匹配键值对
-    pattern = r'([^:]+): ([^\n]+)'
-    matches = re.findall(pattern, exif_string)
-    return {key.strip(): value.strip() for key, value in matches}
+    将EXIF字符串转换为字典格式。
+    
+    Args:
+        exif_string (str): 输入的EXIF字符串，格式为 "key: value" 的多行文本。
+        
+    Returns:
+        dict: 转换后的字典数据。
+        
+    Raises:
+        ValueError: 当输入参数不是字符串类型时。
+        Exception: 当正则表达式匹配失败时。
+    """
+    try:
+        # 输入类型检查
+        if not isinstance(exif_string, str):
+            raise ValueError("输入参数必须是字符串类型")
+            
+        # 检查输入是否为空
+        if not exif_string.strip():
+            return {}
+            
+        # 使用正则表达式匹配键值对
+        pattern = r'([^:]+): ([^\n]+)'
+        matches = re.findall(pattern, exif_string)
+        
+        # 检查是否成功匹配到数据
+        if not matches:
+            raise ValueError("未能从输入字符串中提取到任何键值对")
+
+        # 返回转换后的字典
+        return {key.strip(): value.strip() for key, value in matches}
+                
+    except Exception as e:
+        print(f"[convert_to_dict]-->error: 转换过程中发生错误: {str(e)}")
+        return {}
 
 
 def pil_to_pixmap(pil_image):
@@ -102,38 +110,28 @@ def pil_to_pixmap(pil_image):
         pil_image (PIL.Image): PIL图像对象
         
     Returns:
-        QPixmap: 转换后的QPixmap对象
+        QPixmap: 转换后的QPixmap对象，如果转换失败则返回None
+        
+    Raises:
+        ValueError: 当输入不是PIL.Image对象时
     """
     try:
+        if not isinstance(pil_image, Image.Image):
+            raise ValueError("输入必须是PIL.Image对象")
+            
         # 使用ImageOps.exif_transpose自动处理EXIF方向信息
         pil_image = ImageOps.exif_transpose(pil_image)
         
-        # 将PIL图像转换为RGB模式（如果不是的话）
-        if pil_image.mode != 'RGB':
-            pil_image = pil_image.convert('RGB')
+        # 转换为RGB模式并获取图像数据
+        img_data = pil_image.convert('RGB').tobytes('raw', 'RGB')
         
-        # 获取图像尺寸
-        width, height = pil_image.size
-        
-        # 将PIL图像转换为numpy数组
-        image_array = np.array(pil_image)
-        
-        # 创建QImage
-        qimage = QImage(
-            image_array.data,
-            width,
-            height,
-            image_array.strides[0],  # 每行的字节数
-            QImage.Format_RGB888
-        )
-        
-        # 转换为QPixmap
-        pixmap = QPixmap.fromImage(qimage)
-        
-        return pixmap
+        # 直接创建QImage并转换为QPixmap
+        qimage = QImage(img_data, pil_image.width, pil_image.height, 
+                       QImage.Format_RGB888)
+        return QPixmap.fromImage(qimage)
         
     except Exception as e:
-        print(f"PIL图像转换为QPixmap失败: {str(e)}")
+        print(f"[pil_to_pixmap]-->error: PIL图像转换为QPixmap失败: {str(e)}")
         return None
 
 
@@ -145,40 +143,37 @@ def rgb_str_to_qcolor(rgb_str):
     return QColor(r, g, b)
 
 
-def qcolor_to_rgb_str(qcolor):
-    """将 QColor 转换为 'rgb(r,g,b)' 格式的字符串"""
-    return f"rgb({qcolor.red()}, {qcolor.green()}, {qcolor.blue()})"
-
-
-def imread_chinese(path):
-    """支持中文路径的图片读取函数"""
-    # 使用二进制读取+解码，跨平台支持
-    try:
-        with open(path, 'rb') as f:
-            data = np.frombuffer(f.read(), dtype=np.uint8)
-            img = cv2.imdecode(data, cv2.IMREAD_COLOR)
-            # 自动转换颜色通道（可选）
-            # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) 
-            return img
-    except Exception as e:
-        print(f"读取图片失败: {e}")
-        return None
 
 def calculate_image_stats(image_input, resize_factor=1):
-    """使用OpenCV计算图片的亮度、RGB、LAB和对比度"""
+    """
+    该函数主要是实现了获取图片的亮度、RGB、LAB和对比度的功能.
+    Args:
+        image_input (str/Image.Image/np.ndarray): 支持传入文件路径、PIL图像、cv图像
+    Returns:
+        dict: 返回特定格式的字典数据.
+        {
+            'width': 宽度
+            'height': 高度
+            'avg_brightness': 亮度,
+            'contrast': 对比度指标
+            'avg_rgb': RGB,
+            'avg_lab': LAB,
+            'R_G': R/G计算结果
+            'B_G': B/G计算结果
+        }
+    """
     try:
-        # 类型判断分支处理，支持传入文件路径和PIL图像
+        # 类型判断分支处理，支持传入文件路径、PIL图像、cv图像
         if isinstance(image_input, str):  # 处理文件路径
-            img = imread_chinese(image_input)
+            with open(image_input, 'rb') as f:
+                data = np.frombuffer(f.read(), dtype=np.uint8)
+                img = cv2.imdecode(data, cv2.IMREAD_COLOR)
         elif isinstance(image_input, Image.Image):  # 处理PIL图像对象
-            # 转换PIL图像到OpenCV格式
             img = np.array(image_input.convert('RGB'))[:, :, ::-1].copy()
         elif isinstance(image_input, np.ndarray):  # 处理opencv图像对象
-            # 传入的是opencv格式图
             img = image_input
         else:
-            print(f"calculate_image_stats无法加载图像, 当前图像格式:{type(image_input)}")
-            return None
+            raise FileNotFoundError(f"无法识别的图像格式:{type(image_input)}")
 
         # 缩小图片
         height, width = img.shape[:2]
@@ -226,12 +221,14 @@ def calculate_image_stats(image_input, resize_factor=1):
         }
         
     except Exception as e:
-        print(f"calculate_image_stats计算图片统计信息失败, 错误: {e}")
+        print(f"[calculate_image_stats]-->error: 计算图片统计信息失败, 错误: {e}")
         return None
 
  
 def close_excel():
-    "强制关闭一个EXCEL表格"
+    """
+    该函数主要是实现了一个 强制关闭一个EXCEL表格 的功能.
+    """
     try:
         # 获取 Excel 应用程序的实例
         excel_app = win32.gencache.EnsureDispatch('Excel.Application')
@@ -309,7 +306,6 @@ def load_xml_data(xml_path):
         print(f"解析XML失败{xml_path}:\n {e}")
         return None
     
-
 def get_aebox_host():
     """读取aebox连接配置"""
     config_path = os.path.join(BasePath, "cache", "aebox_link_host.json")

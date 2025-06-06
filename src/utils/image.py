@@ -1,10 +1,16 @@
-# -*- coding: utf-8 -*-
-import cv2
-import time
+# -*- encoding: utf-8 -*-
+'''
+@File         :hiviewer.py
+@Time         :2025/06/04
+@Author       :diamond_cz@163.com
+@Version      :release-v3.5.2
+@Description  :处理图片, 获取基础的exif信息
+'''
+
 from PIL import Image
 from pathlib import Path
 from fractions import Fraction
-from typing import Optional, Tuple, Union, Dict, Any
+from typing import Optional, Dict, Any
 
 # 设置视频首帧图缓存路径
 BASEICONPATH = Path(__file__).parent.parent.parent

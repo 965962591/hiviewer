@@ -6,7 +6,6 @@ import shutil
 import hashlib
 import threading
 from pathlib import Path
-from io import BytesIO
 from functools import lru_cache
 from typing import Optional, Tuple
 
