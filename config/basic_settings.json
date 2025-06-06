@@ -62,17 +62,16 @@
         "D:/Tuning/O19/0_pic/02_IN_pic/0521_IN_回归验证原图/HDR",
         "D:/Tuning/O19/0_pic/02_IN_pic/0521_IN_回归验证原图/normal/N19",
         "D:/Tuning/O19/0_pic/02_IN_pic/0521_IN_回归验证原图/normal/15pro",
-        "C:\\Users\\caozhen\\Downloads\\P17"
+        "C:\\Users\\caozhen\\Downloads\\P17",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.4.22-O19-IN-一供-FT-原图/video/O19-1st",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.4.22-O19-IN-一供-FT-原图/video/xiaomi15"
     ],
-    "current_directory": "D:/Tuning/O19/0_pic/02_IN_pic/2025.4.22-O19-IN-一供-FT-原图/normal/O19-1st",
+    "current_directory": "D:/Tuning/O19/0_pic/02_IN_pic/2025.4.22-O19-IN-一供-FT-原图/video/xiaomi15",
     "file_type_option": "显示图片文件",
-    "combobox1_checked_items": [
-        "N19",
-        "xiaomi15"
-    ],
+    "combobox1_checked_items": [],
     "combobox1_all_items": [
         "N19",
-        "xiaomi15"
+        "O19-1st"
     ],
     "sort_option": "按文件名称排序",
     "theme_option": "默认主题",

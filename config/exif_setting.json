@@ -4,8 +4,8 @@
         "exif_info": true,
         "roi_info": true,
         "ai_tips": false,
-        "srgb_color_space": false,
-        "p3_color_space": true,
+        "srgb_color_space": true,
+        "p3_color_space": false,
         "gray_color_space": false
     },
     "exif_visable_setting": {
