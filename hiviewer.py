@@ -3437,8 +3437,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """处理子窗口关闭事件"""
         if self.compare_window:
             print("[on_compare_window_closed]-->主界面,接受看图子窗口关闭事件")
-            # self.compare_window.close()
-            self.compare_window.hide()
+            # 隐藏看图子界面，清理资源
+            self.compare_window.hide(), self.compare_window.cleanup()
             self.statusbar_label1.setText(f"🔉: 看图子界面关闭成功")
 
         # 检查看图子窗口的主题是否与主窗口一致,若不一致则更新主窗口的主题

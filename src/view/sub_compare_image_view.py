@@ -1784,30 +1784,35 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         """更新图片显示"""
         try:
             # 记录开始时间
-            start_time1 = time.time()
-            self.is_updating = True
+            start_time_set_images = time.time()
 
-            print("开始更新图片...")
-            if not image_paths:
-                print("没有有效的图片路径")
+            # 判断形参是否有效
+            if not image_paths or not index_list:
+                print("[set_images]-->waring:主界面传入到看图子界面的图片路径和图片索引为None")
                 return False
 
+            # 设置正在更新标志位，设置传入的图片数量
+            print("开始更新图片...")
+            self.is_updating, num_images = True, len(image_paths)
+             
             # 更新当前显示的图片路径列表
-            self.images_path_list = image_paths
-            self.index_list = index_list
-
+            self.images_path_list, self.index_list = image_paths, index_list
+            
             # 调用封装后的函数,将看图界面图片索引发送到aebox中
             self.sync_image_index_with_aebox(self.images_path_list, self.index_list)
 
             # 设置进度条初始化
             if not hasattr(self, 'progress_bar'):
                 self.set_progress_bar()
-            # 设置进度条总数
-            num_all = len(image_paths) + 5
+
+            # 设置进度条总数为传入的图片总数 elf.progress_bar.maximum() - self.progress_bar.value()
+            num_all = num_images + 5
+
             # 启动进度条显示
             self.progress_bar.setMaximum(num_all)
             self.progress_bar.setValue(0)
             self.progress_bar.setVisible(True)
+
             # 强制立即重绘界面
             # self.progress_bar.repaint()   # 重绘进度条
             # QApplication.processEvents()  # 处理所有挂起的事件
@@ -1816,14 +1821,15 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 # 确保表格可见
                 self.tableWidget_medium.setUpdatesEnabled(False) # 禁用表格自动刷新
                 self.tableWidget_medium.show()
-                
+
+                # 清理资源
+                self.cleanup()
+
                 # 1. 预先分配数据结构
                 self.progress_updated.emit(1)  # 发送进度条更新信号
                 if self.parent_window:         # 主界面标签进度更新
                     self.parent_window.statusbar_label1.setText(f"🔉: 正在更新图片...10%")
                     self.parent_window.statusbar_label1.repaint()  # 刷新标签文本 
-                self.cleanup()
-                num_images = len(image_paths)
                 self.exif_texts = [None] * num_images
                 self.histograms = [None] * num_images
                 self.original_rotation = [None] * num_images
@@ -1847,7 +1853,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     
                     """
                     # 记录开始时间
-                    start_time = time.time()  
+                    start_time_process_image = time.time()  
                     index, path = args
                     try:
                         # 如果图片是heic格式，则转换为jpg格式
@@ -1889,7 +1895,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                             histogram, cv_img, stats, gray_pixmap, p3_pixmap = self._generate_pixmaps_parallel(img)
 
                             
-                        # print(f"色域转换耗时: {(time.time() - start_time):.2f} 秒")
+                        # print(f"色域转换耗时: {(time.time() - start_time_process_image):.2f} 秒")
                         
                         # 1. 提取图片的基础信息
                         basic_info = self.get_pic_basic_info(path, img, pixmap, index_list[index])
@@ -1926,7 +1932,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                         return index, None
                     finally:
                         # 记录结束时间并计算耗时
-                        print(f"处理图片{index}_{os.path.basename(path)} 耗时: {(time.time() - start_time):.2f} 秒")
+                        print(f"处理图片{index}_{os.path.basename(path)} 耗时: {(time.time() - start_time_process_image):.2f} 秒")
                         
 
                 # 2. 使用线程池并行处理图片
@@ -1934,10 +1940,10 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 if self.parent_window:
                     self.parent_window.statusbar_label1.setText(f"🔉: 正在更新图片...20%")
                     self.parent_window.statusbar_label1.repaint()  # 刷新标签文本 
-                
                 # 使用并行解析图片的pil格式图、cv_img、histogram、pixmap、gray_pixmap、p3_pixmap以及exif等信息
                 with ThreadPoolExecutor(max_workers=min(len(image_paths), cpu_count() - 2)) as executor:
                     futures = list(executor.map(process_image, enumerate(image_paths)))
+
 
                 # 4. 计算目标尺寸
                 self.progress_updated.emit(3)
@@ -1946,6 +1952,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     self.parent_window.statusbar_label1.repaint()  # 刷新标签文本 
                 # 使用生成器表达式提高效率
                 valid_sizes = ((result[1]['pixmap'].width(), result[1]['pixmap'].height()) for result in futures if result and result[1])
+                
                 # 计算多张图片中的最大宽（max_width）和高（max_height）
                 widths, heights = zip(*valid_sizes)
                 max_width, max_height = max(widths), max(heights)
@@ -1954,28 +1961,33 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 total_area = sum(w * h for w, h in zip(widths, heights))      
                 avg_aspect_ratio = sum((w/h) * (w*h)/total_area for w, h in zip(widths, heights))
             
-                # 根据动态阈值判断方向，确定多张图片的统一宽（target_width）和高（target_height）
-                aspect_threshold = 1.2  # 可调整的阈值参数
-                if avg_aspect_ratio > aspect_threshold:  # 明显横向
+                # 根据动态阈值（默认1.2）判断方向，确定多张图片的统一宽（target_width）和高（target_height）
+                aspect_threshold = 1.2  
+                if avg_aspect_ratio > aspect_threshold:  
+                    # 明显横向
                     target_width = max_width
                     target_height = int(target_width / avg_aspect_ratio)
-                elif avg_aspect_ratio < 1/aspect_threshold:  # 明显纵向
+                elif avg_aspect_ratio < 1/aspect_threshold:  
+                    # 明显纵向
                     target_height = max_height
                     target_width = int(target_height * avg_aspect_ratio)
-                else:  # 接近方形
+                else:  
+                    # 接近方形
                     target_width = int((max_width + max_height * avg_aspect_ratio) / 2)
                     target_height = int((max_height + max_width / avg_aspect_ratio) / 2)
-                
+                         
 
                 # 4. 更新表格设置
                 self.progress_updated.emit(4)
                 if self.parent_window:
                     self.parent_window.statusbar_label1.setText(f"🔉: 正在更新图片...80%")
-                    self.parent_window.statusbar_label1.repaint()  # 刷新标签文本 
-                self.tableWidget_medium.setUpdatesEnabled(True) # 表格自动刷新
-                self.tableWidget_medium.clearContents()
+                    self.parent_window.statusbar_label1.repaint()   
+                # 启动表格自动刷新，设置表格行列数量
+                self.tableWidget_medium.setUpdatesEnabled(True) 
+                # self.tableWidget_medium.clearContents()
                 self.tableWidget_medium.setColumnCount(num_images)
                 self.tableWidget_medium.setRowCount(1)
+                # 设置表头内容
                 folder_names = [os.path.basename(os.path.dirname(path)) for path in image_paths]
                 if len(set(folder_names)) == 1: # 如果所有图片都在同一个文件夹中，则显示文件名
                     folder_names = [os.path.basename(path) for path in image_paths]
@@ -2056,7 +2068,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                         self.tableWidget_medium.setCellWidget(0, index, view)
 
                     # 更新进度条
-                    self.progress_updated.emit(index  + 7)
+                    self.progress_updated.emit(index + 7)
                     if self.parent_window:
                         self.parent_window.statusbar_label1.setText(f"🔉: 正在更新图片...100%")
                         self.parent_window.statusbar_label1.repaint()  # 刷新标签文本    
@@ -2071,9 +2083,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 self.is_updating = False
 
                 # 记录结束时间并计算耗时
-                end_time1 = time.time()
-                elapsed_time = end_time1 - start_time1
-                print(f"处理图片总耗时: {elapsed_time:.2f} 秒")
+                print(f"处理图片总耗时: {(time.time() - start_time_set_images):.2f} 秒")
 
         except Exception as e:
             print(f"❌ [set_images]-->处理图片时发生错误: {e}")
@@ -2256,13 +2266,21 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 self.roi_selection_active = False
             
             # 清理所有列表
-            self.graphics_views.clear()
             self.exif_texts.clear()
             self.histograms.clear()
-            self.original_pixmaps.clear()
             self.original_rotation.clear()
+            self.graphics_views.clear()
+            self.original_pixmaps.clear()
+            self.gray_pixmaps.clear()
+            self.p3_pixmaps.clear()
+            self.cv_imgs.clear()
+            self.pil_imgs.clear()
             self.base_scales.clear()
             self._scales_min.clear()
+
+            # 清理线程池
+            if hasattr(self, 'thread_pool'):
+                self.thread_pool.clear()
 
             # 强制垃圾回收
             gc.collect()
@@ -3255,14 +3273,10 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
     def Escape_close(self):
         """统一处理窗口关闭逻辑"""
-        if self.is_updating:
-            print("⭕[Escape_close]-->看图子界面-->warning: 正在更新图片，忽略关闭请求")
-            return
-            
         try:
-            # 保存颜色设置
-            self.save_settings()
-            self.cleanup()      # 清理资源
+            if self.is_updating:
+                print("⭕[Escape_close]-->看图子界面-->warning: 正在更新图片，忽略关闭请求")
+                return
             super().close()     # 调用父类的close方法
         except Exception as e:
             print(f"❌[Escape_close]-->看图子界面-->warning: 关闭窗口时发生错误: {e}")
