@@ -1760,12 +1760,13 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         print("打开设置窗口,还在开发中...")
 
 
-    def update_progress(self, value):
+    def update_progress(self, value):  # self.update_progress_play
         """更新进度条数值""" 
         if hasattr(self, 'progress_bar'):
             self.progress_bar.setValue(value)
             self.progress_bar.repaint()
             # QApplication.processEvents()
+
 
     def resizeEvent(self, event):
         # 窗口大小改变时更新进度条位置
@@ -1805,8 +1806,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             if not hasattr(self, 'progress_bar'):
                 self.set_progress_bar()
 
-            # 设置进度条总数为传入的图片总数 elf.progress_bar.maximum() - self.progress_bar.value()
-            num_all = num_images + 5
+            # 设置进度条总数为传入的图片总数 
+            num_all = num_images + 5 
 
             # 启动进度条显示
             self.progress_bar.setMaximum(num_all)
@@ -1842,6 +1843,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 self.base_scales = [None] * num_images
                 self._scales_min = [None] * num_images
 
+
                 # 定义图片处理函数
                 def process_image(args):
                     """
@@ -1874,8 +1876,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                             """2. 使用线程池并行生成，获取histogram, cv_img, stats, gray_pixmap, p3_pixmap等图像信息---------------------------------"""
                             histogram, cv_img, stats, gray_pixmap, p3_pixmap = self._generate_pixmaps_parallel(img)
                             # print(f"色域转换耗时: {(time.time() - start_time_process_image):.2f} 秒")
-                        
-                        """3. EXIF信息提取------------------------------------------------------------------------------------------------------""" 
+
+                        """3. EXIF信息提取-------------------------------------------------------------------------------------------------------""" 
                         # 提取图片的基础信息
                         basic_info = self.get_pic_basic_info(path, img, pixmap, index_list[index])
 
@@ -1922,7 +1924,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 # 使用并行解析图片的pil格式图、cv_img、histogram、pixmap、gray_pixmap、p3_pixmap以及exif等信息
                 with ThreadPoolExecutor(max_workers=min(len(image_paths), cpu_count() - 2)) as executor:
                     futures = list(executor.map(process_image, enumerate(image_paths)))
-
 
                 # 4. 计算目标尺寸
                 self.progress_updated.emit(3)
@@ -1996,7 +1997,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                         scene = QGraphicsScene(self)
                         scene.setBackgroundBrush(QBrush(qcolor)) # 设置场景背景色
 
-                        
                         # 创建图片项
                         pixmap_item = QGraphicsPixmapItem(pixmap)
                         pixmap_item.setTransformOriginPoint(pixmap.rect().center())
