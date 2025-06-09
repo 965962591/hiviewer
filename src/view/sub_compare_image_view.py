@@ -116,20 +116,37 @@ def pil_to_pixmap(pil_image):
         ValueError: 当输入不是PIL.Image对象时
     """
     try:
+        # 参数检查
+        if not pil_image:
+            raise ValueError(f"传入的参数为None")
+
+        # 判断传入的数据类型
         if not isinstance(pil_image, Image.Image):
-            raise ValueError("输入必须是PIL.Image对象")
+            raise ValueError(f"不支持传入的类型: {type(pil_image)},只支持传入PIL.Image类型")
             
         # 使用ImageOps.exif_transpose自动处理EXIF方向信息
         pil_image = ImageOps.exif_transpose(pil_image)
-        
-        # 转换为RGB模式并获取图像数据
-        img_data = pil_image.convert('RGB').tobytes('raw', 'RGB')
-        
-        # 直接创建QImage并转换为QPixmap
-        qimage = QImage(img_data, pil_image.width, pil_image.height, 
-                       QImage.Format_RGB888)
-        return QPixmap.fromImage(qimage)
-        
+
+        # 确保图像是RGB格式
+        if pil_image.mode != 'RGB':
+            pil_image = pil_image.convert('RGB')
+
+        # 将PIL图像转换为numpy数组
+        image_array = np.array(pil_image)
+
+        # 创建QImage
+        qimage = QImage(
+            image_array.data,
+            pil_image.width,
+            pil_image.height,
+            image_array.strides[0],  # 每行的字节数
+            QImage.Format_RGB888
+        )
+             
+        # 获取pixmap
+        pixmap = QPixmap.fromImage(qimage)
+
+        return pixmap
     except Exception as e:
         print(f"[pil_to_pixmap]-->error: PIL图像转换为QPixmap失败: {str(e)}")
         return None
@@ -143,7 +160,7 @@ def rgb_str_to_qcolor(rgb_str):
     return QColor(r, g, b)
 
 
-
+# @CC_TimeDec(tips="sucess")
 def calculate_image_stats(image_input, resize_factor=1):
     """
     该函数主要是实现了获取图片的亮度、RGB、LAB和对比度的功能.
@@ -1845,26 +1862,43 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                         # 使用PIL获取isinstance(image_input, Image.Image)格式图像
                         with Image.open(path) as img:
                             
+                            # 获取pil_img的格式,确保函数get_exif_info能正确加载信息
+                            img_format = img.format
+
+                            # 生成sRGB色域的pil_img和pixmap
+                            pixmap = pil_to_pixmap((img := self.p3_converter.get_pilimg_sRGB(img)))
+
                             # 获取cv_img
-                            cv_img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+                            # cv_img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+                            
+                            # 获取亮度统计信息
+                            # stats = calculate_image_stats(cv_img, resize_factor=0.1)
 
                             # 获取直方图
-                            histogram = self.calculate_brightness_histogram(img) 
+                            # histogram = self.calculate_brightness_histogram(img) 
 
-                            # 并行生成不同色域的pixmap
-                            pixmap, gray_pixmap, p3_pixmap = self._generate_pixmaps_parallel(img)
+                            # 获取sRGB色域图
+                            # gray_image = img.convert('L')
+                            # gray_pixmap = pil_to_pixmap(gray_image)
+
+                            # 获取display-p3色域图
+                            # p3_image = self.p3_converter.convert_color_space(img, "Display-P3", intent="Relative Colorimetric")
+                            # p3_pixmap = pil_to_pixmap(p3_image)
+
+                            # 使用线程池并行生成，需要获取的图像信息
+                            histogram, cv_img, stats, gray_pixmap, p3_pixmap = self._generate_pixmaps_parallel(img)
+
                             
-                        print(f"色域转换耗时: {(time.time() - start_time):.2f} 秒")
+                        # print(f"色域转换耗时: {(time.time() - start_time):.2f} 秒")
                         
                         # 1. 提取图片的基础信息
                         basic_info = self.get_pic_basic_info(path, img, pixmap, index_list[index])
 
                         # 2. piexf解析曝光时间光圈值ISO等复杂的EXIF信息
-                        exif_info = self.get_exif_info(path) + basic_info
+                        exif_info = self.get_exif_info(path, img_format) + basic_info
 
                         # 3. 检测是否存在同图片路径的xml文件  将lux_index、DRCgain写入到exif信息中去
-                        xml_path = os.path.join(os.path.dirname(path), os.path.basename(path).split('.')[0] + "_new.xml")
-                        hdr_flag = False
+                        hdr_flag, xml_path = False, os.path.join(os.path.dirname(path), os.path.basename(path).split('.')[0] + "_new.xml")
                         if os.path.exists(xml_path):
                             # 提取xml中lux_index、cct、drcgain等关键信息，拼接到exif_info
                             exif_info_qpm, hdr_flag = load_xml_data(xml_path)
@@ -1873,15 +1907,10 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                         # 处理EXIF信息，根据可见性字典更新
                         exif_info = self.process_exif_info(self.dict_exif_info_visibility, exif_info, hdr_flag)
 
-                        # 4. 计算亮度等统计信息
-                        stats = calculate_image_stats(path, resize_factor=0.1)
-                        # 移除LAB显示，替换为R/G和B/G
+                        # 4. 拼接亮度统计信息，计算亮度统计信息方法calculate_image_stats放到并行函数_generate_pixmaps_parallel中执行
                         stats_text = f"亮度: {stats['avg_brightness']}\n对比度(L值标准差): {stats['contrast']}" \
                         f"\nLAB: {stats['avg_lab']}\nRGB: {stats['avg_rgb']}\nR/G: {stats['R_G']}  B/G: {stats['B_G']}"
 
-                        # 记录结束时间并计算耗时
-                        print(f"处理图片{index}_{os.path.basename(path)} 耗时: {(time.time() - start_time):.2f} 秒")
-                    
                         return index, {
                             'pil_image': img,            # PIL图像
                             'cv_img': cv_img,            # OpenCV图像
@@ -1895,6 +1924,9 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     except Exception as e:
                         print(f"[process_image]-->error: 处理图片失败 {path}: {e}")
                         return index, None
+                    finally:
+                        # 记录结束时间并计算耗时
+                        print(f"处理图片{index}_{os.path.basename(path)} 耗时: {(time.time() - start_time):.2f} 秒")
                         
 
                 # 2. 使用线程池并行处理图片
@@ -2000,10 +2032,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                         
                         # 设置直方图、EXIF、亮度统计信息
                         view.set_histogram_visibility(self.checkBox_1.isChecked())
-                        if data['histogram']:
-                            view.set_histogram_data(data['histogram'])  
+                        view.set_histogram_data(data['histogram']) if data['histogram'] else ...
                         view.set_exif_visibility(self.checkBox_2.isChecked(), self.font_color_exif)
-                        # view.set_stats_visibility(self.checkBox_3.isChecked())
                         view.set_stats_visibility(self.stats_visible) 
 
                         # 设置原始OpenCV图像
@@ -2051,21 +2081,11 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
     def _generate_pixmaps_parallel(self, img):
         """并行生成不同色域的pixmap"""
-        def generate_srgb():
-            try:
-                pil_image = self.p3_converter.get_pilimg_sRGB(img)
-                pixmap = pil_to_pixmap(pil_image)
-                del pil_image  # 及时释放PIL图像
-                return pixmap
-            except Exception as e:
-                print(f"sRGB转换失败: {str(e)}")
-                return pil_to_pixmap(img)
-            
         def generate_gray():
             try:
-                gray_image = img.convert('L')
-                gray_pixmap = pil_to_pixmap(gray_image)
-                del gray_image  # 及时释放PIL图像
+                # 先转换为灰度区间pil_img，然后转换为pixmap
+                gray_pixmap = pil_to_pixmap(img.convert('L'))
+
                 return gray_pixmap
             except Exception as e:
                 print(f"sGray转换失败: {str(e)}")
@@ -2074,26 +2094,42 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         def generate_p3():
             try:
                 p3_image = self.p3_converter.convert_color_space(img, "Display-P3", intent="Relative Colorimetric")
-                p3_pixmap = pil_to_pixmap(p3_image)
-                del p3_image  # 及时释放PIL图像
-                return p3_pixmap
+                return pil_to_pixmap(p3_image)
             except Exception as e:
                 print(f"display-p3转换失败: {str(e)}")
                 return pil_to_pixmap(img)
+
+        def generate_cv_img():
+            try:
+                cv_img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+                stats = calculate_image_stats(cv_img, resize_factor=0.1)
+                return cv_img, stats
+            except Exception as e:
+                print(f"cv_img转换失败: {str(e)}")
+                return None, None
+
+        def generate_histogram():
+            try:
+                return self.calculate_brightness_histogram(img)
+            except Exception as e:
+                print(f"cv_img转换失败: {str(e)}")
+                return None
             
         # 使用线程池并行处理 min(4, cpu_count()) ，设置最大线程数
-        with ThreadPoolExecutor(max_workers=min(4, cpu_count())) as executor:
+        with ThreadPoolExecutor(max_workers=min(5, cpu_count())) as executor:
             # 提交所有任务
-            srgb_future = executor.submit(generate_srgb)
             gray_future = executor.submit(generate_gray)
             p3_future = executor.submit(generate_p3)
-            
+            cv_future = executor.submit(generate_cv_img)
+            histogram_future = executor.submit(generate_histogram)
+
             # 获取结果
-            pixmap = srgb_future.result()
             gray_pixmap = gray_future.result()
             p3_pixmap = p3_future.result()
-            
-        return pixmap, gray_pixmap, p3_pixmap
+            cv_img, stats =  cv_future.result()
+            histogram =  histogram_future.result()
+
+        return histogram, cv_img, stats, gray_pixmap, p3_pixmap
 
     def sync_image_index_with_aebox(self, images_path_list, index_list):
         """同步当前图片索引到aebox应用"""
@@ -2447,41 +2483,33 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             print(f"❌ [ai_tips_info]-->处理ai_tips_info函数时发生错误: {e}")
 
-    """modify by diamond_cz 20250218 移除该函数，使用更加高效的opencv方法实现
-    def calculate_brightness_histogram(self, path):
-        try:
-            image = Image.open(path).convert('L')  # 转换为灰度图
-            histogram = image.histogram()
-            # 只保留0-255的灰度值
-            histogram = histogram[:256]
-            return histogram
-        except Exception as e:
-            print(f"计算直方图失败: {path}\n错误: {e}")
-            return None
-    """ 
-    
     def calculate_brightness_histogram(self, img):
-        """传入PIL图像img,将其转换为灰度图, 输出直方图"""
+        """传入PIL图像img,将其转换为灰度图, 输出直方图和灰度pixmap"""
         try:
             # 处理PIL图像对象
             if isinstance(img, Image.Image):  
-                # 转换PIL图像到OpenCV格式
-                pass
+                # 转换为灰度图
+                gray_img = img.convert('L')
+                
+                # 将灰度图转换为RGB模式（QPixmap需要RGB格式）
+                # gray_rgb = gray_img.convert('RGB')
+                
+                # 转换为pixmap
+                # gray_pixmap = pil_to_pixmap(gray_rgb)
+                
+                # 使用numpy计算直方图
+                histogram = np.array(gray_img).flatten()
+                _hist_counts = np.bincount(histogram, minlength=256)
+                histogram = _hist_counts.tolist()
+
+                return histogram
             else:
                 print(f"❌ [calculate_brightness_histogram]-->无法加载图像")
-                return None
+                return None, None
 
-            # 转换为灰度图
-            gray_img = img.convert('L')
-            
-            # 使用numpy计算直方图
-            histogram = np.array(gray_img).flatten()
-            hist_counts = np.bincount(histogram, minlength=256)
-
-            return hist_counts.tolist()
         except Exception as e:
             print(f"❌ [calculate_brightness_histogram]-->计算直方图失败\n错误: {e}")
-            return None
+            return None, None
         
     
     def get_pic_basic_info(self, path, pil_img, pixmap, index):
@@ -2527,13 +2555,18 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             return f"❌ [get_pic_basic_info]-->无法获取图片{os.path.basename(path)}的基础信息:\n报错信息: {e}"
     
     
-    def get_exif_info(self, path):
+    def get_exif_info(self, path, image_format):
         """
         函数功能： 使用piexif解析特定格式（"JPEG", "TIFF", "MPO"）图片的曝光时间、光圈、ISO等详细信息
         输入： path 图片文件路径, image_format图片文件的PIL_image 格式
         输出： exif_info 解析出来的详细信息（exif_tags_id）
         """
         try:
+            # 检查文件格式
+            
+            if image_format not in ["JPEG", "TIFF", "MPO"]:
+                return ""
+
             # 直接使用 piexif库加载exif信息
             exif_info = "" 
             if (exif_dict := piexif.load(path)) and "0th" in exif_dict:
@@ -2609,7 +2642,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
             return exif_info
         except Exception as e:
-            print( f"❌ [get_exif_info]-->error: 读取图片{os.path.basename(path)}EXIF信息发生错误:\n报错信息: {e}")
+            print(f"❌ [get_exif_info]-->error: 读取图片{os.path.basename(path)}EXIF信息发生错误:\n报错信息: {e}")
             return ""
 
     def wheelEvent(self, event: QEvent):

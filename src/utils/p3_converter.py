@@ -6,13 +6,11 @@
 @Version      :1.0
 @Description  :
 '''
-
-
-from PIL import ImageCms,Image
-from pathlib import Path
 from io import BytesIO
+from pathlib import Path
+from PIL import ImageOps,ImageCms,Image
 
-
+# 设置项目根路径
 if True:
     BASEICONPATH = Path(__file__).parent.parent.parent
 
@@ -140,6 +138,9 @@ class ColorSpaceConverter:
             if not pil_image or not isinstance(pil_image, Image.Image):
                 raise ValueError(f"传入的pil_image为None或者格式不对")
 
+            # 设置自动校准图片方向信息    
+            pil_image = ImageOps.exif_transpose(pil_image)
+
             # 尝试读取图片的ICC配置文件并转换到sRGB色域
             if 'icc_profile' in pil_image.info:
                 # 从图片中获取ICC配置文件
@@ -155,6 +156,7 @@ class ColorSpaceConverter:
                     'RGB',          # 输入模式
                     'RGB'           # 输出模式
                 )
+
                 # 应用转换
                 pil_image = ImageCms.applyTransform(pil_image, transform)
 

@@ -64,14 +64,31 @@
         "D:/Tuning/O19/0_pic/02_IN_pic/0521_IN_回归验证原图/normal/15pro",
         "C:\\Users\\caozhen\\Downloads\\P17",
         "D:/Tuning/O19/0_pic/02_IN_pic/2025.4.22-O19-IN-一供-FT-原图/video/O19-1st",
-        "D:/Tuning/O19/0_pic/02_IN_pic/2025.4.22-O19-IN-一供-FT-原图/video/xiaomi15"
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.4.22-O19-IN-一供-FT-原图/video/xiaomi15",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.5.13-O19-IN-一供-FT原图/video/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.5.13-O19-IN-一供-FT原图/video/xiaomi15",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.5.15-O19-IN-三方测试原图/视频通话/Messenger",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.5.15-O19-IN-三方测试原图/视频通话/Messenger/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.5.15-O19-IN-三方测试原图/视频通话/Telegram/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.5.15-O19-IN-三方测试原图/视频通话/WhatsAPP/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/o19问题截图-0512&14/normal问题/AE",
+        "D:/Tuning/O19/0_pic/02_IN_pic/o19问题截图-0512&14/normal问题/AE/偏暗",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.5.15-O19-IN-三方测试原图/视频通话/WhatsAPP/V50",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.5.15-O19-IN-三方测试原图/Telegram/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/o19问题截图-0512&14/normal问题/AE/偏亮过曝",
+        "D:/Tuning/O19/0_pic/02_IN_pic/0521_IN_回归验证原图"
     ],
-    "current_directory": "D:/Tuning/O19/0_pic/02_IN_pic/2025.4.22-O19-IN-一供-FT-原图/video/xiaomi15",
+    "current_directory": "D:/Tuning/O19/0_pic/02_IN_pic/0521_IN_回归验证原图/normal/N19",
     "file_type_option": "显示图片文件",
-    "combobox1_checked_items": [],
+    "combobox1_checked_items": [
+        "15pro",
+        "O19",
+        "vico V50"
+    ],
     "combobox1_all_items": [
-        "N19",
-        "O19-1st"
+        "15pro",
+        "O19",
+        "vico V50"
     ],
     "sort_option": "按文件名称排序",
     "theme_option": "默认主题",

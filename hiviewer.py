@@ -1989,11 +1989,14 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             print(f"[getSiblingFolders]-->获取同级文件夹列表失败: {e}")
             return []
 
-
+    # @CC_TimeDec(tips="suc")
     def handle_table_selection(self):
         """处理表格选中事件（新增预览功能）"""
         try:
-            # print("handle_table_selection()--处理表格选中事件")
+            # 看图子界面更新图片时忽略表格选中事件
+            if self.compare_window and self.compare_window.is_updating:
+                return
+
             if not (file_paths := self.get_selected_file_path()):
                 print("[handle_table_selection]-->warning: 没有获取到文件路径")
                 return
@@ -2050,6 +2053,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             print(f"[clear_preview_layout]-->清空预览区域失败: {e}")
 
+    # @CC_TimeDec(tips="suc")
     def create_image_preview(self, path):
         """创建图片预览"""
         try:

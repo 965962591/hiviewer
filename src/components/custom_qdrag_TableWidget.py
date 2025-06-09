@@ -4,8 +4,6 @@ from PyQt5.QtWidgets import (QAbstractItemView, QApplication, QTableWidget)
 from PyQt5.QtCore import (Qt, QTimer, QMimeData, QPoint, QUrl)
 from PyQt5.QtGui import (QPixmap, QPainter, QDrag, QColor, QFont)
 
-# 自定义模块
-from src.utils.heic import extract_jpg_from_heic
 
 class DragTableWidget(QTableWidget):
     """重写QTableWidget类, 支持拖拽功能"""
@@ -97,42 +95,19 @@ class DragTableWidget(QTableWidget):
             mime_data.setUrls(urls)
             drag.setMimeData(mime_data)
 
-            # 根据选择项数量创建不同的预览图
-            if len(urls) == 1:
-                # 获取文件路径
-                file_path = urls[0].toLocalFile()
-                # 获取文件扩展名
-                file_extension = Path(file_path).suffix
+            # 使用默认的纯色背景预览图
+            preview = self.create_preview_image(f"{len(urls)}个")
 
-                # 根据文件扩展名创建不同的预览图
-                if file_extension.endswith(self.main_window.IMAGE_FORMATS):
-                    if file_extension.endswith(tuple(".heic")):
-                        if (new_path := extract_jpg_from_heic(file_path)):
-                            # 获取heic格式图片预览
-                            preview = QPixmap(new_path).scaled(128, 128, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                        else:
-                            # 使用默认预览图
-                            preview = self.create_preview_image(file_extension)
-                    else:
-                        # 获取其它图片预览
-                        preview = QPixmap(file_path).scaled(128, 128, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                
-                elif file_extension.endswith(self.main_window.VIDEO_FORMATS):
-                    # 获取视频预览帧
-                    video_frame_path = Path(__file__).parent.parent.parent / "cache" / "videos" / "video_preview_frame.jpg"
-                    if video_frame_path.exists():
-                        # 使用视频预览帧创建预览图
-                        preview = QPixmap(video_frame_path._str).scaled(128, 128, Qt.KeepAspectRatio, Qt.SmoothTransformation) 
-                    
-                    else: # 如果视频预览帧不存在，则使用默认预览图
-                        preview = self.create_preview_image(file_extension)
-                    
-                else: # 如果文件扩展名不是图片或视频，则使用默认预览图
-                    preview = self.create_preview_image(file_extension)
-                    
-            else: # 如果选择项数量大于1，则使用默认预览图
-                preview = self.create_preview_image(f"{len(urls)}个")
-            
+            # 选择项数量为1时直接获取预览区域的pixmap
+            if len(urls) == 1:
+                # self.main_window.image_viewer.pixmap_item.pixmap()
+                # self.main_window.image_viewer.scene.items()[0].pixmap()
+
+                # 直接获取主界面预览区域的pixmap
+                if self.main_window.image_viewer and self.main_window.image_viewer.pixmap_item:
+                    _pixmap = self.main_window.image_viewer.pixmap_item.pixmap()
+                    preview = _pixmap.scaled(128, 128, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+
             # 设置预览图
             drag.setPixmap(preview)
             drag.setHotSpot(QPoint(preview.width()//2, preview.height()//2))
