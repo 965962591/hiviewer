@@ -1762,10 +1762,10 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
     def update_progress(self, value):
         """更新进度条数值""" 
-        self.progress_bar.setValue(value)
-        self.progress_bar.repaint()
-        # QApplication.processEvents()
-
+        if hasattr(self, 'progress_bar'):
+            self.progress_bar.setValue(value)
+            self.progress_bar.repaint()
+            # QApplication.processEvents()
 
     def resizeEvent(self, event):
         # 窗口大小改变时更新进度条位置
@@ -1825,11 +1825,11 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 # 清理资源
                 self.cleanup()
 
-                # 1. 预先分配数据结构
-                self.progress_updated.emit(1)  # 发送进度条更新信号
-                if self.parent_window:         # 主界面标签进度更新
+                # 1. 预先分配数据结构, 发送进度条更新信号, 主界面标签进度更新
+                self.progress_updated.emit(1)  
+                if self.parent_window:         
                     self.parent_window.statusbar_label1.setText(f"🔉: 正在更新图片...10%")
-                    self.parent_window.statusbar_label1.repaint()  # 刷新标签文本 
+                    self.parent_window.statusbar_label1.repaint()
                 self.exif_texts = [None] * num_images
                 self.histograms = [None] * num_images
                 self.original_rotation = [None] * num_images
@@ -1865,45 +1865,24 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                         if not os.path.exists(path):
                             raise FileNotFoundError(f"❌ 图片不存在: {path}")
 
-                        # 使用PIL获取isinstance(image_input, Image.Image)格式图像
+                        # 使用PIL获取所需的图像信息
                         with Image.open(path) as img:
-                            
-                            # 获取pil_img的格式,确保函数get_exif_info能正确加载信息
+                            """1. 获取pil_img的格式,确保函数get_exif_info能正确加载信息; 生成sRGB色域的pil_img和pixmap--------------------------------"""
                             img_format = img.format
-
-                            # 生成sRGB色域的pil_img和pixmap
                             pixmap = pil_to_pixmap((img := self.p3_converter.get_pilimg_sRGB(img)))
 
-                            # 获取cv_img
-                            # cv_img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
-                            
-                            # 获取亮度统计信息
-                            # stats = calculate_image_stats(cv_img, resize_factor=0.1)
-
-                            # 获取直方图
-                            # histogram = self.calculate_brightness_histogram(img) 
-
-                            # 获取sRGB色域图
-                            # gray_image = img.convert('L')
-                            # gray_pixmap = pil_to_pixmap(gray_image)
-
-                            # 获取display-p3色域图
-                            # p3_image = self.p3_converter.convert_color_space(img, "Display-P3", intent="Relative Colorimetric")
-                            # p3_pixmap = pil_to_pixmap(p3_image)
-
-                            # 使用线程池并行生成，需要获取的图像信息
+                            """2. 使用线程池并行生成，获取histogram, cv_img, stats, gray_pixmap, p3_pixmap等图像信息---------------------------------"""
                             histogram, cv_img, stats, gray_pixmap, p3_pixmap = self._generate_pixmaps_parallel(img)
-
-                            
-                        # print(f"色域转换耗时: {(time.time() - start_time_process_image):.2f} 秒")
+                            # print(f"色域转换耗时: {(time.time() - start_time_process_image):.2f} 秒")
                         
-                        # 1. 提取图片的基础信息
+                        """3. EXIF信息提取------------------------------------------------------------------------------------------------------""" 
+                        # 提取图片的基础信息
                         basic_info = self.get_pic_basic_info(path, img, pixmap, index_list[index])
 
-                        # 2. piexf解析曝光时间光圈值ISO等复杂的EXIF信息
+                        # piexf解析曝光时间光圈值ISO等复杂的EXIF信息
                         exif_info = self.get_exif_info(path, img_format) + basic_info
 
-                        # 3. 检测是否存在同图片路径的xml文件  将lux_index、DRCgain写入到exif信息中去
+                        # 检测是否存在同图片路径的xml文件  将lux_index、DRCgain写入到exif信息中去
                         hdr_flag, xml_path = False, os.path.join(os.path.dirname(path), os.path.basename(path).split('.')[0] + "_new.xml")
                         if os.path.exists(xml_path):
                             # 提取xml中lux_index、cct、drcgain等关键信息，拼接到exif_info
@@ -1913,7 +1892,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                         # 处理EXIF信息，根据可见性字典更新
                         exif_info = self.process_exif_info(self.dict_exif_info_visibility, exif_info, hdr_flag)
 
-                        # 4. 拼接亮度统计信息，计算亮度统计信息方法calculate_image_stats放到并行函数_generate_pixmaps_parallel中执行
+                        # 拼接亮度统计信息，计算亮度统计信息方法calculate_image_stats放到并行函数_generate_pixmaps_parallel中执行
                         stats_text = f"亮度: {stats['avg_brightness']}\n对比度(L值标准差): {stats['contrast']}" \
                         f"\nLAB: {stats['avg_lab']}\nRGB: {stats['avg_rgb']}\nR/G: {stats['R_G']}  B/G: {stats['B_G']}"
 
@@ -1938,7 +1917,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 # 2. 使用线程池并行处理图片
                 self.progress_updated.emit(2)
                 if self.parent_window:
-                    self.parent_window.statusbar_label1.setText(f"🔉: 正在更新图片...20%")
+                    self.parent_window.statusbar_label1.setText(f"🔉: 正在更新图片...40%")
                     self.parent_window.statusbar_label1.repaint()  # 刷新标签文本 
                 # 使用并行解析图片的pil格式图、cv_img、histogram、pixmap、gray_pixmap、p3_pixmap以及exif等信息
                 with ThreadPoolExecutor(max_workers=min(len(image_paths), cpu_count() - 2)) as executor:
@@ -1948,7 +1927,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 # 4. 计算目标尺寸
                 self.progress_updated.emit(3)
                 if self.parent_window:
-                    self.parent_window.statusbar_label1.setText(f"🔉: 正在更新图片...40%")
+                    self.parent_window.statusbar_label1.setText(f"🔉: 正在更新图片...60%")
                     self.parent_window.statusbar_label1.repaint()  # 刷新标签文本 
                 # 使用生成器表达式提高效率
                 valid_sizes = ((result[1]['pixmap'].width(), result[1]['pixmap'].height()) for result in futures if result and result[1])
@@ -2068,7 +2047,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                         self.tableWidget_medium.setCellWidget(0, index, view)
 
                     # 更新进度条
-                    self.progress_updated.emit(index + 7)
+                    maxmum = self.progress_bar.maximum()
+                    self.progress_updated.emit(maxmum)
                     if self.parent_window:
                         self.parent_window.statusbar_label1.setText(f"🔉: 正在更新图片...100%")
                         self.parent_window.statusbar_label1.repaint()  # 刷新标签文本    
@@ -2090,6 +2070,27 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             return False
 
     def _generate_pixmaps_parallel(self, img):
+        """
+        该函数主要是实现了一个线程池并行生成不同色域的pixmap.
+        Args:
+            img (Image.Image): PIL Image.
+        Returns:
+            histogram, cv_img, stats, gray_pixmap, p3_pixmap.
+        Note:
+            # 获取cv_img
+            cv_img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+            # 获取亮度统计信息
+            stats = calculate_image_stats(cv_img, resize_factor=0.1)
+            # 获取直方图
+            histogram = self.calculate_brightness_histogram(img) 
+            # 获取sRGB色域图
+            gray_image = img.convert('L')
+            gray_pixmap = pil_to_pixmap(gray_image)
+            # 获取display-p3色域图
+            p3_image = self.p3_converter.convert_color_space(img, "Display-P3", intent="Relative Colorimetric")
+            p3_pixmap = pil_to_pixmap(p3_image)
+        """
+        
         """并行生成不同色域的pixmap"""
         def generate_gray():
             try:
