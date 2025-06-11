@@ -1808,18 +1808,16 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             self.progress_bar.setValue(0)
             self.progress_bar.setVisible(True)
             # 强制立即重绘界面
-            # self.progress_bar.repaint()   # 重绘进度条
+            self.progress_bar.repaint()   # 重绘进度条
             # QApplication.processEvents()  # 处理所有挂起的事件
 
             # 调用封装后的函数,将看图界面图片索引发送到aebox中
             self.sync_image_index_with_aebox(self.images_path_list, self.index_list)
 
             try:
-                # 确保表格可见
-                self.tableWidget_medium.setUpdatesEnabled(False) # 禁用表格自动刷新
+                # 先禁用表格自动刷新，确保表格可见，然后释放之前的表格显示等资源
+                self.tableWidget_medium.setUpdatesEnabled(False) 
                 self.tableWidget_medium.show()
-
-                # 清理资源
                 self.cleanup()
 
                 # 1. 预先分配数据结构, 发送进度条更新信号
@@ -1850,18 +1848,16 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
 
                 # 3. 使用线程池并行处理图片
-                self.progress_updated.emit(3)
+                self.progress_updated.emit(5)
                 # 使用并行解析图片的pil格式图、cv_img、histogram、pixmap、gray_pixmap、p3_pixmap以及exif等信息
                 with ThreadPoolExecutor(max_workers=min(len(image_paths), cpu_count() - 2)) as executor:
                     futures = list(executor.map(self._process_image, enumerate(image_paths)))
 
                 # 4. 计算目标尺寸
-                self.progress_updated.emit(4)
-                target_width, target_height, avg_aspect_ratio = self.calculate_target_dimensions(futures)
+                target_width, target_height, avg_aspect_ratio = self._calculate_target_dimensions(futures)
                 
 
                 # 5. 批量更新UI, 更新进度条
-                self.progress_updated.emit(5)
                 maxmum = self.progress_bar.maximum()
                 self.progress_updated.emit(maxmum)
 
@@ -1869,6 +1865,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 self.tableWidget_medium.setUpdatesEnabled(True)
                 for index, result in enumerate(futures):
                     if result and result[1]:
+                        # 获取图片处理结果
                         data = result[1]
 
                         # 根据下拉框索引判断pixmap类型(0:原始图、1:灰度图、2:p3色域图)
@@ -1920,7 +1917,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                         # 更新表格
                         self.tableWidget_medium.setCellWidget(0, index, view)
                         
-
                 return True
             except Exception as e:
                 print(f"更新图片时发生错误: {e}")
@@ -1937,48 +1933,85 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             print(f"❌ [set_images]-->处理图片时发生错误: {e}")
             return False
 
-    def calculate_target_dimensions(self, futures, aspect_threshold=1.2):
+    def _calculate_target_dimensions(self, futures, aspect_threshold=1.2):
         """
         计算多张图片的目标尺寸
-        
+
         Args:
             futures: 包含图片处理结果的future列表
-            aspect_threshold: 宽高比阈值，默认1.2
-            
+            aspect_threshold: 宽高比阈值, 默认1.2
+
         Returns:
-            tuple: (target_width, target_height) 目标宽度和高度
+            tuple: (target_width, target_height, avg_aspect_ratio) 目标宽度、高度和平均宽高比
+
+        Raises:
+            ValueError: 当输入数据无效时抛出
+            ZeroDivisionError: 当计算比例时出现除零错误
+            Exception: 其他未预期的错误
         """
-        # 使用列表推导获取有效的宽高数据
-        dimensions = [(result[1]['pixmap'].width(), result[1]['pixmap'].height()) 
-                     for result in futures if result and result[1]]
-        
-        if not dimensions:
-            return 0, 0, 0
-            
-        # 使用zip和max高效计算最大宽高
-        widths, heights = zip(*dimensions)
-        max_width, max_height = max(widths), max(heights)
-        
-        # 计算面积加权的平均宽高比
-        areas = [w * h for w, h in dimensions]
-        total_area = sum(areas)
-        avg_aspect_ratio = sum((w/h) * area for (w, h), area in zip(dimensions, areas)) / total_area
-        
-        # 根据宽高比确定目标尺寸
-        if avg_aspect_ratio > aspect_threshold:
-            # 横向图片
-            target_width = max_width
-            target_height = int(target_width / avg_aspect_ratio)
-        elif avg_aspect_ratio < 1/aspect_threshold:
-            # 纵向图片
-            target_height = max_height
-            target_width = int(target_height * avg_aspect_ratio)
-        else:
-            # 接近方形
-            target_width = int((max_width + max_height * avg_aspect_ratio) / 2)
-            target_height = int((max_height + max_width / avg_aspect_ratio) / 2)
-            
-        return target_width, target_height, avg_aspect_ratio
+        try:
+            # 使用列表推导获取有效的宽高数据，同时进行数据验证
+            dimensions = []
+            for result in futures:
+                if not result or not result[1] or not result[1].get('pixmap'):
+                    continue
+                try:
+                    width = result[1]['pixmap'].width()
+                    height = result[1]['pixmap'].height()
+                    if width <= 0 or height <= 0:
+                        continue
+                    dimensions.append((width, height))
+                except (AttributeError, KeyError):
+                    continue
+
+            if not dimensions:
+                raise ValueError("没有有效的图片尺寸数据")
+
+            # 使用zip和map优化计算
+            widths, heights = zip(*dimensions)
+            max_width, max_height = max(widths), max(heights)
+
+            # 使用map和zip优化面积计算
+            areas = list(map(lambda x: x[0] * x[1], dimensions))
+            total_area = sum(areas)
+
+            if total_area == 0:
+                raise ZeroDivisionError("总面积为0，无法计算平均宽高比")
+
+            # 优化宽高比计算
+            aspect_ratios = map(lambda d: d[0]/d[1], dimensions)
+            weighted_ratios = map(lambda r, a: r * a, aspect_ratios, areas)
+            avg_aspect_ratio = sum(weighted_ratios) / total_area
+
+            # 根据宽高比确定目标尺寸
+            if avg_aspect_ratio > aspect_threshold:
+                # 横向图片
+                target_width = max_width
+                target_height = int(target_width / avg_aspect_ratio)
+            elif avg_aspect_ratio < 1/aspect_threshold:
+                # 纵向图片
+                target_height = max_height
+                target_width = int(target_height * avg_aspect_ratio)
+            else:
+                # 接近方形
+                target_width = int((max_width + max_height * avg_aspect_ratio) / 2.0)
+                target_height = int((max_height + max_width / avg_aspect_ratio) / 2.0)
+
+            # 确保尺寸有效
+            target_width = max(1, target_width)
+            target_height = max(1, target_height)
+
+            return target_width, target_height, avg_aspect_ratio
+
+        except ValueError as ve:
+            print(f"计算目标尺寸时出现值错误: {ve}")
+            return 1, 1, 1.0
+        except ZeroDivisionError as ze:
+            print(f"计算目标尺寸时出现除零错误: {ze}")
+            return 1, 1, 1.0
+        except Exception as e:
+            print(f"计算目标尺寸时出现未预期错误: {e}")
+            return 1, 1, 1.0
 
     def _process_image(self, args):
         """
