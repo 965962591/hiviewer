@@ -16,10 +16,10 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import QApplication, QWidget
 from PyQt5 import QtGui,QtCore
  
-class RoundProgress(QWidget):
+class RectangleProgress(QWidget):
  
     def __init__(self, parent=None, total_time=5000, interval=50):
-        super(RoundProgress, self).__init__(parent)
+        super(RectangleProgress, self).__init__(parent)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)  # 添加Tool标志
         self.setAttribute(Qt.WA_TranslucentBackground)  # 设置窗口背景透明
         self.setAttribute(Qt.WA_ShowWithoutActivating)  # 显示时不获取焦点
@@ -62,7 +62,7 @@ class RoundProgress(QWidget):
     @staticmethod
     def show_progress(parent=None, total_time=5000, interval=50):
         """静态方法用于创建和显示进度条"""
-        progress = RoundProgress(parent, total_time, interval)
+        progress = RectangleProgress(parent, total_time, interval)
         progress.center_on_mouse()  # 居中显示
         progress.show()
         progress.raise_()           # 确保窗口在最顶层
@@ -151,7 +151,7 @@ if __name__ == '__main__':
     interval = 30       # 更新间隔30毫秒
     
     # 使用静态方法创建进度条
-    progress = RoundProgress.show_progress(total_time=total_time, interval=interval)
+    progress = RectangleProgress.show_progress(total_time=total_time, interval=interval)
 
     # 添加1.5秒延时后触发快速完成
     QTimer.singleShot(1500, progress.complete_progress)

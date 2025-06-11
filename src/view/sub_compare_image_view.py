@@ -924,7 +924,7 @@ class MyGraphicsView(QGraphicsView):
         self.update_labels_position()
         
 
-    def set_original_image(self, cv_img):
+    def set_cv_image(self, cv_img):
         """设置原始OpenCV图像用于统计计算"""
         self.original_image = cv_img
 
@@ -1799,25 +1799,21 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             # 更新当前显示的图片路径列表
             self.images_path_list, self.index_list = image_paths, index_list
             
-            # 调用封装后的函数,将看图界面图片索引发送到aebox中
-            self.sync_image_index_with_aebox(self.images_path_list, self.index_list)
-
             # 设置进度条初始化
             if not hasattr(self, 'progress_bar'):
                 self.set_progress_bar()
-
-            # 设置进度条总数为传入的图片总数 
+            # 设置进度条总数为传入的图片总数，启动进度条显示
             num_all = num_images + 5 
-
-            # 启动进度条显示
             self.progress_bar.setMaximum(num_all)
             self.progress_bar.setValue(0)
             self.progress_bar.setVisible(True)
-
             # 强制立即重绘界面
             # self.progress_bar.repaint()   # 重绘进度条
             # QApplication.processEvents()  # 处理所有挂起的事件
-            
+
+            # 调用封装后的函数,将看图界面图片索引发送到aebox中
+            self.sync_image_index_with_aebox(self.images_path_list, self.index_list)
+
             try:
                 # 确保表格可见
                 self.tableWidget_medium.setUpdatesEnabled(False) # 禁用表格自动刷新
@@ -1826,11 +1822,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 # 清理资源
                 self.cleanup()
 
-                # 1. 预先分配数据结构, 发送进度条更新信号, 主界面标签进度更新
+                # 1. 预先分配数据结构, 发送进度条更新信号
                 self.progress_updated.emit(1)  
-                if self.parent_window:         
-                    self.parent_window.statusbar_label1.setText(f"🔉: 正在更新图片...10%")
-                    self.parent_window.statusbar_label1.repaint()
                 self.exif_texts = [None] * num_images
                 self.histograms = [None] * num_images
                 self.original_rotation = [None] * num_images
@@ -1844,214 +1837,89 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 self._scales_min = [None] * num_images
 
 
-                # 定义图片处理函数
-                def process_image(args):
-                    """
-                    图片基础信息处理:
-                    (1) 图片旋转处理
-                    (2) EXIF信息获取 (self.get_exif_info)
-                    (3) 直方图计算 (self.calculate_brightness_histogram)
-                    (4) 图片亮度统计信息计算 (calculate_image_stats)
-                    
-                    """
-                    # 记录开始时间
-                    start_time_process_image = time.time()  
-                    index, path = args
-                    try:
-                        # 如果图片是heic格式，则转换为jpg格式
-                        if path.endswith(".heic"):
-                            if new_path := extract_jpg_from_heic(path):
-                                path = new_path
-
-                        # 如果图片不存在，则抛出异常
-                        if not os.path.exists(path):
-                            raise FileNotFoundError(f"❌ 图片不存在: {path}")
-
-                        # 使用PIL获取所需的图像信息
-                        with Image.open(path) as img:
-                            """1. 获取pil_img的格式,确保函数get_exif_info能正确加载信息; 生成sRGB色域的pil_img和pixmap--------------------------------"""
-                            img_format = img.format
-                            pixmap = pil_to_pixmap((img := self.p3_converter.get_pilimg_sRGB(img)))
-
-                            """2. 使用线程池并行生成，获取histogram, cv_img, stats, gray_pixmap, p3_pixmap等图像信息---------------------------------"""
-                            histogram, cv_img, stats, gray_pixmap, p3_pixmap = self._generate_pixmaps_parallel(img)
-                            # print(f"色域转换耗时: {(time.time() - start_time_process_image):.2f} 秒")
-
-                        """3. EXIF信息提取-------------------------------------------------------------------------------------------------------""" 
-                        # 提取图片的基础信息
-                        basic_info = self.get_pic_basic_info(path, img, pixmap, index_list[index])
-
-                        # piexf解析曝光时间光圈值ISO等复杂的EXIF信息
-                        exif_info = self.get_exif_info(path, img_format) + basic_info
-
-                        # 检测是否存在同图片路径的xml文件  将lux_index、DRCgain写入到exif信息中去
-                        hdr_flag, xml_path = False, os.path.join(os.path.dirname(path), os.path.basename(path).split('.')[0] + "_new.xml")
-                        if os.path.exists(xml_path):
-                            # 提取xml中lux_index、cct、drcgain等关键信息，拼接到exif_info
-                            exif_info_qpm, hdr_flag = load_xml_data(xml_path)
-                            exif_info += exif_info_qpm
-                            
-                        # 处理EXIF信息，根据可见性字典更新
-                        exif_info = self.process_exif_info(self.dict_exif_info_visibility, exif_info, hdr_flag)
-
-                        # 拼接亮度统计信息，计算亮度统计信息方法calculate_image_stats放到并行函数_generate_pixmaps_parallel中执行
-                        stats_text = f"亮度: {stats['avg_brightness']}\n对比度(L值标准差): {stats['contrast']}" \
-                        f"\nLAB: {stats['avg_lab']}\nRGB: {stats['avg_rgb']}\nR/G: {stats['R_G']}  B/G: {stats['B_G']}"
-
-                        return index, {
-                            'pil_image': img,            # PIL图像
-                            'cv_img': cv_img,            # OpenCV图像
-                            'histogram': histogram,      # 直方图信息
-                            'pixmap': pixmap,            # 原始pixmap格式图
-                            'gray_pixmap': gray_pixmap,  # pixmap格式灰度图
-                            'p3_pixmap': p3_pixmap,      # pixmap格式p3色域图
-                            'exif_info': exif_info,      # exif信息
-                            'stats': stats_text,         # 添加亮度/RGB/LAB等信息
-                        }
-                    except Exception as e:
-                        print(f"[process_image]-->error: 处理图片失败 {path}: {e}")
-                        return index, None
-                    finally:
-                        # 记录结束时间并计算耗时
-                        print(f"处理图片{index}_{os.path.basename(path)} 耗时: {(time.time() - start_time_process_image):.2f} 秒")
-                        
-
-                # 2. 使用线程池并行处理图片
+                # 2. 设置表头行列结构以及单元格内容（文件夹名或文件名）
                 self.progress_updated.emit(2)
-                if self.parent_window:
-                    self.parent_window.statusbar_label1.setText(f"🔉: 正在更新图片...40%")
-                    self.parent_window.statusbar_label1.repaint()  # 刷新标签文本 
-                # 使用并行解析图片的pil格式图、cv_img、histogram、pixmap、gray_pixmap、p3_pixmap以及exif等信息
-                with ThreadPoolExecutor(max_workers=min(len(image_paths), cpu_count() - 2)) as executor:
-                    futures = list(executor.map(process_image, enumerate(image_paths)))
-
-                # 4. 计算目标尺寸
-                self.progress_updated.emit(3)
-                if self.parent_window:
-                    self.parent_window.statusbar_label1.setText(f"🔉: 正在更新图片...60%")
-                    self.parent_window.statusbar_label1.repaint()  # 刷新标签文本 
-                # 使用生成器表达式提高效率
-                valid_sizes = ((result[1]['pixmap'].width(), result[1]['pixmap'].height()) for result in futures if result and result[1])
-                
-                # 计算多张图片中的最大宽（max_width）和高（max_height）
-                widths, heights = zip(*valid_sizes)
-                max_width, max_height = max(widths), max(heights)
-
-                # 计算加权平均宽高比（根据图片面积加权）
-                total_area = sum(w * h for w, h in zip(widths, heights))      
-                avg_aspect_ratio = sum((w/h) * (w*h)/total_area for w, h in zip(widths, heights))
-            
-                # 根据动态阈值（默认1.2）判断方向，确定多张图片的统一宽（target_width）和高（target_height）
-                aspect_threshold = 1.2  
-                if avg_aspect_ratio > aspect_threshold:  
-                    # 明显横向
-                    target_width = max_width
-                    target_height = int(target_width / avg_aspect_ratio)
-                elif avg_aspect_ratio < 1/aspect_threshold:  
-                    # 明显纵向
-                    target_height = max_height
-                    target_width = int(target_height * avg_aspect_ratio)
-                else:  
-                    # 接近方形
-                    target_width = int((max_width + max_height * avg_aspect_ratio) / 2)
-                    target_height = int((max_height + max_width / avg_aspect_ratio) / 2)
-                         
-
-                # 4. 更新表格设置
-                self.progress_updated.emit(4)
-                if self.parent_window:
-                    self.parent_window.statusbar_label1.setText(f"🔉: 正在更新图片...80%")
-                    self.parent_window.statusbar_label1.repaint()   
-                # 启动表格自动刷新，设置表格行列数量
-                self.tableWidget_medium.setUpdatesEnabled(True) 
-                # self.tableWidget_medium.clearContents()
+                # self.tableWidget_medium.setUpdatesEnabled(True) 
                 self.tableWidget_medium.setColumnCount(num_images)
                 self.tableWidget_medium.setRowCount(1)
-                # 设置表头内容
                 folder_names = [os.path.basename(os.path.dirname(path)) for path in image_paths]
-                if len(set(folder_names)) == 1: # 如果所有图片都在同一个文件夹中，则显示文件名
-                    folder_names = [os.path.basename(path) for path in image_paths]
-                self.tableWidget_medium.setHorizontalHeaderLabels(folder_names) # 更新表头
+                if len(set(folder_names)) == 1: # 如果图片路径都在同一个文件夹下，则将文件夹名作为表头
+                    _tmp = folder_names[0]
+                    folder_names = [_tmp + ":" + os.path.basename(path) for path in image_paths]
+                self.tableWidget_medium.setHorizontalHeaderLabels(folder_names) 
 
 
-                # 5. 批量更新UI并计算基准缩放比例
+                # 3. 使用线程池并行处理图片
+                self.progress_updated.emit(3)
+                # 使用并行解析图片的pil格式图、cv_img、histogram、pixmap、gray_pixmap、p3_pixmap以及exif等信息
+                with ThreadPoolExecutor(max_workers=min(len(image_paths), cpu_count() - 2)) as executor:
+                    futures = list(executor.map(self._process_image, enumerate(image_paths)))
+
+                # 4. 计算目标尺寸
+                self.progress_updated.emit(4)
+                target_width, target_height, avg_aspect_ratio = self.calculate_target_dimensions(futures)
+                
+
+                # 5. 批量更新UI, 更新进度条
                 self.progress_updated.emit(5)
-                if self.parent_window:
-                    self.parent_window.statusbar_label1.setText(f"🔉: 正在更新图片...90%")
-                    self.parent_window.statusbar_label1.repaint()  # 刷新标签文本 
+                maxmum = self.progress_bar.maximum()
+                self.progress_updated.emit(maxmum)
+
+                # 启动表格自动刷新，批量更新UI
+                self.tableWidget_medium.setUpdatesEnabled(True)
                 for index, result in enumerate(futures):
                     if result and result[1]:
                         data = result[1]
 
-                        # 根据下拉框1判断是否获取原始图pixmap
+                        # 根据下拉框索引判断pixmap类型(0:原始图、1:灰度图、2:p3色域图)
                         pixmap = data['pixmap']
-                        # 根据下拉框2判断是否获取灰度图gray_pixmap
                         if self.comboBox_2.currentIndex() == 1:
                             pixmap = data['gray_pixmap']
-                        # 根据下拉框2判断是否获取p3色域图
                         if self.comboBox_2.currentIndex() == 2:
                             pixmap = data['p3_pixmap']
 
-                        # 创建和设置场景
-                        qcolor = rgb_str_to_qcolor(self.background_color_table) # 将背景色转换为QColor
+                        # 创建并设置场景，设置场景颜色为读取的背景色
                         scene = QGraphicsScene(self)
-                        scene.setBackgroundBrush(QBrush(qcolor)) # 设置场景背景色
+                        qcolor = rgb_str_to_qcolor(self.background_color_table)
+                        scene.setBackgroundBrush(QBrush(qcolor)) 
 
                         # 创建图片项
                         pixmap_item = QGraphicsPixmapItem(pixmap)
                         pixmap_item.setTransformOriginPoint(pixmap.rect().center())
                         scene.addItem(pixmap_item)
                         
-                        # 创建和设置视图
+                        # 创建并设置视图
                         view = MyGraphicsView(scene, data['exif_info'], data['stats'], self)
                         view.pixmap_items = [pixmap_item]
                         
-                        # 计算缩放比例
-                        current_width, current_height = (pixmap.width(), pixmap.height())
-                        scale_x = target_width / current_width
-                        scale_y = target_height / current_height
-
-                        # 保持宽高比,得到当前图片尺寸到统一尺寸的缩放比例
-                        base_scale = min(scale_x, scale_y)  
-
-                        # 计算图片缩放比例以适应当前表格大小显示 
-                        zoom_scale = self.set_zoom_scale(num_images,avg_aspect_ratio,target_width,target_height)
-                        base_scale = base_scale*zoom_scale
-
-                        # 设置视图的缩放
-                        view.scale(base_scale, base_scale)
+                        # 设置视图的缩放，先计算基础缩放比例，再计算最终缩放比例，最后应用缩放
+                        w, h = pixmap.width(), pixmap.height()
+                        final_scale = min(target_width / w, target_height / h) * self.set_zoom_scale(avg_aspect_ratio, target_width, target_height)
+                        view.scale(final_scale, final_scale)
                         
-                        # 设置直方图、EXIF、亮度统计信息
+                        # 设置直方图、EXIF、亮度统计信息、cv_img
                         view.set_histogram_visibility(self.checkBox_1.isChecked())
-                        view.set_histogram_data(data['histogram']) if data['histogram'] else ...
                         view.set_exif_visibility(self.checkBox_2.isChecked(), self.font_color_exif)
                         view.set_stats_visibility(self.stats_visible) 
-
-                        # 设置原始OpenCV图像
-                        view.set_original_image(data['cv_img'])
+                        view.set_histogram_data(data['histogram']) if data['histogram'] is not None else ...
+                        view.set_cv_image(data['cv_img']) if data['cv_img'] is not None else ...
 
                         # 保存数据
                         self.graphics_views[index] = view
+                        self.original_rotation[index] = pixmap_item.rotation()
                         self.original_pixmaps[index] = data['pixmap']
                         self.gray_pixmaps[index] = data['gray_pixmap']
                         self.p3_pixmaps[index] = data['p3_pixmap']
-                        self.original_rotation[index] = pixmap_item.rotation()
-                        self.exif_texts[index] = data['exif_info']
-                        self.histograms[index] = data['histogram']
                         self.cv_imgs[index] = data['cv_img']
                         self.pil_imgs[index] = data['pil_image']
-                        self.base_scales[index] = base_scale
-                        self._scales_min[index] = base_scale
+                        self.exif_texts[index] = data['exif_info']
+                        self.histograms[index] = data['histogram']
+                        self.base_scales[index] = final_scale
+                        self._scales_min[index] = final_scale
 
                         # 更新表格
                         self.tableWidget_medium.setCellWidget(0, index, view)
-
-                    # 更新进度条
-                    maxmum = self.progress_bar.maximum()
-                    self.progress_updated.emit(maxmum)
-                    if self.parent_window:
-                        self.parent_window.statusbar_label1.setText(f"🔉: 正在更新图片...100%")
-                        self.parent_window.statusbar_label1.repaint()  # 刷新标签文本    
+                        
 
                 return True
             except Exception as e:
@@ -2068,6 +1936,130 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             print(f"❌ [set_images]-->处理图片时发生错误: {e}")
             return False
+
+    def calculate_target_dimensions(self, futures, aspect_threshold=1.2):
+        """
+        计算多张图片的目标尺寸
+        
+        Args:
+            futures: 包含图片处理结果的future列表
+            aspect_threshold: 宽高比阈值，默认1.2
+            
+        Returns:
+            tuple: (target_width, target_height) 目标宽度和高度
+        """
+        # 使用列表推导获取有效的宽高数据
+        dimensions = [(result[1]['pixmap'].width(), result[1]['pixmap'].height()) 
+                     for result in futures if result and result[1]]
+        
+        if not dimensions:
+            return 0, 0, 0
+            
+        # 使用zip和max高效计算最大宽高
+        widths, heights = zip(*dimensions)
+        max_width, max_height = max(widths), max(heights)
+        
+        # 计算面积加权的平均宽高比
+        areas = [w * h for w, h in dimensions]
+        total_area = sum(areas)
+        avg_aspect_ratio = sum((w/h) * area for (w, h), area in zip(dimensions, areas)) / total_area
+        
+        # 根据宽高比确定目标尺寸
+        if avg_aspect_ratio > aspect_threshold:
+            # 横向图片
+            target_width = max_width
+            target_height = int(target_width / avg_aspect_ratio)
+        elif avg_aspect_ratio < 1/aspect_threshold:
+            # 纵向图片
+            target_height = max_height
+            target_width = int(target_height * avg_aspect_ratio)
+        else:
+            # 接近方形
+            target_width = int((max_width + max_height * avg_aspect_ratio) / 2)
+            target_height = int((max_height + max_width / avg_aspect_ratio) / 2)
+            
+        return target_width, target_height, avg_aspect_ratio
+
+    def _process_image(self, args):
+        """
+        该函数主要是实现了图片基础信息提取功能.
+        Args:
+            args: 包含 (index, path) 的元组
+        Returns:
+            index, {
+                'pil_image': img,            # PIL图像
+                'cv_img': cv_img,            # OpenCV图像
+                'histogram': histogram,      # 直方图信息
+                'pixmap': pixmap,            # 原始pixmap格式图
+                'gray_pixmap': gray_pixmap,  # pixmap格式灰度图
+                'p3_pixmap': p3_pixmap,      # pixmap格式p3色域图
+                'exif_info': exif_info,      # exif信息
+                'stats': stats_text,         # 添加亮度/RGB/LAB等信息
+            }
+        Note:
+            注意事项，列出任何重要的假设、限制或前置条件.
+        """
+        # 记录开始时间
+        start_time_process_image = time.time()  
+        index, path = args
+        try:
+            # 如果图片是heic格式，则转换为jpg格式
+            if path.endswith(".heic"):
+                if new_path := extract_jpg_from_heic(path):
+                    path = new_path
+
+            # 如果图片不存在，则抛出异常
+            if not os.path.exists(path):
+                raise FileNotFoundError(f"❌ 图片不存在: {path}")
+
+            # 使用PIL获取所需的图像信息
+            with Image.open(path) as img:
+                """1. 获取pil_img的格式,确保函数get_exif_info能正确加载信息; 生成sRGB色域的pil_img和pixmap--------------------------------"""
+                img_format = img.format
+                pixmap = pil_to_pixmap((img := self.p3_converter.get_pilimg_sRGB(img)))
+
+                """2. 使用线程池并行生成，获取histogram, cv_img, stats, gray_pixmap, p3_pixmap等图像信息---------------------------------"""
+                histogram, cv_img, stats, gray_pixmap, p3_pixmap = self._generate_pixmaps_parallel(img)
+                # print(f"色域转换耗时: {(time.time() - start_time_process_image):.2f} 秒")
+
+            """3. EXIF信息提取-------------------------------------------------------------------------------------------------------""" 
+            # 提取图片的基础信息
+            basic_info = self.get_pic_basic_info(path, img, pixmap, self.index_list[index])
+
+            # piexf解析曝光时间光圈值ISO等复杂的EXIF信息
+            exif_info = self.get_exif_info(path, img_format) + basic_info
+
+            # 检测是否存在同图片路径的xml文件  将lux_index、DRCgain写入到exif信息中去
+            hdr_flag, xml_path = False, os.path.join(os.path.dirname(path), os.path.basename(path).split('.')[0] + "_new.xml")
+            if os.path.exists(xml_path):
+                # 提取xml中lux_index、cct、drcgain等关键信息，拼接到exif_info
+                exif_info_qpm, hdr_flag = load_xml_data(xml_path)
+                exif_info += exif_info_qpm
+                
+            # 处理EXIF信息，根据可见性字典更新
+            exif_info = self.process_exif_info(self.dict_exif_info_visibility, exif_info, hdr_flag)
+
+            # 拼接亮度统计信息，计算亮度统计信息方法calculate_image_stats放到并行函数_generate_pixmaps_parallel中执行
+            stats_text = f"亮度: {stats['avg_brightness']}\n对比度(L值标准差): {stats['contrast']}" \
+            f"\nLAB: {stats['avg_lab']}\nRGB: {stats['avg_rgb']}\nR/G: {stats['R_G']}  B/G: {stats['B_G']}"
+
+            return index, {
+                'pil_image': img,            # PIL图像
+                'cv_img': cv_img,            # OpenCV图像
+                'histogram': histogram,      # 直方图信息
+                'pixmap': pixmap,            # 原始pixmap格式图
+                'gray_pixmap': gray_pixmap,  # pixmap格式灰度图
+                'p3_pixmap': p3_pixmap,      # pixmap格式p3色域图
+                'exif_info': exif_info,      # exif信息
+                'stats': stats_text,         # 添加亮度/RGB/LAB等信息
+            }
+        except Exception as e:
+            print(f"[process_image]-->error: 处理图片失败 {path}: {e}")
+            return index, None
+        finally:
+            # 记录结束时间并计算耗时
+            print(f"处理图片{index}_{os.path.basename(path)} 耗时: {(time.time() - start_time_process_image):.2f} 秒")
+
 
     def _generate_pixmaps_parallel(self, img):
         """
@@ -2225,10 +2217,19 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             return ""  # 返回空字符串或其他适当的默认值
 
 
-    def set_zoom_scale(self, num_images,avg_aspect_ratio,target_width,target_height):
-        """根据图片数量设置缩放因子"""
+    def set_zoom_scale(self, avg_aspect_ratio,target_width,target_height):
+        """
+        该函数主要是实现了根据图片数量、平均宽高比、目标宽度和目标高度计算真实的缩放因子.
+        Args:
+            avg_aspect_ratio (float): 平均宽高比
+            target_width (int): 目标宽度
+            target_height (int): 目标高度
+        Returns:
+            float: 缩放因子
+        """
+        
         # 计算表格中单个单元格的宽度和高度
-        sigle_table_w = (self.table_width_heigth_default[0]-18)/num_images
+        sigle_table_w = (self.table_width_heigth_default[0]-18) / len(self.images_path_list)
         sigle_table_h = self.table_width_heigth_default[1]-55
 
         if avg_aspect_ratio > 1: #横向图片
