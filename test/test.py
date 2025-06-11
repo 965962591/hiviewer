@@ -11,7 +11,8 @@
 函数头注释关键字: func
 '''
 from munch import Munch
-
+import time
+import sys
 
 # 创建一个Munch对象, 并判断是否是dict对象
 profile = Munch()
@@ -28,17 +29,29 @@ print(profile.name, profile.age, profile.city)  # 输出: John
 
 
 
-def test_munch():
+
+def animated_progress_bar(total):
     """
-    @Description :
-    @Param:
-    @Returns     :
+    该函数主要是实现了一个动态进度条显示功能.
+
     """
-    
-    pass
+    animation = "|/-\\"
+    idx = 0
+    for i in range(total + 1):
+        percent = 100 * i / total
+        sys.stdout.write(f"\rProgress: [{animation[idx]}] {percent:.2f}%")
+        idx = (idx + 1) % len(animation)
+        sys.stdout.flush()
+        time.sleep(0.1)
+    sys.stdout.write("\n")
+
+
 
 
 
 # 程序入口路径
 if __name__ == "__main__":
-    pass
+
+    animated_progress_bar(100)
+
+    ...

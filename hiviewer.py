@@ -1995,17 +1995,21 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         try:
             # 看图子界面更新图片时忽略表格选中事件
             if self.compare_window and self.compare_window.is_updating:
+                # 若预览区域显示的是ImageViewer，清空旧预览内容, 显示label
+                if (self.verticalLayout_left_2.itemAt(0) and self.verticalLayout_left_2.itemAt(0).widget() 
+                    and type(self.verticalLayout_left_2.itemAt(0).widget()).__name__ == "ImageViewer"):
+                    self.clear_preview_layout()
+                    self.show_preview_error("预览区域")
                 return
-
+            
+            # 获取选中的文件路径列表并检查是否有效
             if not (file_paths := self.get_selected_file_path()):
                 print("[handle_table_selection]-->warning: 没有获取到文件路径")
                 return
             
-            # 只需要第一个选中文件的路径
+            # 清空旧预览内容，只需要第一个选中文件的路径
+            self.clear_preview_layout() 
             preview_path = file_paths[0]
-
-            # 清空旧预览内容
-            self.clear_preview_layout()
 
             # 根据文件类型创建预览
             if preview_path.lower().endswith(tuple(self.IMAGE_FORMATS)):
@@ -2071,7 +2075,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             print(f"[create_image_preview]-->图片预览失败: {e}")
             self.show_preview_error("图片预览不可用")
-
 
 
     def show_preview_error(self, message):
@@ -3326,7 +3329,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 # 限制最多选中8个文件
                 if len(selected_file_paths) > 8:
                     show_message_box("最多只能同时选中8个文件", "提示", 1000)
-                    raise ValueError(f"没有提取到有效的文件格式")             
+                    raise ValueError(f"没有提取到有效的文件格式")  
+                           
                 # 调用看图子界面
                 self.create_compare_window(selected_file_paths, image_indexs)
 
@@ -3343,6 +3347,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def on_space_pressed(self):
         """处理空格键按下事件"""
         try:
+
             # 按键防抖机制，防止快速多次按下导致错误，设置0.5秒内不重复触发
             current_time = time.time()
             if hasattr(self, 'last_space_press_time') and current_time - self.last_space_press_time < 0.5:  
