@@ -9,8 +9,8 @@
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 # 导入自定义的QComboBox类 & QDragTableWidget类
-from .custom_qcombobox_folder import CustomComboBox
-from .custom_qdrag_TableWidget import DragTableWidget
+from .custom_qCombox_spinner import CustomComboBox
+from .custom_qTableWidget_drag import DragTableWidget
 from src.utils.decorator import CC_TimeDec
 
 

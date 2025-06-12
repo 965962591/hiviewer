@@ -22,6 +22,9 @@ def load_and_convert_image(path):
     """加载并转换单张图片"""
     try:
         img = Image.open(path)
+        # 移除ICC配置文件
+        if 'icc_profile' in img.info:
+            del img.info['icc_profile']
         return img.convert('RGB') if img.mode != 'RGB' else img
     except Exception as e:
         print(f"加载图片 {path} 失败: {str(e)}")
@@ -105,7 +108,9 @@ def stitch_images(image_paths, output_path, font_path, max_width=1920, max_heigh
                 draw.text((x_offset, 5), filename, fill='black', font=font)
                 x_offset += target_size[0]
             
-            # 保存结果
+            # 保存结果，移除ICC配置文件
+            if 'icc_profile' in result.info:
+                del result.info['icc_profile']
             result.save(output_path, 
                        quality=100,
                        optimize=True,

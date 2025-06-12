@@ -25,7 +25,7 @@ from PyQt5.QtWidgets import (
     QFileSystemModel, QAbstractItemView, QTableWidgetItem, QHeaderView, QShortcut, QSplashScreen, 
     QMainWindow, QSizePolicy, QApplication, QMenu, QInputDialog, QProgressDialog, QDialog, QLabel)
 from PyQt5.QtCore import (
-    Qt, QDir, QTimer, QSize, QTimer, QThreadPool, QUrl, QSize, QMimeData, QPropertyAnimation, QItemSelection, QItemSelectionModel)
+    Qt, QDir, QSize, QTimer, QThreadPool, QUrl, QSize, QMimeData, QPropertyAnimation, QItemSelection, QItemSelectionModel)
 
 """导入用户自定义的模块"""
 from src.components.ui_main import Ui_MainWindow                            # 假设你的主窗口类名为Ui_MainWindow
@@ -34,12 +34,14 @@ from src.view.sub_compare_video_view import VideoWall                       # �
 from src.view.sub_rename_view import FileOrganizer                          # 添加这行以导入批量重名名类名
 from src.view.sub_image_process_view import SubCompare                      # 确保导入 SubCompare 类
 from src.view.sub_bat_view import LogVerboseMaskApp                         # 导入批量执行命令的类
-from src.components.custom_qmessagebox import show_message_box              # 导入消息框类
+from src.components.custom_qMbox_showinfo import show_message_box           # 导入消息框类
 from src.components.custom_qdialog_about import AboutDialog                 # 导入关于对话框类,显示帮助信息
 from src.components.custom_qdialog_LinkQualcomAebox import Qualcom_Dialog   # 导入自定义对话框的类
-from src.components.custom_qcombobox_folder import CheckBoxListModel, CheckBoxDelegate      # 导入自定义下拉框类中的数据模型和委托代理类
-from src.components.custom_qdialog_rename import SingleFileRenameDialog                     # 导入自定义重命名对话框类
-from src.components.custom_adialog_progress import ProgressDialog, CompressWorker           # 导入自定义压缩进度对话框类
+from src.components.custom_qCombox_spinner import (CheckBoxListModel, 
+                                                   CheckBoxDelegate)        # 导入自定义下拉框类中的数据模型和委托代理类
+from src.components.custom_qdialog_rename import SingleFileRenameDialog     # 导入自定义重命名对话框类
+from src.components.custom_qdialog_progress import (ProgressDialog, 
+                                                    CompressWorker)         # 导入自定义压缩进度对话框类
 from src.common.font_manager import MultiFontManager                        # 字体管理器
 from src.common.version_Init import version_init                            # 版本号初始化
 from src.common.settings_ColorAndExif import load_color_settings            # 导入自定义json配置文件

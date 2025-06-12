@@ -3,7 +3,6 @@ from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtCore import QTimer
 
 
-
 def show_message_box(text, title="提示", timeout=None):
     """显示消息框，宽度自适应文本内容
     

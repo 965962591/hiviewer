@@ -39,16 +39,20 @@ from PyQt5.QtWidgets import (
     QGraphicsItem, QDialogButtonBox, QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QCheckBox, QComboBox, QFileDialog)
 
 """导入自定义模块"""
-from src.components.ui_sub_image import Ui_MainWindow                                 # 看图子界面，导入界面UI
-from src.components.custom_qmessagebox import show_message_box                        # 导入消息框类
-from src.common.settings_ColorAndExif import load_exif_settings,load_color_settings   # 导入json配置模块
-from src.common.font_manager import SingleFontManager                       # 看图子界面，导入字体管理器
-from src.utils.aitips import CustomLLM_Siliconflow                          # 看图子界面，AI提示看图复选框功能模块
-from src.utils.hisnot import WScreenshot                                    # 看图子界面，导入自定义截图的类
-from src.utils.aeboxlink import check_process_running,get_api_data          # 导入与AEBOX通信的模块函数
-from src.utils.heic import extract_jpg_from_heic                            # 导入heic图片转换为jpg图片的模块
-from src.utils.p3_converter import ColorSpaceConverter                      # 导入色彩空间转换配置类
-from src.utils.decorator import CC_TimeDec                                  # 导入自定义装饰器
+from src.components.ui_sub_image import Ui_MainWindow                   # 看图子界面，导入界面UI
+from src.components.custom_qMbox_showinfo import show_message_box       # 导入消息框类
+from src.components.custom_qdialog_problems import ProblemsDialog       # 导入问题对话框类
+from src.common.settings_ColorAndExif import (load_exif_settings, 
+                                              load_color_settings)      # 导入json配置模块
+from src.common.font_manager import SingleFontManager                   # 看图子界面，导入字体管理器
+from src.utils.aitips import CustomLLM_Siliconflow                      # 看图子界面，AI提示看图复选框功能模块
+from src.utils.hisnot import WScreenshot                                # 看图子界面，导入自定义截图的类
+from src.utils.aeboxlink import check_process_running, get_api_data     # 导入与AEBOX通信的模块函数
+from src.utils.heic import extract_jpg_from_heic                        # 导入heic图片转换为jpg图片的模块
+from src.utils.p3_converter import ColorSpaceConverter                  # 导入色彩空间转换配置类
+
+from src.utils.decorator import CC_TimeDec                              # 导入自定义装饰器
+from src.utils.rectangleprogress import RectangleProgress               # 导入自定义进度条
 
 """设置本项目的入口路径,全局变量BasePath"""
 # 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
@@ -242,26 +246,7 @@ def calculate_image_stats(image_input, resize_factor=1):
         return None
 
  
-def close_excel():
-    """
-    该函数主要是实现了一个 强制关闭一个EXCEL表格 的功能.
-    """
-    try:
-        # 获取 Excel 应用程序的实例
-        excel_app = win32.gencache.EnsureDispatch('Excel.Application')
-        
-        # 检查是否有打开的工作簿
-        if excel_app.Workbooks.Count > 0:
-            # 强制关闭所有工作簿，不保存更改
-            for workbook in excel_app.Workbooks:
-                workbook.Close(SaveChanges=False)
-        
-        # 退出 Excel 应用程序
-        excel_app.Quit()
-        print("Excel 已成功关闭。")
-        
-    except Exception as e:
-        print(f"关闭 Excel 时发生错误: {e}")
+
 
 
 def load_xml_data(xml_path):
@@ -355,470 +340,6 @@ def get_aebox_host():
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 """
 
-class CameraTestDialog(QDialog):
-    """自定义对话框类, 用于输入信息"""
-    def __init__(self, images_path_list, parent=None):
-        super().__init__(parent)
-
-        # 初始化对话框UI
-        self.init_ui()
-
-        # 根据传入的图片路径列表设置关联图片下拉框；
-        self.images_path_list = images_path_list
-
-        # 设置是否在同一文件夹下 self.is_same_folder
-        if self.images_path_list:
-            self.is_same_folder = len(set([os.path.dirname(path) for path in self.images_path_list])) == 1
-        
-        # 先判断是否存在变量self.is_same_folder
-        if hasattr(self, "is_same_folder"): 
-            # 判断self.is_same_folder是否为True
-            if self.is_same_folder:
-                # 将 上一级文件夹名+图片名称 设置到 combo_box0 中
-                image_names_all = [os.path.relpath(path, start=os.path.dirname(os.path.dirname(path))) for path in self.images_path_list]
-                self.combo_box0.addItems(image_names_all)
-            else:
-                parent_folders = [os.path.basename(os.path.dirname(path)) for path in self.images_path_list]
-                image_names = [os.path.basename(path) for path in self.images_path_list]
-                # 将 上一级文件夹名 设置到 combo_box0 中
-                self.combo_box0.addItems(parent_folders)
-                # 设置字典将上一级文件夹名和图片名称对应起来
-                self.parent_folder_dict = dict(zip(parent_folders, image_names))
-        else:
-            print(f"类CameraTestDialog: 传入的图片路径列表为空, 请检查传入的图片路径列表")
-
-
-        # 设置是否加载设置
-        self.load_settings()
-
-        # 连接按钮信号
-        self.button_box.accepted.connect(self.accept)
-        self.button_box.rejected.connect(self.reject)
-        self.combo_box0.activated.connect(self.update_input0_text)  # 连接 combo_box0 的信号
-        self.load_button.clicked.connect(self.load_data)            # 连接加载按钮信号
-        self.write_button.clicked.connect(self.write_data)          # 连接写入按钮信号
-        self.refresh_button.clicked.connect(self.refresh_data)      # 连接汇总按钮信号
-        self.save_button.clicked.connect(self.save_data)            # 连接保存按钮信号
-        self.finished.connect(self.save_settings)                   # 连接关闭信号
-
-    def init_ui(self):
-        """初始化对话框UI"""
-
-        # 设置窗口标题
-        self.setWindowTitle("Camera Test 问题点记录")
-        # 设置窗口大小
-        self.setFixedSize(1200, 600)  # 设置对话框大小
-        
-        # 初始化字体管理器，标签组件使用;设置全局变量，定义项目基础路径
-        # BasePath = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) # 使用全局变量 BasePath
-        font_path_jetbrains = os.path.join(BasePath, "resource", "fonts", "JetBrainsMapleMono_Regular.ttf")
-        self.font_manager_jetbrains_big = SingleFontManager.get_font(size=12, font_path=font_path_jetbrains) 
-        self.font_manager_jetbrains_small = SingleFontManager.get_font(size=10, font_path=font_path_jetbrains)
-
-        # 创建主布局
-        self.layout = QVBoxLayout(self)
-
-        # 统一的下拉框高度
-        combo_box_height = 35
-
-        # 第零行：标签 + 下拉框 + 输入框
-        layout_zero = QHBoxLayout()
-        self.label0 = QLabel("关联图片项:", self)
-        self.label0.setFont(self.font_manager_jetbrains_big)
-        self.combo_box0 = QComboBox(self)
-        self.combo_box0.setFont(self.font_manager_jetbrains_small)
-        self.combo_box0.setFixedHeight(combo_box_height)  # 设置下拉框高度
-        self.text_input0 = QLineEdit(self)
-        self.text_input0.setFont(self.font_manager_jetbrains_small)
-        self.text_input0.setFixedHeight(combo_box_height)  # 设置输入框高度
-        layout_zero.addWidget(self.label0)
-        layout_zero.addWidget(self.combo_box0)
-        layout_zero.addWidget(self.text_input0)
-        # 设置比例
-        layout_zero.setStretch(0, 1)  # label0 的比例
-        layout_zero.setStretch(1, 4)  # combo_box0 的比例
-        layout_zero.setStretch(2, 6)  # text_input0 的比例
-        self.layout.addLayout(layout_zero)
-        
-        # 第一行：标签 + 输入框 + 加载按钮 + 写入按钮
-        layout_one = QHBoxLayout()
-        self.label1 = QLabel("问题点路径:", self)
-        self.label1.setFont(self.font_manager_jetbrains_big)
-        self.text_input1 = QLineEdit(self)
-        self.text_input1.setFixedHeight(combo_box_height)  # 设置下拉框高度
-        self.text_input1.setFont(self.font_manager_jetbrains_small)
-        self.text_input1.setPlaceholderText("输入保存问题点的EXCEL路径...")  # 设置提示文本
-        self.load_button = QPushButton("加载", self)
-        self.load_button.setFont(self.font_manager_jetbrains_big)
-        self.load_button.setFixedHeight(combo_box_height)  # 设置下拉框高度
-        self.write_button = QPushButton("写入", self)
-        self.write_button.setFont(self.font_manager_jetbrains_big)
-        self.write_button.setFixedHeight(combo_box_height)  # 设置下拉框高度
-        layout_one.addWidget(self.label1)
-        layout_one.addWidget(self.text_input1)
-        layout_one.addWidget(self.load_button)
-        layout_one.addWidget(self.write_button)
-        # 设置比例
-        layout_one.setStretch(0, 1)   # label1 的比例
-        layout_one.setStretch(1, 10)  # combo_box1 的比例
-        layout_one.setStretch(2, 1)   # load_button 的比例
-        layout_one.setStretch(3, 1)   # write_button 的比例
-        self.layout.addLayout(layout_one)
-
-        # 第二行：标签 + 输入框 + 汇总按钮 + 保存按钮
-        layout_two = QHBoxLayout()
-        self.label2 = QLabel("问题点汇总:", self)
-        self.label2.setFont(self.font_manager_jetbrains_big)
-        self.text_input2 = QLineEdit(self)
-        self.text_input2.setFixedHeight(combo_box_height)  # 设置下拉框高度
-        self.text_input2.setFont(self.font_manager_jetbrains_small)
-        self.text_input2.setPlaceholderText("汇总显示各模块问题点...")  # 设置提示文本
-        self.refresh_button = QPushButton("汇总", self)
-        self.refresh_button.setFont(self.font_manager_jetbrains_big)
-        self.refresh_button.setFixedHeight(combo_box_height)  # 设置下拉框高度
-        self.save_button = QPushButton("保存", self)
-        self.save_button.setFont(self.font_manager_jetbrains_big)
-        self.save_button.setFixedHeight(combo_box_height)  # 设置下拉框高度
-        layout_two.addWidget(self.label2)
-        layout_two.addWidget(self.text_input2)
-        layout_two.addWidget(self.refresh_button)
-        layout_two.addWidget(self.save_button)
-        # 设置比例
-        layout_two.setStretch(0, 1)   # label2 的比例
-        layout_two.setStretch(1, 10)  # combo_box2 的比例
-        layout_two.setStretch(2, 1)   # refresh_button 的比例
-        layout_two.setStretch(3, 1)   # save_button 的比例
-        self.layout.addLayout(layout_two)
-
-        # 第三行：复选框 + 输入框
-        layout_three = QHBoxLayout()
-        self.checkbox1 = QCheckBox("AE", self)
-        self.checkbox1.setFont(self.font_manager_jetbrains_small)
-        # 设置复选框的初始状态
-        self.checkbox1.setChecked(True)
-        self.combo_box3 = QComboBox(self)
-        self.combo_box3.setFixedHeight(combo_box_height)  # 设置下拉框高度
-        self.combo_box3.setFont(self.font_manager_jetbrains_small)
-        self.combo_box3.setEditable(True)  
-        layout_three.addWidget(self.checkbox1)
-        layout_three.addWidget(self.combo_box3)
-        # 设置比例
-        layout_three.setStretch(0, 1)
-        layout_three.setStretch(1, 10) 
-        self.layout.addLayout(layout_three)
-
-        # 第四行：复选框 + 输入框
-        layout_four = QHBoxLayout()
-        self.checkbox2 = QCheckBox("AWB", self)
-        self.checkbox2.setFont(self.font_manager_jetbrains_small)
-        # 设置复选框的初始状态
-        self.checkbox2.setChecked(True)
-        self.combo_box4 = QComboBox(self)
-        self.combo_box4.setFixedHeight(combo_box_height)  # 设置下拉框高度
-        self.combo_box4.setFont(self.font_manager_jetbrains_small)
-        self.combo_box4.setEditable(True)  
-        layout_four.addWidget(self.checkbox2)
-        layout_four.addWidget(self.combo_box4)
-        # 设置比例
-        layout_four.setStretch(0, 1)
-        layout_four.setStretch(1, 10)  
-        self.layout.addLayout(layout_four)
-
-        # 第五行：复选框 + 输入框
-        layout_five = QHBoxLayout()
-        self.checkbox3 = QCheckBox("AF", self)
-        self.checkbox3.setFont(self.font_manager_jetbrains_small)
-        # 设置复选框的初始状态
-        self.checkbox3.setChecked(True)
-        self.combo_box5 = QComboBox(self)
-        self.combo_box5.setFixedHeight(combo_box_height)  # 设置下拉框高度
-        self.combo_box5.setFont(self.font_manager_jetbrains_small)
-        self.combo_box5.setEditable(True) 
-        layout_five.addWidget(self.checkbox3)
-        layout_five.addWidget(self.combo_box5)
-        # 设置比例
-        layout_five.setStretch(0, 1)
-        layout_five.setStretch(1, 10)  
-        self.layout.addLayout(layout_five)
-
-        # 第六行：复选框 + 输入框
-        layout_six = QHBoxLayout()
-        self.checkbox4 = QCheckBox("ISP", self)
-        self.checkbox4.setFont(self.font_manager_jetbrains_small)
-        # 设置复选框的初始状态
-        self.checkbox4.setChecked(True)
-        self.combo_box6 = QComboBox(self)
-        self.combo_box6.setEditable(True)  
-        self.combo_box6.setFixedHeight(combo_box_height)  # 设置下拉框高度
-        self.combo_box6.setFont(self.font_manager_jetbrains_small)
-        layout_six.addWidget(self.checkbox4)
-        layout_six.addWidget(self.combo_box6)
-        # 设置比例
-        layout_six.setStretch(0, 1)
-        layout_six.setStretch(1, 10)  
-        self.layout.addLayout(layout_six)
-
-        # 添加确认和取消按钮
-        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        self.button_box.setFont(self.font_manager_jetbrains_big)
-        self.layout.addWidget(self.button_box)
-
-
-
-    def update_input0_text(self):   
-        """combo_box0 的信号"""
-        # 获取 combo_box0 的当前文本
-        current_text = self.combo_box0.currentText()
-        # 判断当前文本是否为空
-        if current_text and hasattr(self, "is_same_folder"):
-            if self.is_same_folder: # 同一文件夹下 current_text 为 上一级文件夹名+图片名称
-                # 将解析后的图片名称直接设置到 text_input0 中
-                self.text_input0.setText(current_text.split("\\")[-1])
-            else: # 不同文件夹下 current_text 为 上一级文件夹名
-                # 将对应上一级文件夹内的图片名称设置到 text_input0 中
-                if hasattr(self, "parent_folder_dict"):
-                    self.text_input0.setText(self.parent_folder_dict[current_text])
-                else:
-                    print(f"类CameraTestDialog: 父文件夹字典self.parent_folder_dict不存在, 请检查self.parent_folder_dict")
-
-
-    def refresh_data(self):
-        """汇总数据"""
-        # 汇总3A+ISP问题点
-        items = []
-        if self.checkbox1.isChecked() and self.combo_box3.currentText():
-            items.append(f"AE{self.combo_box3.currentText()}")
-        if self.checkbox2.isChecked() and self.combo_box4.currentText():
-            items.append(f"AWB{self.combo_box4.currentText()}")
-        if self.checkbox3.isChecked() and self.combo_box5.currentText():
-            items.append(f"AF{self.combo_box5.currentText()}")
-        if self.checkbox4.isChecked() and self.combo_box6.currentText():
-            items.append(f"ISP{self.combo_box6.currentText()}")
-        # 拼接内容并设置到 combo_box2
-        self.text_input2.clear()  # 清空现有内容
-        self.text_input2.setText("_".join(items))  # 添加拼接后的内容
-
-    def save_data(self):
-        """保存数据"""
-        pass
-
-    
-    def write_data_backup(self):
-        """写入数据,不支持实时写入,初始版本"""  
-        excel_path = self.text_input1.text()  # 获取Excel文件路径
-        search_value = self.text_input0.text()  # 获取要查找的值
-
-        # 判断excel_path是否为空
-        if not excel_path:
-            print("Excel文件路径为空，请输入Excel文件路径。")
-            return
-
-        # 判断search_value是否为空
-        if not search_value:
-            print("要查找的值为空，请输入要查找的值。")
-            return
-
-        #尝试打开文件判断是否被占用,若被占用了则强制关闭excel
-        try:
-            with open(excel_path, 'a') as f:
-                pass
-        except PermissionError:
-            print(f"Error: Excel file is locked or in use: {excel_path}")
-            # 强制关闭excel
-            close_excel()
-
-        try:
-            # 对excel表格进行读写操作
-            workbook = openpyxl.load_workbook(excel_path) 
-            sheet = workbook['Sheet1'] # workbook.active
-
-            # 获取第一行的值
-            first_row_values = [cell.value for cell in sheet[1]]  # sheet[1]表示第一行
-            target_column_ae = first_row_values.index("AE") + 1
-            problem_ae = self.combo_box3.currentText()
-            target_column_awb = first_row_values.index("AWB") + 1
-            problem_awb = self.combo_box4.currentText()
-            target_column_af = first_row_values.index("AF") + 1
-            problem_af = self.combo_box5.currentText()
-            target_column_isp = first_row_values.index("ISP") + 1
-            problem_isp = self.combo_box6.currentText()
-
-            # 获取第一列的值
-            first_column_values = [cell.value for cell in sheet['A']]  # 'A'表示第一列
-
-            # search_value匹配，获取目标行索引
-            target_row = 0
-            for index, value in enumerate(first_column_values):
-                if value == search_value:
-                    target_row  = index + 1
-            if not target_row: # 如果找不到对应的图片行，目标索引就是没有数据的最后一行
-                target_row = len(sheet['A']) + 1
-                # 写入对应的图片名称
-                sheet.cell(target_row, 1).value = search_value
-                
-            # 向表格写入数据
-            sheet.cell(target_row, target_column_ae).value = problem_ae
-            sheet.cell(target_row, target_column_awb).value = problem_awb
-            sheet.cell(target_row, target_column_af).value = problem_af
-            sheet.cell(target_row, target_column_isp).value = problem_isp
-        
-            # 保存修改后的文件
-            workbook.save(excel_path)
-            print("数据已成功写入Excel文件。")
-
-        except Exception as e:
-            print(f"写入数据时发生错误: {e}")
-
-
-    def write_data(self):
-        """写入数据，支持实时写入"""  
-        excel_path = self.text_input1.text()  # 获取Excel文件路径
-        search_value = self.text_input0.text()  # 获取要查找的值
-
-        # 判断excel_path是否为空
-        if not os.path.exists(excel_path):
-            show_message_box("Excel文件路径为空或不存在, 请加载或手动输入Excel文件路径", "提示", 1500)
-            return
-
-        if not search_value:
-            show_message_box("没有要关联的图片项, 请点击下拉框加载", "提示", 1500)
-            return
-
-        try:
-            # 启动 Excel 应用程序
-            excel_app = win32.gencache.EnsureDispatch('Excel.Application')
-            excel_app.Visible = True  # 设置为可见
-
-            # 打开工作簿
-            workbook = excel_app.Workbooks.Open(excel_path)
-            # 选择第一个工作表
-            sheet = workbook.Worksheets(1)  # 索引从 1 开始
-
-            # 查找目标行
-            target_row = 0
-            for row in range(1, sheet.UsedRange.Rows.Count + 1):
-                if sheet.Cells(row, 1).Value == search_value:  # 假设在第一列查找
-                    target_row = row
-                    break
-
-            if target_row == 0:  # 如果找不到对应的行
-                target_row = sheet.UsedRange.Rows.Count + 1      # 写入到最后一行
-                sheet.Cells(target_row, 1).Value = search_value  # 写入文件名
-
-
-            # 找到目标行后；按列，向表格写入数据
-            for col in range(1, sheet.UsedRange.Columns.Count + 1):
-                if sheet.Cells(1, col).Value  == "AE":
-                    sheet.Cells(target_row, col).Value = self.combo_box3.currentText()
-                if sheet.Cells(1, col).Value  == "AWB":
-                    sheet.Cells(target_row, col).Value = self.combo_box4.currentText()
-                if sheet.Cells(1, col).Value  == "AF":
-                    sheet.Cells(target_row, col).Value = self.combo_box5.currentText()
-                if sheet.Cells(1, col).Value  == "ISP":
-                    sheet.Cells(target_row, col).Value = self.combo_box6.currentText()     
-
-            # 保存工作簿
-            workbook.Save()
-
-            print("数据已成功写入Excel文件。")
-
-        except Exception as e:
-            print(f"写入数据时发生错误: {e}")
-        finally:
-            pass
-            # 关闭工作簿（如果需要）
-            # workbook.Close(SaveChanges=True)  # 如果需要保存更改
-            # excel_app.Quit()  # 关闭 Excel 应用程序
-
-
-    def load_data(self):
-        """加载EXCEL表格"""
-        try:
-            options = QFileDialog.Options()
-            file_path, _ = QFileDialog.getOpenFileName(self, "选择EXCEL文件", "", "Excel Files (*.xls *.xlsx);;All Files (*)", options=options)
-            if file_path:
-                self.text_input1.setText(file_path)  # 显示选定的文件路径
-        except Exception as e:
-            print(f"加载EXCEL表格时发生错误: {e}")
-
-    def get_data(self):
-        """获取用户输入的数据"""
-        return {
-            "关联图片项": self.combo_box0.currentText() + "/" + self.text_input0.text(),
-            "问题点": self.text_input2.text(),
-            "AE": self.combo_box3.currentText(),
-            "AWB": self.combo_box4.currentText(),
-            "AF": self.combo_box5.currentText(),
-            "ISP": self.combo_box6.currentText(),
-        }
-
-    # 新增方法：保存设置
-    def save_settings(self):
-        """保存当前设置"""
-        settings = {
-            "关联图片项": self.combo_box0.currentText(),
-            # "输入框0": self.text_input0.text(),
-            "问题点路径": self.text_input1.text(),
-            # "问题点汇总": self.text_input2.text(),
-            "AE": [self.combo_box3.itemText(i) for i in range(self.combo_box3.count())],
-            "AWB": [self.combo_box4.itemText(i) for i in range(self.combo_box4.count())],
-            "AF": [self.combo_box5.itemText(i) for i in range(self.combo_box5.count())],
-            "ISP": [self.combo_box6.itemText(i) for i in range(self.combo_box6.count())],
-        }
-        save_path = os.path.join(BasePath, "cache", "test_settings.json")
-        with open(save_path, 'w', encoding='utf-8') as f:
-            json.dump(settings, f, ensure_ascii=False, indent=4)
-
-        print("设置已保存。")
-
-
-    # 新增方法：加载设置
-    def load_settings(self):
-        """加载上次保存的设置"""
-        try:
-            with open('./cache/test_settings.json', 'r', encoding='utf-8') as f:
-                settings = json.load(f)
-                combo_box0_text = settings.get("关联图片项", "")
-                combo_box0_items = [self.combo_box0.itemText(i) for i in range(self.combo_box0.count())]
-                if combo_box0_text and combo_box0_text in combo_box0_items:
-                    # 如果 combo_box0 的当前文本不为空，则更新 text_input0 的文本
-                    self.combo_box0.setCurrentText(combo_box0_text)
-                    self.update_input0_text()
-                
-                self.text_input1.setText(settings.get("问题点路径", ""))
-                # self.text_input2.setText(settings.get("问题点汇总", ""))
-
-                # 恢复AE、AWB、AF、ISP的选项
-                for item in settings.get("AE", []):
-                    self.combo_box3.addItem(item)
-                for item in settings.get("AWB", []):
-                    self.combo_box4.addItem(item)
-                for item in settings.get("AF", []):
-                    self.combo_box5.addItem(item)
-                for item in settings.get("ISP", []):
-                    self.combo_box6.addItem(item)
-        except FileNotFoundError:
-            print("未找到设置文件，使用默认值。")
-        except json.JSONDecodeError:
-            print("设置文件格式错误，使用默认值。")
-
-    def keyPressEvent(self, event):
-        """重写键盘按下事件，防止在输入框或下拉框中按下回车时关闭对话框"""
-        if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
-            # 如果当前焦点在输入框或下拉框中，阻止默认行为
-            if self.focusWidget() in [self.text_input0, self.text_input2, self.combo_box0, self.combo_box3, self.combo_box4, self.combo_box5, self.combo_box6]:
-                event.ignore()  # 忽略事件
-            # 如果当前焦点在问题点输入框中，打开Excel文件
-            elif self.focusWidget() == self.text_input1:
-                excel_path = self.text_input1.text()
-                if os.path.exists(excel_path):
-                    os.startfile(excel_path)  # 在Windows上打开文件
-                else:
-                    print("指定的Excel文件不存在。")
-            else:
-                super().keyPressEvent(event)  # 处理其他情况
-        else:
-            super().keyPressEvent(event)  # 处理其他按键事件
 
 
 
@@ -877,7 +398,10 @@ class MyGraphicsView(QGraphicsView):
 
 
         # 初始化字体管理器
-        self.font_manager_view = SingleFontManager.get_font(10) 
+        if self.parent_SubMainWindow and self.parent_SubMainWindow.font_manager_j11:
+            self.font_manager_view = self.parent_SubMainWindow.font_manager_j11
+        else:
+            self.font_manager_view = SingleFontManager.get_font(10)
 
         # 初始化基本信息
         self.exif_text = exif_text  # 存储 EXIF 信息
@@ -1363,11 +887,9 @@ class MyGraphicsView(QGraphicsView):
 
 class SubMainWindow(QMainWindow, Ui_MainWindow):
     """看图主界面类"""
-    # 添加一个信号用于通知主窗口子窗口已关闭
+    # 在类级别定义信号，通知主窗口子窗口已关闭，AI响应信号，进度条更新信号 
     closed = pyqtSignal()
-    # 在类级别定义信号
     ai_response_signal = pyqtSignal(str)
-    # 新增进度条更新信号
     progress_updated = pyqtSignal(int)
 
     def __init__(self, images_path_list, index_list=None, parent=None):
@@ -1445,10 +967,16 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         
         # 导入主界面的一些设置:字体设置，颜色设置等
         if self.parent_window:
-            # 导入字体设置
-            self.custom_font = self.parent_window.custom_font if self.parent_window.custom_font else SingleFontManager.get_font(12) 
-            self.font_manager_jetbrains = (self.parent_window.custom_font_jetbrains_medium if self.parent_window.custom_font_jetbrains_medium 
-                                           else SingleFontManager.get_font(size=11, font_path=os.path.join(BasePath, "resource", "fonts", "JetBrainsMapleMono_Regular.ttf")))
+
+            self.custom_font = (self.parent_window.custom_font if self.parent_window.custom_font 
+                                else SingleFontManager.get_font(12)) # 12号字体
+            self.font_manager_j12 = (self.parent_window.custom_font_jetbrains if self.parent_window.custom_font_jetbrains 
+                                    else self.custom_font)           # 12号字体
+            self.font_manager_j11= (self.parent_window.custom_font_jetbrains_medium if self.parent_window.custom_font_jetbrains_medium 
+                                           else self.custom_font)    # 11号字体
+            self.font_manager_j10 = (self.parent_window.custom_font_jetbrains_small if self.parent_window.custom_font_jetbrains_small 
+                                       else self.custom_font)        # 10号字体
+
 
             # 导入颜色设置, 背景色，表格背景色，字体颜色，exif字体颜色; 从load_settings()中读取
             # self.background_color_default = self.parent_window.background_color_default
@@ -1456,7 +984,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             # self.font_color_default = self.parent_window.font_color_default
             # self.font_color_exif = self.parent_window.font_color_exif
 
-        
+
 
     def set_shortcut(self):
         """设置快捷键和槽函数"""
@@ -1521,9 +1049,12 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
         # 连接AI响应信号到槽函数
         self.ai_response_signal.connect(self.update_ai_response)
-        # 连接进度条更新信号到槽函数
-        self.progress_updated.connect(self.update_progress)
 
+        # 连接进度条更新信号到槽函数
+        if hasattr(self, 'progress_updated'):
+            self.progress_updated.connect(self.update_progress)
+        
+            
         
     def set_stylesheet(self):
         """设置窗口标题组件和样式表"""
@@ -1544,7 +1075,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
         # 设置第一排标签
         self.label_0.setText("提示:鼠标左键拖动所有图像,滚轮控制放大/缩小;按住Ctrl+滚轮或者鼠标右键操作单独图像")
-        self.label_0.setFont(self.font_manager_jetbrains)
+        self.label_0.setFont(self.font_manager_j11)
 
         # 设置下拉框选项,会自动进入槽函数self.show_menu_combox1-->on_comboBox_1_changed
         self.comboBox_1.clear()  # 清除已有项
@@ -1610,8 +1141,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         statusbar_label_style = f"""
             color: {self.font_color_default}; 
             text-align: center;
-            font-family: "{self.font_manager_jetbrains.family()}";
-            font-size: {self.font_manager_jetbrains.pointSize()}pt;
+            font-family: "{self.font_manager_j11.family()}";
+            font-size: {self.font_manager_j11.pointSize()}pt;
         """
         self.label_bottom.setStyleSheet(statusbar_label_style)
 
@@ -1620,8 +1151,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             QPushButton {{
                 color: {self.font_color_default};
                 text-align: center;
-                font-family: "{self.font_manager_jetbrains.family()}";
-                font-size: {self.font_manager_jetbrains.pointSize()}pt;
+                font-family: "{self.font_manager_j11.family()}";
+                font-size: {self.font_manager_j11.pointSize()}pt;
             }}
             QPushButton:hover {{
                 background-color: {self.background_color_table};
@@ -1633,8 +1164,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 border: none;
                 color: {self.font_color_default};
                 text-align: center;
-                font-family: "{self.font_manager_jetbrains.family()}";
-                font-size: {self.font_manager_jetbrains.pointSize()}pt;
+                font-family: "{self.font_manager_j11.family()}";
+                font-size: {self.font_manager_j11.pointSize()}pt;
             }}
             QPushButton:hover {{
                 background-color: {self.background_color_table};
@@ -1724,26 +1255,42 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
     def set_progress_bar(self):
         """设置进度条"""
-        # 添加进度条并设置样式
+        
+        # 添加进度条并设置进度条位置为窗口中心
         self.progress_bar = QProgressBar(self)
-        # 初始化时设置进度条位置
         self.update_progress_bar_position()
 
         # 设置进度条样式
         self.progress_bar.setStyleSheet("""
             QProgressBar {
+                border: none;
+                background-color: #e3ebff;
+                border-radius: 0px;
                 text-align: center;
+                font-family: "微软雅黑";
+                font-size: 11pt;
+                color: black;
+                height: 40px;
+                margin: 0px;
+                padding: 0px;
+                background-clip: content-box;
             }
             QProgressBar::chunk {
+                border-radius: 0px;
+                margin: 0px;
                 background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
                 stop:0 #36D1DC, stop:1 #5B86E5);
             }
         """)
-
-        self.progress_bar.setAlignment(Qt.AlignCenter)  # 设置文字居中
-
-        # 设置默认不显示
-        self.progress_bar.setVisible(False) 
+  
+        # 设置进度条基本属性(窗口背景透明、文字居中、最大值、初始值、默认隐藏、重绘)
+        # self.progress_bar.setAttribute(Qt.WA_TranslucentBackground)
+        self.progress_bar.setAlignment(Qt.AlignCenter) 
+        self.progress_bar.setMaximum(100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setVisible(False)
+        self.progress_bar.repaint()  
+        # QApplication.processEvents()
         
 
     def update_progress_bar_position(self):
@@ -1751,7 +1298,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.progress_bar.setGeometry(
             (self.width() - self.progress_bar.width()) // 2,
             (self.height() - self.progress_bar.height()) // 2,
-            400, 40
+            600, 50
         )
 
     def open_settings_window(self):
@@ -1760,17 +1307,21 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         print("打开设置窗口,还在开发中...")
 
 
-    def update_progress(self, value):  # self.update_progress_play
-        """更新进度条数值""" 
+    def update_progress(self, value):
+        """更新进度条数值"""
+        print("进度条--更新进度条数值")
         if hasattr(self, 'progress_bar'):
+            # 设置进度条数值
             self.progress_bar.setValue(value)
             self.progress_bar.repaint()
             # QApplication.processEvents()
 
 
+
     def resizeEvent(self, event):
-        # 窗口大小改变时更新进度条位置
-        self.update_progress_bar_position()
+        """窗口大小改变时更新进度条位置"""
+        if hasattr(self, 'progress_bar'):
+            self.update_progress_bar_position()
 
         # 获取表格的尺寸信息 print("table_width_heigth_default:", self.table_width_heigth_default)
         table_width = self.tableWidget_medium.width()
@@ -1799,17 +1350,13 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             # 更新当前显示的图片路径列表
             self.images_path_list, self.index_list = image_paths, index_list
             
-            # 设置进度条初始化
+            # 设置进度条初始化, 如果进度条不存在，则创建进度条
             if not hasattr(self, 'progress_bar'):
                 self.set_progress_bar()
-            # 设置进度条总数为传入的图片总数，启动进度条显示
-            num_all = num_images + 5 
-            self.progress_bar.setMaximum(num_all)
-            self.progress_bar.setValue(0)
+            # 若存在进度条，则启动进度条显示, 并发送进度条更新信号
             self.progress_bar.setVisible(True)
-            # 强制立即重绘界面
-            self.progress_bar.repaint()   # 重绘进度条
-            # QApplication.processEvents()  # 处理所有挂起的事件
+            self.progress_updated.emit(0)
+
 
             # 调用封装后的函数,将看图界面图片索引发送到aebox中
             self.sync_image_index_with_aebox(self.images_path_list, self.index_list)
@@ -1821,7 +1368,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 self.cleanup()
 
                 # 1. 预先分配数据结构, 发送进度条更新信号
-                self.progress_updated.emit(1)  
                 self.exif_texts = [None] * num_images
                 self.histograms = [None] * num_images
                 self.original_rotation = [None] * num_images
@@ -1835,9 +1381,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 self._scales_min = [None] * num_images
 
 
-                # 2. 设置表头行列结构以及单元格内容（文件夹名或文件名）
-                self.progress_updated.emit(2)
-                # self.tableWidget_medium.setUpdatesEnabled(True) 
+                # 2. 设置表头行列结构以及单元格内容（文件夹名或文件名） 
                 self.tableWidget_medium.setColumnCount(num_images)
                 self.tableWidget_medium.setRowCount(1)
                 folder_names = [os.path.basename(os.path.dirname(path)) for path in image_paths]
@@ -1848,7 +1392,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
 
                 # 3. 使用线程池并行处理图片
-                self.progress_updated.emit(5)
+                self.progress_updated.emit(50)
                 # 使用并行解析图片的pil格式图、cv_img、histogram、pixmap、gray_pixmap、p3_pixmap以及exif等信息
                 with ThreadPoolExecutor(max_workers=min(len(image_paths), cpu_count() - 2)) as executor:
                     futures = list(executor.map(self._process_image, enumerate(image_paths)))
@@ -1858,11 +1402,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 
 
                 # 5. 批量更新UI, 更新进度条
-                maxmum = self.progress_bar.maximum()
-                self.progress_updated.emit(maxmum)
-
-                # 启动表格自动刷新，批量更新UI
-                self.tableWidget_medium.setUpdatesEnabled(True)
+                self.progress_updated.emit(100)
                 for index, result in enumerate(futures):
                     if result and result[1]:
                         # 获取图片处理结果
@@ -1915,8 +1455,14 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                         self._scales_min[index] = final_scale
 
                         # 更新表格
+                        # self.tableWidget_medium.setCellWidget(0, index, view)
+
+                # 启动表格自动刷新，批量更新表格内容
+                self.tableWidget_medium.setUpdatesEnabled(True)
+                for index, view in enumerate(self.graphics_views):
+                    if view is not None:
                         self.tableWidget_medium.setCellWidget(0, index, view)
-                        
+
                 return True
             except Exception as e:
                 print(f"更新图片时发生错误: {e}")
@@ -1925,6 +1471,9 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 # 完成后恢复确定模式
                 self.progress_bar.setVisible(False)  # 隐藏进度条
                 self.is_updating = False
+
+                # 释放futures
+                futures = None
 
                 # 记录结束时间并计算耗时
                 print(f"处理图片总耗时: {(time.time() - start_time_set_images):.2f} 秒")
@@ -3027,33 +2576,11 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
     def on_t_pressed(self):
         """处理T键事件"""
-        print("[on_t_pressed]-->按下了t键")
-
-        # 调用截屏工具
-        WScreenshot.run()
-
-        if False:
-            # 创建并显示自定义对话框,传入图片列表
-            dialog = CameraTestDialog(self.images_path_list)
-
-            # 显示对话框  convert_to_dict()   self.exif_texts
-            if dialog.exec_() == QDialog.Accepted:
-                # 写入问题点到表格中
-                dialog.write_data()
-                # data = dialog.get_data()
-                # print(f"用户输入的文字信息: {data}")
-            
-            # 无论对话框是接受还是取消，都手动销毁对话框
-            dialog.deleteLater()
-            dialog = None
-
-    def on_ctrl_t_pressed(self):
-        """处理Ctrl+T键事件"""
-        print("[on_ctrl_t_pressed]-->按下了t键")
+        print("[on_t_pressed]-->按下了t键,创建并显示自定义问题点对话框")
 
         try:
-            # 创建并显示自定义对话框,传入图片列表
-            dialog = CameraTestDialog(self.images_path_list)
+            # 创建并显示自定义问题点对话框,传入图片列表和父窗口
+            dialog = ProblemsDialog(self.images_path_list, self)
 
             # 显示对话框
             if dialog.exec_() == QDialog.Accepted:
@@ -3065,6 +2592,14 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             # 无论对话框是接受还是取消，都手动销毁对话框
             dialog.deleteLater()
             dialog = None
+        except Exception as e:
+            print(f"❌ [on_ctrl_t_pressed]-->处理Ctrl+T键事件失败:{e}")
+
+    def on_ctrl_t_pressed(self):
+        """处理Ctrl+T键事件"""
+        print("[on_ctrl_t_pressed]-->按下了ctrl+t键,调用截屏工具")
+        try:
+            WScreenshot.run()
         except Exception as e:
             print(f"❌ [on_ctrl_t_pressed]-->处理Ctrl+T键事件失败:{e}")
 
