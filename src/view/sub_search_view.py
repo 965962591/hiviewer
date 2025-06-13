@@ -24,85 +24,15 @@ import sys
 class SearchOverlay(QMainWindow):
     # 修改信号，当项从搜索结果中被选中时发出，传递项的位置
     item_selected_from_search = pyqtSignal(tuple)
-    
     def __init__(self, main_window, data_list):
         super().__init__()
         self.main_window = main_window
         self.data_list = data_list  # 保存多维列表数据
         
-        # 创建中心部件和布局
-        container_widget = QWidget()
-        self.setCentralWidget(container_widget)
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
-        self.setAttribute(Qt.WA_TranslucentBackground)
-        
-        # 创建主布局
-        main_layout = QVBoxLayout(container_widget)
-        main_layout.setContentsMargins(10, 10, 10, 10)
-        main_layout.setSpacing(2)
-        
-        # 创建QFrame作为容器
-        """
-        rgba(255, 255, 255, 0.85):
-        调整透明度,0.85表示 85% 的不透明度, 0.0表示完全透明, 1.0表示完全不透明
-        """
-        self.frame = QFrame()
-        self.frame.setStyleSheet("""
-            QFrame {
-                background-color: rgba(127,127,127, 0.55);
-                border-radius: 5px;
-                border: 1px solid rgba(0, 0, 0, 0.1);
-            }
-        """)
-        
-        # 创建搜索框和结果列表的布局
-        self.search_layout = QVBoxLayout(self.frame)
-        self.search_layout.setContentsMargins(10, 10, 10, 10)
-        self.search_layout.setSpacing(2)
-        
-        # 创建搜索输入框
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("在此处键入以搜索...")
-        self.search_input.setStyleSheet("""
-            QLineEdit {
-                background-color: rgba(255, 255, 255, 0.9);
-                color: #333333;
-                border: 1px solid rgba(78, 78, 78, 0.3);
-                border-radius: 3px;
-                padding: 5px;
-            }
-            QLineEdit:focus {
-                border: 1px solid rgba(78, 78, 78, 0.5);
-            }
-        """)
-        self.search_layout.addWidget(self.search_input)
-        
-        # 创建搜索结果列表
-        self.search_results_list = QListWidget()
-        self.search_results_list.setStyleSheet("""
-            QListWidget {
-                background-color: rgba(255, 255, 255, 0.9);
-                color: #333333;
-                border: 1px solid rgba(78, 78, 78, 0.3);
-                border-radius: 3px;
-            }
-            QListWidget::item {
-                padding: 5px;
-                border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-            }
-            QListWidget::item:selected {
-                background-color: rgba(78, 78, 78, 0.2);
-                color: #000000;
-            }
-            QListWidget::item:hover {
-                background-color: rgba(78, 78, 78, 0.1);
-            }
-        """)
-        self.search_layout.addWidget(self.search_results_list)
-        
-        # 将frame添加到主布局
-        main_layout.addWidget(self.frame)
-        
+        # 初始化ui
+        self.init_ui()
+
+
         # 连接信号和槽
         self.search_input.textChanged.connect(self.update_search_results)
         self.search_results_list.itemClicked.connect(self.select_item_from_search)
@@ -113,10 +43,93 @@ class SearchOverlay(QMainWindow):
 
         # 设置窗口属性
         self.old_pos = None
-        self.resize(800, 400)
+        # self.resize(800, 400)
 
         # 显示窗口
-        self.show()
+        # self.show()
+
+    def init_ui(self):
+        """
+        该函数主要是初始化ui.
+
+        """
+        # 创建中心部件和布局
+        container_widget = QWidget()
+        self.setCentralWidget(container_widget)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        
+        # 创建主布局
+        main_layout = QVBoxLayout(container_widget)
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setSpacing(2)
+
+        # 创建QFrame作为容器，它包含搜索框和结果列表的主布局
+        self.frame = QFrame()
+        self.search_layout = QVBoxLayout(self.frame)
+        self.search_layout.setContentsMargins(10, 10, 10, 10)
+        self.search_layout.setSpacing(2)
+        
+        # 创建搜索输入框
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("在此处键入以搜索...")
+        self.search_layout.addWidget(self.search_input)
+        
+        # 创建搜索结果列表
+        self.search_results_list = QListWidget()
+        self.search_layout.addWidget(self.search_results_list)
+
+        """设置搜索框和结果列表的样式
+        rgba(255, 255, 255, 0.85):
+        调整透明度,0.85表示 85% 的不透明度, 0.0表示完全透明, 1.0表示完全不透明
+        """
+        self.frame.setStyleSheet("""
+            QFrame {
+                background-color: rgba(187,187,187, 0.55);
+                border-radius: 5px;
+                border: 1px solid rgba(0, 0, 0, 0.1);
+            }
+        """)
+        self.search_input.setStyleSheet("""
+            QLineEdit {
+                background-color: rgba(240, 240, 240, 0.9);
+                color: #333333;
+                border: 1px solid rgba(78, 78, 78, 0.3);
+                border-radius: 3px;
+                padding: 5px;
+            }
+            QLineEdit:focus {
+                border: 1px solid rgba(78, 78, 78, 0.5);
+            }
+        """)
+        self.search_results_list.setStyleSheet("""
+            QListWidget {
+                background-color: rgba(240, 240, 240, 0.9);
+                color: #333333;
+                border: 1px solid rgba(187, 187, 187, 0.3);
+                border-radius: 3px;
+            }
+            QListWidget::item {
+                padding: 5px;
+                border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            }
+            QListWidget::item:selected {
+                background-color: rgba(187, 187, 187, 0.2);
+                color: #000000;
+            }
+            QListWidget::item:hover {
+                background-color: rgba(173,216,230, 0.5);
+            }
+        """)
+        
+        if self.main_window is not None and self.main_window.custom_font_jetbrains_medium:
+            #设置字体
+            self.search_input.setFont(self.main_window.custom_font_jetbrains_medium)
+            self.search_results_list.setFont(self.main_window.custom_font_jetbrains_medium)
+
+        # 将frame添加到主布局
+        main_layout.addWidget(self.frame)
+
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -139,16 +152,28 @@ class SearchOverlay(QMainWindow):
             self.hide_search_overlay()
             
     def show_search_overlay(self):
-        main_window_rect = self.main_window.geometry()
-        center_x = main_window_rect.center().x() - self.width() // 2
-        center_y = main_window_rect.center().y() - self.height() // 2
-        self.move(center_x, center_y)
+        """显示搜索框和结果列表"""
+        # 获取主窗口的矩形区域
+        screen = QApplication.desktop().screenNumber(QApplication.desktop().cursor().pos())
+        screen_geometry = QApplication.desktop().screenGeometry(screen)
+        main_window_rect = (
+            self.main_window.geometry() if self.main_window is not None
+            else screen_geometry
+        )
+        x = main_window_rect.x() + (main_window_rect.width() - self.width()) // 2
+        y = main_window_rect.y() + (main_window_rect.height() - self.height()) // 2
+        w, h = main_window_rect.width(), main_window_rect.height()
+        w, h = int(w * 0.40), int(h * 0.40)
+
+        # 设置搜索界面位置和大小
+        self.move(x, y)
+        self.resize(w, h)
         self.show()
         self.search_input.setFocus()
         self.update_search_results(self.search_input.text())
         
     def hide_search_overlay(self):
-        self.hide()
+        self.close()
         
     def update_search_results(self, query):
         """根据搜索查询更新结果列表"""
@@ -184,6 +209,7 @@ class SearchOverlay(QMainWindow):
         position = item.data(Qt.UserRole)
         self.item_selected_from_search.emit(position)
         self.hide_search_overlay()
+
 
 
 if __name__ == "__main__":

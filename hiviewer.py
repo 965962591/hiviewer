@@ -3285,15 +3285,14 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         try:
             # 构建图片名称列表，保持多维列表的结构, 保持图片名称的完整路径
             image_names = [[os.path.basename(path) for path in folder_paths] for folder_paths in self.paths_list]
-            # self.RB_QTableWidget0.item(row, col).text()
 
             # 创建搜索窗口
             self.search_window = SearchOverlay(self, image_names)
+
             self.search_window.show_search_overlay()
 
             # 连接搜索窗口的选中项信号
             self.search_window.item_selected_from_search.connect(self.on_item_selected_from_search)
-
             print("[on_ctrl_f_pressed]-->打开图片模糊搜索工具成功")
 
         except Exception as e:
@@ -3306,13 +3305,22 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.RB_QTableWidget0.clearSelection()
         item = self.RB_QTableWidget0.item(row, col)
         if item:
-            # 滚动到选中项
-            self.RB_QTableWidget0.scrollToItem(item, QAbstractItemView.PositionAtCenter)
-            # 设置选中项
             item.setSelected(True)
-        
+            self.RB_QTableWidget0.scrollToItem(item, QAbstractItemView.PositionAtCenter)
+            
+
+        # 释放搜索窗口
+        if self.search_window:
+            self.search_window.deleteLater()
+            self.search_window = None
 
         print(f"[on_item_selected_from_search]-->选中图片: {row}, {col}")
+
+    def on_search_window_closed(self):
+        """处理搜索窗口关闭事件"""
+        # 释放搜索窗口
+        self.search_window = None
+        print("[on_search_window_closed]-->搜索窗口关闭")
 
     def on_b_pressed(self):
         """处理B键按下事件，用于查看上一组图片/视频"""
