@@ -6,6 +6,18 @@
 @Author       :diamond_cz@163.com
 @Version      :release-v3.5.1
 @Description  :hiviewer看图工具主界面
+
+python项目多文件夹路径说明:
+(1)获取当前py文件的路径: 
+os.path.abspath(__file__)
+(2)获取当前py文件的父文件夹路径: 
+os.path.dirname(os.path.abspath(__file__))
+BASEICONPATH = Path(__file__).parent
+(1)获取主函数py文件的路径: 
+os.path.abspath(sys.argv[0])
+(2)获取主函数py文件的父文件夹路径: 
+os.path.dirname(os.path.abspath(sys.argv[0]))
+BASEICONPATH = Path(sys.argv[0]).parent
 '''
 
 """导入python内置模块"""
@@ -19,13 +31,15 @@ from pathlib import Path
 from itertools import zip_longest
 
 """导入python第三方模块"""
-from PyQt5.QtGui import (
-    QIcon, QKeySequence, QPixmap)
+from PyQt5.QtGui import QIcon, QKeySequence, QPixmap
 from PyQt5.QtWidgets import (
-    QFileSystemModel, QAbstractItemView, QTableWidgetItem, QHeaderView, QShortcut, QSplashScreen, 
-    QMainWindow, QSizePolicy, QApplication, QMenu, QInputDialog, QProgressDialog, QDialog, QLabel)
+    QFileSystemModel, QAbstractItemView, QTableWidgetItem, 
+    QHeaderView, QShortcut, QSplashScreen, QMainWindow, 
+    QSizePolicy, QApplication, QMenu, QInputDialog, 
+    QProgressDialog, QDialog, QLabel)
 from PyQt5.QtCore import (
-    Qt, QDir, QSize, QTimer, QThreadPool, QUrl, QSize, QMimeData, QPropertyAnimation, QItemSelection, QItemSelectionModel)
+    Qt, QDir, QSize, QTimer, QThreadPool, QUrl, QSize, 
+    QMimeData, QPropertyAnimation, QItemSelection, QItemSelectionModel)
 
 """导入用户自定义的模块"""
 from src.components.ui_main import Ui_MainWindow                            # 假设你的主窗口类名为Ui_MainWindow
@@ -37,11 +51,11 @@ from src.view.sub_bat_view import LogVerboseMaskApp                         # �
 from src.components.custom_qMbox_showinfo import show_message_box           # 导入消息框类
 from src.components.custom_qdialog_about import AboutDialog                 # 导入关于对话框类,显示帮助信息
 from src.components.custom_qdialog_LinkQualcomAebox import Qualcom_Dialog   # 导入自定义对话框的类
-from src.components.custom_qCombox_spinner import (CheckBoxListModel, 
-                                                   CheckBoxDelegate)        # 导入自定义下拉框类中的数据模型和委托代理类
+from src.components.custom_qCombox_spinner import (CheckBoxListModel,       # 导入自定义下拉框类中的数据模型和委托代理类
+    CheckBoxDelegate)        
 from src.components.custom_qdialog_rename import SingleFileRenameDialog     # 导入自定义重命名对话框类
-from src.components.custom_qdialog_progress import (ProgressDialog, 
-                                                    CompressWorker)         # 导入自定义压缩进度对话框类
+from src.components.custom_qdialog_progress import (ProgressDialog,         # 导入自定义压缩进度对话框类
+    CompressWorker)         
 from src.common.font_manager import MultiFontManager                        # 字体管理器
 from src.common.version_Init import version_init                            # 版本号初始化
 from src.common.settings_ColorAndExif import load_color_settings            # 导入自定义json配置文件
@@ -59,18 +73,11 @@ from src.utils.video import extract_video_first_frame                       # �
 from src.utils.image import ImageProcessor                                  # 导入图片处理工具类
 from src.utils.sort import sort_by_custom                                   # 导入文件排序工具类
 from src.utils.decorator import CC_TimeDec                                  # 导入自定义装饰器
-from src.utils.aeboxlink import (check_process_running, urlencode_folder_path, get_api_data)
+from src.utils.aeboxlink import (check_process_running,                     # 导入自定义装饰器
+    urlencode_folder_path, get_api_data)
 
 
 
-"""python项目多文件夹路径说明
-(1)获取当前py文件的路径: os.path.abspath(__file__)
-(2)获取当前py文件的父文件夹路径: os.path.dirname(os.path.abspath(__file__))
-BASEICONPATH = Path(__file__).parent
-(1)获取主函数py文件的路径: os.path.abspath(sys.argv[0])
-(2)获取主函数py文件的父文件夹路径: os.path.dirname(os.path.abspath(sys.argv[0]))  
-BASEICONPATH = Path(sys.argv[0]).parent
-"""
 
 
 """
@@ -83,7 +90,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         
         # 记录程序启动时间；设置图标路径；读取本地版本信息，并初始化新版本信息
         self.start_time = time.time()        
-        self.base_icon_path = Path(__file__).parent / "resource" / "icons"    
+        self.base_icon_path = Path(__file__).parent / "resource" / "icons"
         self.version_info, self.new_version_info = version_init(), False     
         
         # 创建启动画面,启动画面以及相关初始化在self.update_splash_message()函数中
@@ -515,7 +522,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """设置主界面图标以及标题"""
         # print("[set_stylesheet]-->设置主界面相关组件")
 
-        icon_path = (self.base_icon_path / "viewer_3.ico").as_posix()
+        icon_path = os.path.join(self.base_icon_path, "viewer_3.ico")
         self.setWindowIcon(QIcon(icon_path))
         self.setWindowTitle(f"HiViewer")
 
@@ -2958,7 +2965,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                         file_name = item.text().split('\n')[0]  # 获取文件名，修改获取方式(第一行为需要的文件名)
                         column_name = self.RB_QTableWidget0.horizontalHeaderItem(col_index).text()
                         current_directory = self.RT_QComboBox.currentText()  # 获取当前选中的目录
-                        full_path = str(Path(current_directory).parent / column_name / file_name)
+                        full_path = (Path(current_directory).parent / column_name / file_name).as_posix()
                         
                         if os.path.isfile(full_path):
                             file_paths.append(full_path)  # 只有在是有效文件时才添加到列表中
@@ -3230,7 +3237,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             item = selected_items[0]
             column_name = self.RB_QTableWidget0.horizontalHeaderItem(item.column()).text()
             file_name = item.text().split('\n')[0]
-            full_path = str(Path(current_dir).parent / column_name / file_name)
+            full_path = (Path(current_dir).parent / column_name / file_name).as_posix()
 
             # 验证文件有效性
             if not full_path.lower().endswith(self.IMAGE_FORMATS):

@@ -74,16 +74,38 @@ class ProblemsDialog(QDialog):
         # 创建主布局
         self.layout = QVBoxLayout(self)
 
-        # 统一的下拉框高度
+        # 统一的下拉框高度和下拉框样式表
         combo_box_height = 35
+        combobox_style = f"""
+            QComboBox {{
+                /* 下拉框本体样式 */
+                min-height: 35px;
+                font-family: "{self.font_manager_jetbrains_small.family()}";
+                font-size: {self.font_manager_jetbrains_small.pointSize()}pt;
+            }}
+            
+            QComboBox QAbstractItemView {{
+                /* 下拉列表样式 */
+                font-family: "{self.font_manager_jetbrains_small.family()}";
+                font-size: {self.font_manager_jetbrains_small.pointSize()}pt;
+            }}
+            
+            QComboBox QAbstractItemView::item {{
+                /* 下拉项样式 */
+                min-height: 35px;
+                padding: 5px;
+                font-family: "{self.font_manager_jetbrains_small.family()}";
+                font-size: {self.font_manager_jetbrains_small.pointSize()}pt;
+            }}
+
+        """
 
         # 第零行：标签 + 下拉框 + 输入框
         layout_zero = QHBoxLayout()
         self.label0 = QLabel("关联图片项:", self)
         self.label0.setFont(self.font_manager_jetbrains_big)
         self.combo_box0 = QComboBox(self)
-        self.combo_box0.setFont(self.font_manager_jetbrains_small)
-        self.combo_box0.setFixedHeight(combo_box_height)  # 设置下拉框高度
+        self.combo_box0.setStyleSheet(combobox_style)
         self.text_input0 = QLineEdit(self)
         self.text_input0.setFont(self.font_manager_jetbrains_small)
         self.text_input0.setFixedHeight(combo_box_height)  # 设置输入框高度
@@ -165,8 +187,7 @@ class ProblemsDialog(QDialog):
         # 设置复选框的初始状态
         self.checkbox1.setChecked(True)
         self.combo_box3 = QComboBox(self)
-        self.combo_box3.setFixedHeight(combo_box_height)  # 设置下拉框高度
-        self.combo_box3.setFont(self.font_manager_jetbrains_small)
+        self.combo_box3.setStyleSheet(combobox_style)
         self.combo_box3.setEditable(True)  
         layout_three.addWidget(self.checkbox1)
         layout_three.addWidget(self.combo_box3)
@@ -182,8 +203,7 @@ class ProblemsDialog(QDialog):
         # 设置复选框的初始状态
         self.checkbox2.setChecked(True)
         self.combo_box4 = QComboBox(self)
-        self.combo_box4.setFixedHeight(combo_box_height)  # 设置下拉框高度
-        self.combo_box4.setFont(self.font_manager_jetbrains_small)
+        self.combo_box4.setStyleSheet(combobox_style)
         self.combo_box4.setEditable(True)  
         layout_four.addWidget(self.checkbox2)
         layout_four.addWidget(self.combo_box4)
@@ -199,8 +219,7 @@ class ProblemsDialog(QDialog):
         # 设置复选框的初始状态
         self.checkbox3.setChecked(True)
         self.combo_box5 = QComboBox(self)
-        self.combo_box5.setFixedHeight(combo_box_height)  # 设置下拉框高度
-        self.combo_box5.setFont(self.font_manager_jetbrains_small)
+        self.combo_box5.setStyleSheet(combobox_style)
         self.combo_box5.setEditable(True) 
         layout_five.addWidget(self.checkbox3)
         layout_five.addWidget(self.combo_box5)
@@ -216,9 +235,8 @@ class ProblemsDialog(QDialog):
         # 设置复选框的初始状态
         self.checkbox4.setChecked(True)
         self.combo_box6 = QComboBox(self)
+        self.combo_box6.setStyleSheet(combobox_style)
         self.combo_box6.setEditable(True)  
-        self.combo_box6.setFixedHeight(combo_box_height)  # 设置下拉框高度
-        self.combo_box6.setFont(self.font_manager_jetbrains_small)
         layout_six.addWidget(self.checkbox4)
         layout_six.addWidget(self.combo_box6)
         # 设置比例
@@ -228,7 +246,7 @@ class ProblemsDialog(QDialog):
 
         # 添加确认和取消按钮
         self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        self.button_box.setFont(self.font_manager_jetbrains_big)
+        self.button_box.setStyleSheet(combobox_style)
         self.layout.addWidget(self.button_box)
 
 

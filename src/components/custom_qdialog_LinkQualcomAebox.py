@@ -45,7 +45,6 @@ class Qualcom_Dialog(QDialog):
         self.test_button3()
         self.test_connection()
 
-
         # 根据传入的图片路径列表设置关联图片下拉框；
         if images_path_list and os.path.exists(images_path_list):
             # 优先选择传入的图片文件夹路径
@@ -301,7 +300,6 @@ class Qualcom_Dialog(QDialog):
             self.status_button3.setText("❌")
             # 设置悬浮提示信息
             self.status_button3.setToolTip(f"请先加载正确的图片文件夹路径")
-            
             return
             
         if not os.path.exists(image_path):
@@ -324,7 +322,6 @@ class Qualcom_Dialog(QDialog):
         except Exception as e:
             print(f"选择Qualcom工具路径时发生错误: {e}")
 
-    # 新增方法：加载AEBOX工具路径
     def load_aebox_path(self):
         """加载AEBOX工具路径"""
         try:
@@ -348,7 +345,6 @@ class Qualcom_Dialog(QDialog):
             print(f"加载文件夹时发生错误: {e}")
 
 
-    # 新增方法：保存设置
     def save_settings(self):
         """保存当前设置"""
         try:
@@ -365,7 +361,6 @@ class Qualcom_Dialog(QDialog):
             print(f"Qualcom_Dialog类_保存配置失败: {e}")
             
 
-    # 新增方法：加载设置
     def load_settings(self):
         """加载上次保存的设置"""
         try:
@@ -380,7 +375,6 @@ class Qualcom_Dialog(QDialog):
         except Exception as e:
             print(f"Qualcom_Dialog类_读取配置失败: {e}")
 
-    # 重写按键事件
     def keyPressEvent(self, event):
         """重写键盘按下事件，防止在输入框或下拉框中按下回车时关闭对话框"""
         if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
@@ -396,7 +390,6 @@ class Qualcom_Dialog(QDialog):
 # 示例用法
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    # dialog = Qualcom_Dialog("D:/Tuning/O19/0_pic")
     dialog = Qualcom_Dialog()
     dialog.show()
     sys.exit(app.exec_())

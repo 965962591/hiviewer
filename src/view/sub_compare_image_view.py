@@ -22,35 +22,31 @@ from multiprocessing import cpu_count
 from concurrent.futures import ThreadPoolExecutor
 
 """导入python第三方模块"""
-
 import cv2
 import piexif
-import openpyxl
 import numpy as np
-import win32com.client as win32
 import matplotlib.pyplot as plt
 from lxml import etree as ETT
-from PIL import Image, ImageOps, ImageCms   
+from PIL import Image, ImageOps
 from PyQt5.QtGui import QIcon, QColor, QPixmap, QKeySequence, QPainter, QCursor, QTransform, QImage, QPen, QBrush
 from PyQt5.QtCore import Qt, QTimer, QEvent, pyqtSignal, QThreadPool, QRunnable
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QLabel, QHeaderView, QShortcut, QGraphicsView, QAction,
     QGraphicsScene, QGraphicsPixmapItem, QMessageBox, QProgressBar, QGraphicsRectItem, QMenu,
-    QGraphicsItem, QDialogButtonBox, QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QCheckBox, QComboBox, QFileDialog)
+    QGraphicsItem, QDialog)
 
 """导入自定义模块"""
 from src.components.ui_sub_image import Ui_MainWindow                   # 看图子界面，导入界面UI
 from src.components.custom_qMbox_showinfo import show_message_box       # 导入消息框类
 from src.components.custom_qdialog_problems import ProblemsDialog       # 导入问题对话框类
-from src.common.settings_ColorAndExif import (load_exif_settings, 
-                                              load_color_settings)      # 导入json配置模块
+from src.common.settings_ColorAndExif import (load_exif_settings,       # 导入json配置模块
+    load_color_settings)                                                
 from src.common.font_manager import SingleFontManager                   # 看图子界面，导入字体管理器
 from src.utils.aitips import CustomLLM_Siliconflow                      # 看图子界面，AI提示看图复选框功能模块
 from src.utils.hisnot import WScreenshot                                # 看图子界面，导入自定义截图的类
 from src.utils.aeboxlink import check_process_running, get_api_data     # 导入与AEBOX通信的模块函数
 from src.utils.heic import extract_jpg_from_heic                        # 导入heic图片转换为jpg图片的模块
 from src.utils.p3_converter import ColorSpaceConverter                  # 导入色彩空间转换配置类
-
 from src.utils.decorator import CC_TimeDec                              # 导入自定义装饰器
 from src.utils.rectangleprogress import RectangleProgress               # 导入自定义进度条
 
@@ -247,8 +243,6 @@ def calculate_image_stats(image_input, resize_factor=1):
 
  
 
-
-
 def load_xml_data(xml_path):
     """加载XML文件并提取Lux值和DRCgain值等EXIF信息"""
     try:
@@ -341,8 +335,6 @@ def get_aebox_host():
 """
 
 
-
-
 """"继承 QGraphicsRectItem 并重写 itemChange 方法来实现对矩形框变化的监听"""
 class CustomGraphicsRectItem(QGraphicsRectItem):
     def __init__(self, parent=None):
@@ -396,20 +388,19 @@ class MyGraphicsView(QGraphicsView):
         # 设置顶层窗口，方便调用类SubMainWindow中的函数与变量
         self.parent_SubMainWindow = self.window()
 
-
         # 初始化字体管理器
-        if self.parent_SubMainWindow and self.parent_SubMainWindow.font_manager_j11:
-            self.font_manager_view = self.parent_SubMainWindow.font_manager_j11
-        else:
-            self.font_manager_view = SingleFontManager.get_font(10)
+        self.font_manager_view = (
+            self.parent_SubMainWindow.font_manager_j11 if self.parent_SubMainWindow.font_manager_j11 
+            else SingleFontManager.get_font(10)
+        ) 
 
-        # 初始化基本信息
-        self.exif_text = exif_text  # 存储 EXIF 信息
-        self.stats_text = stats_text  # 存储 stats 信息
-        self.show_exif = True if exif_text else False  # 控制 EXIF 显示
-        self.stats_visible = True if stats_text else False  # 控制 stats 显示
-        self.histogram = None  # 存储直方图数据
-        self.show_histogram = False  # 控制直方图显示
+        # 初始化基本信息(exif信息, stats信息, 控制exif显示, stats显示, 直方图, 控制直方图显示)
+        self.exif_text = exif_text
+        self.stats_text = stats_text
+        self.show_exif = True if exif_text else False
+        self.stats_visible = True if stats_text else False
+        self.histogram = None
+        self.show_histogram = False
 
         # 添加 QLabel 显示 EXIF 信息
         self.exif_label = QLabel(self)
@@ -967,22 +958,23 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         
         # 导入主界面的一些设置:字体设置，颜色设置等
         if self.parent_window:
+            self.custom_font = (       # 12号字体
+                self.parent_window.custom_font if self.parent_window.custom_font 
+                else SingleFontManager.get_font(12) 
+            )
+            self.font_manager_j12 = (  # 12号字体
+                self.parent_window.custom_font_jetbrains if self.parent_window.custom_font_jetbrains 
+                else self.custom_font
+            )           
+            self.font_manager_j11= (  # 11号字体
+                self.parent_window.custom_font_jetbrains_medium if self.parent_window.custom_font_jetbrains_medium 
+                else SingleFontManager.get_font(11)
+            )   
+            self.font_manager_j10 = (  # 10号字体
+                self.parent_window.custom_font_jetbrains_small if self.parent_window.custom_font_jetbrains_small 
+                else SingleFontManager.get_font(10)
+            )   
 
-            self.custom_font = (self.parent_window.custom_font if self.parent_window.custom_font 
-                                else SingleFontManager.get_font(12)) # 12号字体
-            self.font_manager_j12 = (self.parent_window.custom_font_jetbrains if self.parent_window.custom_font_jetbrains 
-                                    else self.custom_font)           # 12号字体
-            self.font_manager_j11= (self.parent_window.custom_font_jetbrains_medium if self.parent_window.custom_font_jetbrains_medium 
-                                           else self.custom_font)    # 11号字体
-            self.font_manager_j10 = (self.parent_window.custom_font_jetbrains_small if self.parent_window.custom_font_jetbrains_small 
-                                       else self.custom_font)        # 10号字体
-
-
-            # 导入颜色设置, 背景色，表格背景色，字体颜色，exif字体颜色; 从load_settings()中读取
-            # self.background_color_default = self.parent_window.background_color_default
-            # self.background_color_table = self.parent_window.background_color_table
-            # self.font_color_default = self.parent_window.font_color_default
-            # self.font_color_exif = self.parent_window.font_color_exif
 
 
 
@@ -1055,7 +1047,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             self.progress_updated.connect(self.update_progress)
         
             
-        
     def set_stylesheet(self):
         """设置窗口标题组件和样式表"""
         """窗口组件概览
@@ -1309,7 +1300,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
     def update_progress(self, value):
         """更新进度条数值"""
-        print("进度条--更新进度条数值")
+        # print("进度条--更新进度条数值")
         if hasattr(self, 'progress_bar'):
             # 设置进度条数值
             self.progress_bar.setValue(value)
@@ -2893,7 +2884,10 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         
 
     def save_settings(self):
-        """保存颜色设置"""
+        """
+        该函数主要是实现保存颜色设置, exif设置到配置文件的功能.
+        
+        """
         try:
             # 确保config目录存在
             config_dir = pathlib.Path("./config")
@@ -2907,25 +2901,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 "font_color_default": self.font_color_default,
                 "font_color_exif": self.font_color_exif,
             }
-            # rgb_color_settings = {
-            #     "18度灰": "rgb(127,127,127)",
-            #     "石榴红": "rgb(242,12,0)",
-            #     "乌漆嘛黑": "rgb(22, 24, 35)",
-            #     "铅白": "rgb(240,240,244)", 
-            #     "水色": "rgb(136,173,166)",   
-            #     "石青": "rgb(123,207,166)",           
-            #     "茶色": "rgb(242,12,0)",
-            #     "天际": "rgb(236,237,236)",   
-            #     "晴空": "rgb(234,243,244)",  
-            #     "苍穹": "rgb(220,230,247)", 
-            #     "湖光": "rgb(74,116,171)", 
-            #     "曜石": "rgb(84, 99,125)", 
-            #     "天际黑": "rgb(8,8,6)",   
-            #     "晴空黑": "rgb(45,53,60)",  
-            #     "苍穹黑": "rgb(47,51,68)", 
-            #     "湖光黑": "rgb(49,69,96)", 
-            #     "曜石黑": "rgb(57,63,78)", 
-            # }
             setting = {
                 "basic_color_settings": basic_color_settings,
                 "rgb_color_settings": self.color_rgb_settings   # 默认使用配置中读取的配置
@@ -2945,32 +2920,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 "p3_color_space":self.p3_color_space,
                 "gray_color_space":self.gray_color_space,
             }
-            # exif_visable_setting = {
-            #     '图片名称' : True,
-            #     '品牌' : True,
-            #     '型号' : True,
-            #     '图片大小' : True,
-            #     '图片尺寸' : True,
-            #     '图片张数' : True,
-            #     '曝光时间' : True,
-            #     '光圈值' : True,
-            #     'ISO值' : True,
-            #     '原始时间' : True,
-            #     '测光模式' : True,
-            #     'HDR' : True,
-            #     'Zoom' : True,
-            #     'Lux' : True,
-            #     'CCT' : True,
-            #     'FaceSA' : True,
-            #     'DRCgain' : True,
-            #     'Awb_sa' : True,
-            #     'Triangle_index' : True,
-            #     'R_gain' : True,
-            #     'B_gain' : True,
-            #     'Safe_gain' : True,
-            #     'Short_gain' : True,
-            #     'Long_gain' : True
-            # }
             setting = {
                 "label_visable_settings": label_visable_settings,
                 "exif_visable_setting": self.dict_exif_info_visibility  # 默认使用配置中读取的配置
@@ -2981,7 +2930,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
         except Exception as e:
             print(f"❌[save_settings]-->error: 保存设置失败: {e}")
-
 
 
     def update_ai_response(self, response):
@@ -3000,20 +2948,18 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             y (int): 当前屏幕中心的y坐标
             w (int): 当前屏幕的宽度
             h (int): 当前屏幕的高度
-        Raises:
-            列出函数可能抛出的所有异常，并描述每个异常的触发条件
-        Example:
-            提供一个或多个使用函数的示例，展示如何调用函数及其预期输出
-        Note:
-            注意事项，列出任何重要的假设、限制或前置条件.
         """
-        screen = QApplication.desktop().screenNumber(QApplication.desktop().cursor().pos())
-        screen_geometry = QApplication.desktop().screenGeometry(screen)
-        x = screen_geometry.x() + (screen_geometry.width() - self.width()) // 2
-        y = screen_geometry.y() + (screen_geometry.height() - self.height()) // 2
-        w = screen_geometry.width()
-        h = screen_geometry.height()
-        return x, y, w, h
+        try:
+            screen = QApplication.desktop().screenNumber(QApplication.desktop().cursor().pos())
+            screen_geometry = QApplication.desktop().screenGeometry(screen)
+            x = screen_geometry.x() + (screen_geometry.width() - self.width()) // 2
+            y = screen_geometry.y() + (screen_geometry.height() - self.height()) // 2
+            w = screen_geometry.width()
+            h = screen_geometry.height()
+            return x, y, w, h
+        except Exception as e:
+            print(f"❌[__get_screen_geometry]-->error: 获取屏幕几何信息失败: {e}")
+            return 0, 0, 0, 0
 
 
 
