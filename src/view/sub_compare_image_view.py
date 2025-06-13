@@ -267,7 +267,7 @@ def load_xml_data(xml_path):
 
         # ETT.XPath('lux_index')(root)[0].text
         # 提取值并拼接
-        extracted_values = []
+        qualcom_exif_info, extracted_values, luma_frame_ev = '', [], False
         for name, tag  in XPATHS.items():
             value = tag(root)
             if name  != 'FaceSA':
@@ -299,8 +299,8 @@ def load_xml_data(xml_path):
         return qualcom_exif_info, bool(luma_frame_ev)
 
     except Exception as e:
-        print(f"解析XML失败{xml_path}:\n {e}")
-        return None
+        print(f"解析XML失败{xml_path}:\n报错信息: {e}")
+        return '', False
     
 def get_aebox_host():
     """读取aebox连接配置"""

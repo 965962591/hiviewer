@@ -2,8 +2,6 @@
 """导入python内置模块"""
 import os
 import sys
-import logging
-
 """导入python三方模块"""
 import cv2
 import piexif
@@ -16,23 +14,6 @@ from PyQt5.QtWidgets import (
     QApplication, QWidget, QGraphicsView, QGraphicsScene, QVBoxLayout,
     QHBoxLayout, QPushButton, QLabel, QDoubleSpinBox, QFileDialog)
 
-
-
-# 增加全局日志控制字段
-log_enable = False
-
-# 修改日志配置
-if log_enable:
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.StreamHandler(sys.stdout),
-            logging.FileHandler("./cache/image_editor.log", encoding='utf-8')  # 更新日志文件路径
-        ]
-    )
-else:
-    logging.disable(logging.CRITICAL)  # 禁用所有日志
 
 class ImageTransform:
     """图片旋转exif信息调整类"""
@@ -91,11 +72,6 @@ class SubCompare(QWidget):
     closed = pyqtSignal()  # 添加关闭信号
     def __init__(self, image_path=None):
         super().__init__()
-        if log_enable:
-            logging.info("初始化 ImageEditor 窗口")
-
-        # 设置窗口初始大小
-        # self.resize(1600, 1200)
 
         # 获取鼠标所在屏幕，并根据当前屏幕计算界面大小与居中位置，调整大小并移动到该位置
         screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
@@ -117,20 +93,14 @@ class SubCompare(QWidget):
         if image_path:
             self.original_pixmap = ImageTransform.auto_rotate_image(image_path)
             if self.original_pixmap.isNull():
-                logging.error(f"无法加载图片: {image_path}")
                 self.original_pixmap = QPixmap()  # 设置为空
             else:
-                logging.debug(f"加载原始图片路径: {image_path}")
                 self.update_images()
         else:
             self.original_pixmap = QPixmap()  # 默认空白
 
 
-
-
     def initUI(self):
-        if log_enable:
-            logging.info("初始化用户界面")
         # 创建布局
         main_layout = QVBoxLayout()
         label_layout = QHBoxLayout()
@@ -281,7 +251,6 @@ class SubCompare(QWidget):
 
     def import_image(self):
         """导入本地图片"""
-        logging.debug("点击导入图片按钮")
         options = QFileDialog.Options()
         file_path, _ = QFileDialog.getOpenFileName(
             self,
@@ -291,18 +260,16 @@ class SubCompare(QWidget):
             options=options
         )
         if file_path:
-            logging.debug(f"导入图片路径: {file_path}")
             new_pixmap = ImageTransform.auto_rotate_image(file_path)
             if new_pixmap.isNull():
-                logging.error(f"无法加载图片: {file_path}")
+                print(f"[sub_image_process_view]--[import_image]-->无法加载图片: {file_path}")
                 return
             self.original_pixmap = new_pixmap
             self.update_images()
 
     def toggle_color_picker(self, checked):
         """切换取色器模式"""
-        if log_enable:
-            logging.debug(f"取色器模式切换到: {'开启' if checked else '关闭'}")
+
         self.view_after.set_pick_mode(checked)
         if checked:
             # 设置按钮高亮
@@ -311,20 +278,18 @@ class SubCompare(QWidget):
             # 取消按钮高亮
             self.color_picker_button.setStyleSheet("")
             self.selected_color = None  # 取消选色时清除选中的颜色
-            logging.info("取消选中色彩")
             self.update_images()
 
     def pick_color(self, color: QColor):
         """处理取色器选中的颜色"""
-        if log_enable:
-            logging.info(f"选中色彩: RGB({color.red()}, {color.green()}, {color.blue()})")
+
         self.selected_color = color
         self.color_picker_button.setChecked(False)  # 取消按钮的选中状态
         self.update_images()
 
     def update_images(self):
         if self.original_pixmap.isNull():
-            logging.warning("没有加载图片，无法更新图像。")
+            print(f"[sub_image_process_view]--[update_images]-->没有加载图片，无法更新图像。")
             self.scene_before.clear()
             self.scene_after.clear()
             return
@@ -343,14 +308,12 @@ class SubCompare(QWidget):
 
     def modify_image(self, pixmap):
         if pixmap.isNull():
-            logging.warning("空的 QPixmap，跳过修改。")
             return QPixmap()
-        if log_enable:
-            logging.debug("开始修改图像")
+
         # 将 QPixmap 转换为 OpenCV 图像
         image = self.qpixmap_to_cv(pixmap)
         if image is None:
-            logging.error("转换 QPixmap 到 OpenCV 图像失败。")
+            print(f"[sub_image_process_view]--[modify_image]-->转换 QPixmap 到 OpenCV 图像失败。")
             return QPixmap()
 
         # 获取旋转框的值
@@ -363,22 +326,12 @@ class SubCompare(QWidget):
         sharpness_increment = self.sharpness_spinbox.value()
         hue_increment = self.hue_spinbox.value()
 
-        if log_enable:
-            logging.debug(f"饱和度增量: {saturation_increment}")
-            logging.debug(f"曝光增量: {exposure_increment}")
-            logging.debug(f"对比度增量: {contrast_increment}")
-            logging.debug(f"红色增量: {red_increment}")
-            logging.debug(f"绿色增量: {green_increment}")
-            logging.debug(f"蓝色增量: {blue_increment}")
-            logging.debug(f"锐度增量: {sharpness_increment}")
-            logging.debug(f"色相增量: {hue_increment}")
 
         # 如果选择了颜色，获取其 HSV 值
         if self.selected_color:
             selected_hue = self.selected_color.hue() % 180  # OpenCV HSV hue范围为0-179
             selected_sat = self.selected_color.saturation()
             selected_val = self.selected_color.value()
-            logging.debug(f"选中色彩 HSV: ({selected_hue}, {selected_sat}, {selected_val})")
             # 定义颜色匹配的容差
             hue_tolerance = 10  # 色相容差
             sat_tolerance = 50  # 饱和度容差
@@ -398,35 +351,28 @@ class SubCompare(QWidget):
             ])
             mask = cv2.inRange(hsv_image, lower_bound, upper_bound)
             non_zero = cv2.countNonZero(mask)
-            logging.debug(f"创建颜色掩码: lower_bound={lower_bound}, upper_bound={upper_bound}, 非零像素数={non_zero}")
         else:
             mask = None  # 如果未选择颜色，则对整个图像应用
-            logging.debug("未选择颜色，应用于整个图像")
 
         # 调整饱和度
         if saturation_increment != 0:
-            logging.debug(f"调整饱和度: {saturation_increment}")
             if mask is not None:
                 hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV).astype(np.float32)
                 hsv_image[..., 1][mask != 0] *= (1 + saturation_increment)
                 hsv_image[..., 1] = np.clip(hsv_image[..., 1], 0, 255)
                 image = cv2.cvtColor(hsv_image.astype(np.uint8), cv2.COLOR_HSV2BGR)
-                logging.debug("应用饱和度增量到选中色彩区域")
             else:
                 hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV).astype(np.float32)
                 hsv_image[..., 1] *= (1 + saturation_increment)
                 hsv_image[..., 1] = np.clip(hsv_image[..., 1], 0, 255)
                 image = cv2.cvtColor(hsv_image.astype(np.uint8), cv2.COLOR_HSV2BGR)
-                logging.debug("应用饱和度增量到整个图像")
 
         # 调整曝光
         if exposure_increment != 0:
-            logging.debug(f"调整曝光: {exposure_increment}")
             image = cv2.convertScaleAbs(image, alpha=1.0, beta=exposure_increment * 255)
 
         # 使用 PIL 调整对比度
         if contrast_increment != 0:
-            logging.debug(f"调整对比度: {contrast_increment}")
             pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
             enhancer = ImageEnhance.Contrast(pil_image)
             factor = 1.0 + contrast_increment  # 对比度因子
@@ -435,7 +381,6 @@ class SubCompare(QWidget):
 
         # 调整颜色通道
         if red_increment != 0 or green_increment != 0 or blue_increment != 0:
-            logging.debug(f"调整颜色通道: R={red_increment}, G={green_increment}, B={blue_increment}")
             b, g, r = cv2.split(image)
             if blue_increment != 0:
                 b = cv2.add(b, blue_increment)
@@ -447,7 +392,6 @@ class SubCompare(QWidget):
 
         # 使用 PIL 调整锐度
         if sharpness_increment != 0:
-            logging.debug(f"调整锐度: {sharpness_increment}")
             pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
             enhancer = ImageEnhance.Sharpness(pil_image)
             factor = 2.0 + sharpness_increment
@@ -456,24 +400,20 @@ class SubCompare(QWidget):
 
         # 调整色相
         if hue_increment != 0:
-            logging.debug(f"调整色相: {hue_increment}")
             hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV).astype(np.float32)
             hue_shift = hue_increment * 180  # OpenCV中hue范围为0-179
             if mask is not None:
                 hsv_image[..., 0][mask != 0] = (hsv_image[..., 0][mask != 0] + hue_shift) % 180
-                logging.debug("应用色相增量到选中色彩区域")
             else:
                 hsv_image[..., 0] = (hsv_image[..., 0] + hue_shift) % 180
-                logging.debug("应用色相增量到整个图像")
             image = cv2.cvtColor(hsv_image.astype(np.uint8), cv2.COLOR_HSV2BGR)
 
         # 将 OpenCV 图像转换回 QPixmap
-        logging.debug("完成图像修改")
         return self.cv_to_qpixmap(image)
 
     def qpixmap_to_cv(self, pixmap):
         if pixmap.isNull():
-            logging.error("尝试转换一个空的 QPixmap。")
+            print(f"[sub_image_process_view]--[qpixmap_to_cv]-->尝试转换一个空的 QPixmap。")
             return None
         # 将 QPixmap 转换为 OpenCV 图像
         image = pixmap.toImage()
@@ -484,7 +424,7 @@ class SubCompare(QWidget):
         try:
             ptr.setsize(bytes_per_line * height)
         except AttributeError:
-            logging.error("无法设置指针大小，可能是 QPixmap 无效。")
+            print(f"[sub_image_process_view]--[qpixmap_to_cv]-->无法设置指针大小，可能是 QPixmap 无效。")
             return None
         # 将数据重塑为 (height, bytes_per_line)
         arr = np.array(ptr).reshape(height, bytes_per_line)
@@ -494,7 +434,7 @@ class SubCompare(QWidget):
         try:
             arr = arr.reshape(height, width, 3)
         except ValueError as e:
-            logging.error(f"重塑数组失败: {e}")
+            print(f"[sub_image_process_view]--[qpixmap_to_cv]-->重塑数组失败: {e}")
             return None
         # 转换为 BGR 格式以适应 OpenCV
         return cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
@@ -512,7 +452,6 @@ class SubCompare(QWidget):
 
     # 在滑块值改变时调用update_images方法
     def on_slider_change(self):
-        logging.debug("滑块值改变，调用 update_images()")
         self.update_images()
 
     def resizeEvent(self, event):
@@ -523,9 +462,8 @@ class SubCompare(QWidget):
 
     # 按钮功能实现示例
     def compare_images(self):
-        logging.debug("按下对比按钮，显示原始图片")
         if self.original_pixmap.isNull():
-            logging.warning("没有加载图片，无法进行对比。")
+            print(f"[sub_image_process_view]--[compare_images]-->没有加载图片，无法进行对比。")
             return
         # 将原始图片覆盖到右侧视图
         self.scene_after.clear()
@@ -533,7 +471,6 @@ class SubCompare(QWidget):
         self.view_after.fitInView(self.scene_after.sceneRect(), Qt.KeepAspectRatio)
 
     def reset_parameters(self):
-        logging.debug("重置所有参数到初始值")
         # 重置所有参数到初始值
         self.red_spinbox.setValue(0.0)
         self.green_spinbox.setValue(0.0)
@@ -548,9 +485,8 @@ class SubCompare(QWidget):
 
     def save_as(self):
         if self.original_pixmap.isNull():
-            logging.warning("没有加载图片，无法保存。")
+            print(f"[sub_image_process_view]--[save_as]-->没有加载图片，无法保存。")
             return
-        logging.debug("点击另存为按钮")
         # 弹出文件保存对话框
         options = QFileDialog.Options()
         file_path, _ = QFileDialog.getSaveFileName(
@@ -562,15 +498,14 @@ class SubCompare(QWidget):
         )
         if file_path:
             # 将修改后的图片保存到用户选择的路径
-            logging.debug(f"保存修改后的图片到: {file_path}")
+            print(f"[sub_image_process_view]--[save_as]-->保存修改后的图片到: {file_path}")
             modified_pixmap = self.modify_image(self.original_pixmap)
             if not modified_pixmap.isNull():
                 modified_pixmap.save(file_path)
             else:
-                logging.error("修改后的图片为空，无法保存。")
+                print(f"[sub_image_process_view]--[save_as]-->修改后的图片为空，无法保存。")
 
     def restore_modified_image(self):
-        logging.debug("恢复修改后的图片")
         # 恢复修改后的图片
         self.update_images()
 
@@ -612,13 +547,12 @@ class GraphicsView(QGraphicsView):
             # 转换为 OpenCV 坐标
             img = self.parent.qpixmap_to_cv(self.parent.original_pixmap)
             if img is None:
-                logging.error("无法获取图片数据进行取色。")
+                print(f"[sub_image_process_view]--[mousePressEvent]-->无法获取图片数据进行取色。")
                 return
             height, width, _ = img.shape
             if 0 <= x < width and 0 <= y < height:
                 b, g, r = img[y, x]
                 color = QColor(r, g, b)
-                logging.debug(f"取色器点击位置: ({x}, {y})，颜色: RGB({r}, {g}, {b})")
                 if self.pick_color_callback:
                     self.pick_color_callback(color)
         else:
@@ -628,6 +562,5 @@ class GraphicsView(QGraphicsView):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     image_path = sys.argv[1] if len(sys.argv) > 1 else None
-    # image_path = r"D:\Tuning\M5151\0_picture\20241105_FT\1105-C3N后置GL四供第一轮FT（宜家+日月光）\Bokeh\C3N\C3N_C3N_IMG_20241105_081206.jpg"
     ex = SubCompare(image_path)
     sys.exit(app.exec_())

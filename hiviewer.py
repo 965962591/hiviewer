@@ -72,12 +72,10 @@ from src.utils.heic import extract_jpg_from_heic                            # �
 from src.utils.video import extract_video_first_frame                       # 导入视频预览工具类
 from src.utils.image import ImageProcessor                                  # 导入图片处理工具类
 from src.utils.sort import sort_by_custom                                   # 导入文件排序工具类
+from src.view.sub_search_view import SearchOverlay                                  # 导入图片搜索工具类(ctrl+f)
 from src.utils.decorator import CC_TimeDec                                  # 导入自定义装饰器
 from src.utils.aeboxlink import (check_process_running,                     # 导入自定义装饰器
     urlencode_folder_path, get_api_data)
-
-
-
 
 
 """
@@ -665,6 +663,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 添加快捷键 Ctrl+h 打开帮助信息显示
         self.h_shortcut = QShortcut(QKeySequence(Qt.ControlModifier + Qt.Key_H), self)
         self.h_shortcut.activated.connect(self.on_ctrl_h_pressed)
+        # 添加快捷键 Ctrl+f 打开图片搜索工具
+        self.f_shortcut = QShortcut(QKeySequence(Qt.ControlModifier + Qt.Key_F), self)
+        self.f_shortcut.activated.connect(self.on_ctrl_f_pressed)
         # 添加快捷键 C,复制选中的文件路径
         self.c_shortcut = QShortcut(QKeySequence('c'), self)
         self.c_shortcut.activated.connect(self.copy_selected_file_path)
@@ -3151,11 +3152,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
             # 显示对话框
             if dialog.exec_() == QDialog.Accepted:
-
-                # 执行命名
+                # 收集用户输入的参数
                 dict_info = dialog.get_data()
-                # print(f"用户加载的路径信息: {dict_info}")
-
                 qualcom_path = dict_info.get("Qualcom工具路径","")
                 images_path = dict_info.get("Image文件夹路径","")
                 metadata_path = os.path.join(os.path.dirname(__file__), "resource", "tools", "metadata.exe")
@@ -3164,31 +3162,20 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 if qualcom_path and images_path and os.path.exists(metadata_path) and os.path.exists(images_path) and os.path.exists(qualcom_path):
                     command = f"{metadata_path} --chromatix \"{qualcom_path}\" --folder \"{images_path}\""
 
-                    """
-                    # 添加检查 图片文件夹目录下是否已存在xml文件，不存在则启动线程解析图片
-                    # xml_exists = [f for f in os.listdir(images_path) if f.endswith('_new.xml')]
-
-                    针对上面的代码，优化了检查'_new.xml'文件的逻辑:
-                    1. os.listdir(images_path) 列出文件夹中的所有文件
-                    2. os.path.exists(os.path.join(images_path, f)) 检查文件是否存在
-                    3. any() 函数会在找到第一个符合条件的文件时立即返回 True, 避免不必要的遍历
-                    """
                     # 检查图片文件夹目录下是否存在xml文件，不存在则启动线程解析图片
                     xml_exists = any(f for f in os.listdir(images_path) if f.endswith('_new.xml'))
 
                     # 创建线程，必须在主线程中连接信号
                     self.command_thread = CommandThread(command, images_path)
-                    self.command_thread.finished.connect(self.on_command_finished)  # 连接信号
-                    # self.command_thread.finished.connect(self.cleanup_thread)  # 连接清理槽
+                    self.command_thread.finished.connect(self.on_command_finished)  
 
+                    # 如果xml文件不存在，则启动线程解析图片；否则提取xml信息保存到excel文件
                     if not xml_exists:
-                        self.command_thread.start()  # 启动线程
+                        self.command_thread.start()   # 启动线程
                         show_message_box("正在使用高通工具后台解析图片Exif信息...", "提示", 1000)
                     else:
                         show_message_box("已有xml文件, 无须解析图片", "提示", 1000)
-
-                        # 解析xml文件将其保存到excel中去
-                        save_excel_data(images_path)
+                        save_excel_data(images_path)  # 解析xml文件将其保存到excel中去
 
             # 无论对话框是接受还是取消，都手动销毁对话框
             dialog.deleteLater()
@@ -3292,6 +3279,40 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             del self.help_dialog
             print("[close_helpinfo]-->成功销毁对话框")
 
+
+    def on_ctrl_f_pressed(self):
+        """处理Ctrl+f键按下事件, 打开图片模糊搜索工具"""
+        try:
+            # 构建图片名称列表，保持多维列表的结构, 保持图片名称的完整路径
+            image_names = [[os.path.basename(path) for path in folder_paths] for folder_paths in self.paths_list]
+            # self.RB_QTableWidget0.item(row, col).text()
+
+            # 创建搜索窗口
+            self.search_window = SearchOverlay(self, image_names)
+            self.search_window.show_search_overlay()
+
+            # 连接搜索窗口的选中项信号
+            self.search_window.item_selected_from_search.connect(self.on_item_selected_from_search)
+
+            print("[on_ctrl_f_pressed]-->打开图片模糊搜索工具成功")
+
+        except Exception as e:
+            print(f"[on_ctrl_f_pressed]-->打开图片模糊搜索工具失败: {e}")   
+
+    def on_item_selected_from_search(self, position):
+        """处理搜索窗口的选中项信号,返回行(row)和列(col)"""
+        row, col = position
+        # 清除表格选中项，设置表格选中项，滚动到选中项
+        self.RB_QTableWidget0.clearSelection()
+        item = self.RB_QTableWidget0.item(row, col)
+        if item:
+            # 滚动到选中项
+            self.RB_QTableWidget0.scrollToItem(item, QAbstractItemView.PositionAtCenter)
+            # 设置选中项
+            item.setSelected(True)
+        
+
+        print(f"[on_item_selected_from_search]-->选中图片: {row}, {col}")
 
     def on_b_pressed(self):
         """处理B键按下事件，用于查看上一组图片/视频"""
