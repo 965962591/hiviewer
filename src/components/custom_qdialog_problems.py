@@ -13,7 +13,8 @@ import json
 
 """导入python第三方模块"""
 import openpyxl
-import win32com.client
+import win32com.client as win32
+import pythoncom
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QLabel, QComboBox, QLineEdit, QPushButton, QDialogButtonBox, 
                              QCheckBox, QVBoxLayout, QHBoxLayout, QDialog, QFileDialog)
@@ -372,40 +373,23 @@ class ProblemsDialog(QDialog):
     def close_excel(self):
         """
         该函数主要是实现了一个 强制关闭一个EXCEL表格 的功能.
-        同时支持 Microsoft Excel 和 WPS 表格
         """
         try:
-            # 尝试关闭 WPS 表格
-            try:
-                excel_app = win32com.client.Dispatch('KWps.Application')
-                print("尝试关闭 WPS 表格")
-            except:
-                # 如果 WPS 不可用，尝试关闭 Microsoft Excel
-                try:
-                    excel_app = win32com.client.Dispatch('Excel.Application')
-                    print("尝试关闭 Microsoft Excel")
-                except Exception as e:
-                    print(f"无法启动 Excel 或 WPS 表格: {e}")
-                    return
+            # 获取 Excel 应用程序的实例
+            excel_app = win32.gencache.EnsureDispatch('Excel.Application')
             
             # 检查是否有打开的工作簿
             if excel_app.Workbooks.Count > 0:
                 # 强制关闭所有工作簿，不保存更改
                 for workbook in excel_app.Workbooks:
-                    try:
-                        workbook.Close(SaveChanges=False)
-                    except:
-                        pass
+                    workbook.Close(SaveChanges=False)
             
-            # 退出应用程序
-            try:
-                excel_app.Quit()
-                print("Excel/WPS 已成功关闭。")
-            except:
-                pass
+            # 退出 Excel 应用程序
+            excel_app.Quit()
+            print("Excel 已成功关闭。")
             
         except Exception as e:
-            print(f"关闭 Excel/WPS 时发生错误: {e}")
+            print(f"关闭 Excel 时发生错误: {e}")
 
 
     def save_stitch_images(self):
@@ -495,7 +479,7 @@ class ProblemsDialog(QDialog):
 
 
     def write_data(self):
-        """写入数据，支持实时写入，同时支持 Microsoft Excel 和 WPS 表格"""  
+        """写入数据，支持实时写入"""  
         excel_path = self.text_input1.text()  # 获取Excel文件路径
         search_value = self.text_input0.text()  # 获取要查找的值
 
@@ -509,83 +493,54 @@ class ProblemsDialog(QDialog):
             return
 
         try:
-            # 尝试启动 WPS 表格
-            try:
-                excel_app = win32com.client.Dispatch('KWps.Application')
-                print("[write_data]-->使用 WPS 表格")
-            except:
-                # 如果 WPS 不可用，尝试启动 Microsoft Excel
-                try:
-                    excel_app = win32com.client.Dispatch('Excel.Application')
-                    print("[write_data]-->使用 Microsoft Excel")
-                except Exception as e:
-                    show_message_box(f"[write_data]-->无法启动 Excel 或 WPS 表格: {str(e)}", "错误", 2000)
-                    return
-
+            # 初始化 COM
+            pythoncom.CoInitialize()
+            
+            # 启动 Excel 应用程序
+            excel_app = win32.gencache.EnsureDispatch('Excel.Application')
             excel_app.Visible = True  # 设置为可见
 
             # 打开工作簿
-            try:
-                workbook = excel_app.Workbooks.Open(excel_path)
-            except Exception as e:
-                show_message_box(f"[write_data]-->无法打开工作簿: {str(e)}", "错误", 2000)
-                excel_app.Quit()
-                return
-
+            workbook = excel_app.Workbooks.Open(excel_path)
             # 选择第一个工作表
-            try:
-                sheet = workbook.Worksheets(1)  # 索引从 1 开始
-            except Exception as e:
-                show_message_box(f"[write_data]-->无法访问工作表: {str(e)}", "错误", 2000)
-                workbook.Close(False)
-                excel_app.Quit()
-                return
+            sheet = workbook.Worksheets(1)  # 索引从 1 开始
 
             # 查找目标行
             target_row = 0
-            try:
-                for row in range(1, sheet.UsedRange.Rows.Count + 1):
-                    if sheet.Cells(row, 1).Value == search_value:  # 假设在第一列查找
-                        target_row = row
-                        break
-            except Exception as e:
-                show_message_box(f"[write_data]-->查找目标行时出错: {str(e)}", "错误", 2000)
-                workbook.Close(False)
-                excel_app.Quit()
-                return
+            for row in range(1, sheet.UsedRange.Rows.Count + 1):
+                if sheet.Cells(row, 1).Value == search_value:  # 假设在第一列查找
+                    target_row = row
+                    break
 
             if target_row == 0:  # 如果找不到对应的行
                 target_row = sheet.UsedRange.Rows.Count + 1      # 写入到最后一行
                 sheet.Cells(target_row, 1).Value = search_value  # 写入文件名
 
             # 找到目标行后；按列，向表格写入数据
-            try:
-                for col in range(1, sheet.UsedRange.Columns.Count + 1):
-                    if sheet.Cells(1, col).Value == "AE":
-                        sheet.Cells(target_row, col).Value = self.combo_box3.currentText()
-                    if sheet.Cells(1, col).Value == "AWB":
-                        sheet.Cells(target_row, col).Value = self.combo_box4.currentText()
-                    if sheet.Cells(1, col).Value == "AF":
-                        sheet.Cells(target_row, col).Value = self.combo_box5.currentText()
-                    if sheet.Cells(1, col).Value == "ISP":
-                        sheet.Cells(target_row, col).Value = self.combo_box6.currentText()
+            for col in range(1, sheet.UsedRange.Columns.Count + 1):
+                if sheet.Cells(1, col).Value  == "AE":
+                    sheet.Cells(target_row, col).Value = self.combo_box3.currentText()
+                if sheet.Cells(1, col).Value  == "AWB":
+                    sheet.Cells(target_row, col).Value = self.combo_box4.currentText()
+                if sheet.Cells(1, col).Value  == "AF":
+                    sheet.Cells(target_row, col).Value = self.combo_box5.currentText()
+                if sheet.Cells(1, col).Value  == "ISP":
+                    sheet.Cells(target_row, col).Value = self.combo_box6.currentText()     
 
-                # 保存工作簿
-                workbook.Save()
-                print("[write_data]-->数据已成功写入Excel文件。")
-            except Exception as e:
-                show_message_box(f"[write_data]-->写入数据时出错: {str(e)}", "错误", 2000)
-            finally:
-                # 关闭工作簿和应用程序
-                try:
-                    workbook.Close(True)  # 保存更改
-                    excel_app.Quit()
-                except:
-                    pass
+            # 保存工作簿
+            workbook.Save()
+            show_message_box("数据已成功写入Excel文件", "提示", 1500)
 
         except Exception as e:
-            print(f"[write_data]-->写入数据时发生错误: {e}")
-            show_message_box(f"[write_data]-->写入数据时发生错误: {str(e)}", "错误", 2000)
+            error_msg = f"写入数据时发生错误: {str(e)}"
+            show_message_box(error_msg, "错误", 1500)
+            print(error_msg)
+        finally:
+            try:
+                # 取消初始化 COM
+                pythoncom.CoUninitialize()
+            except:
+                pass
 
 
     def load_data(self):
@@ -597,7 +552,7 @@ class ProblemsDialog(QDialog):
             if file_path:
                 self.text_input1.setText(file_path)  # 显示选定的文件路径
         except Exception as e:
-            print(f"[load_data]-->加载EXCEL表格时发生错误: {e}")
+            print(f"加载EXCEL表格时发生错误: {e}")
 
 
     def set_path_data(self):
