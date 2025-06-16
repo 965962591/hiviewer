@@ -14,7 +14,7 @@ if sys.platform == "win32":
         '--mingw64',                            # windows平台使用的基于gcc的mingw64编译器
         '--show-memory',                        # 显示内存使用情况
         '--standalone',                         # 独立打包，不依赖python环境
-        '--lto=yes',                           # 启用链接时优化,比lto=yes节省编译时间
+        '--lto=yes',                            # 启用链接时优化,比lto=yes节省编译时间
         '--jobs=10' ,                           # 使用10个线程进行编译
         '--show-progress',                      # 显示编译进度
         '--enable-plugin=pyqt5,upx' ,           # 启用pyqt5插件

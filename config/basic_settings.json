@@ -6,11 +6,18 @@
         "D:/Tuning/O19/0_pic/02_IN_pic/2025.6.10-IN-一供测试原图/2025.6.10-IN-一供测试原图/video/O19",
         "D:/Tuning/O19/0_pic/02_IN_pic/2025.6.10-IN-一供测试原图/2025.6.10-IN-一供测试原图/video",
         "D:/Tuning/O19/0_pic/02_IN_pic/2025.6.10-IN-一供测试原图/2025.6.10-IN-一供测试原图/video/N19",
-        "C:\\Users\\caozhen\\Downloads\\12"
+        "C:\\Users\\caozhen\\Downloads\\12",
+        "D:/Tuning/O19/0_pic/0515",
+        "D:/Tuning/O19/0_pic/0515/O19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.6.13-IN-原图",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.6.10-IN-一供测试原图2/hdr/N19"
     ],
-    "current_directory": "D:/Tuning/O19/0_pic/02_IN_pic/2025.6.10-IN-一供测试原图/2025.6.10-IN-一供测试原图/HDR/N19",
+    "current_directory": "D:/Tuning/O19/0_pic/02_IN_pic/2025.6.10-IN-一供测试原图2/hdr/N19",
     "file_type_option": "显示图片文件",
-    "combobox1_checked_items": [],
+    "combobox1_checked_items": [
+        "O19",
+        "VIVO"
+    ],
     "combobox1_all_items": [
         "O19",
         "VIVO"

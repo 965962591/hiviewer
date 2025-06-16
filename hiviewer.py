@@ -2916,80 +2916,66 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         try:
             selected_items = self.RB_QTableWidget0.selectedItems()  # 获取选中的项
             if not selected_items:
-                # 弹出提示框
+                # 弹出提示框并抛出异常
                 show_message_box("没有选中的项！", "提示", 500)
-                print("[press_space_and_b_get_selected_file_paths]-->没有检测到选中项！")
-                return [], []
+                raise Exception("没有检测到选中项！")
             
-            # 获取最大最小的行索引
-            row_min, row_max = 0, self.RB_QTableWidget0.rowCount() - 1 
-            # 用于存储文件路径和文件索引的列表
+            # 初始化用于存储文件路径和文件索引的列表，初始化最大最小行索引
             file_paths, current_image_index = [], []  
-            # 判断是否是首次按键
+            row_min, row_max = 0, self.RB_QTableWidget0.rowCount() - 1 
+
+            # 判断是否是首次按键，step_row表示每列行索引需要移动的步长，是一个列表
             if not self.last_key_press:
-                step_row = 0   # 首次按键不移动
-                self.last_key_press = True # 第二次进入设置为True
+                # 首次按键不移动,并设置为True，保证后续按键移动step_row
+                step_row = [0]*self.RB_QTableWidget0.columnCount()
+                self.last_key_press = True 
             else:
-                # 统计行索引需要移动step
-                if len(set([item.column() for item in selected_items])) == len(selected_items):
-                    # 如果选中项的个数和图片列数相等，则表示是单选，行索引移动step_row = 1
-                    step_row = 1
-                else:
-                    # 如果选中项的个数和图片列数不相等，则表示是多选，行索引移动step_row = 选中项的行索引去重后长度
-                    step_row = len(set([item.row() for item in selected_items]))   
-            
+                # 统计每列行索引需要移动step 
+                step_row = [sum(1 for item in selected_items if item.column() == i) 
+                            for i in range(max((item.column() for item in selected_items), default=-1) + 1)]
+ 
             # 清除所有选中的项
             self.RB_QTableWidget0.clearSelection() 
 
             # 遍历选中的项
             for item in selected_items:
                 # 获取当前项的列索引行索引
-                col_index = item.column()
-                row_index = item.row()
+                col_index, row_index = item.column(), item.row()
                 # 判断按下space和b来控制选中的单元格上移和下移
-                if key_type == 'space':    # 空格键获取下一组图片
-                    row_index += step_row
-                elif key_type == 'b':      # B键获取上一组图片
-                    row_index -= step_row
+                if key_type == 'space':    
+                    row_index += step_row[col_index]
+                elif key_type == 'b':      
+                    row_index -= step_row[col_index]
                 else:
                     print("没有按下space和b键")
 
-                if row_index > row_max or row_index < row_min:  # 修正边界检查
-                    self.RB_QTableWidget0.clearSelection()      # 清除所有选中的项
-                    print(f"已超出表格范围: {row_index}")
-                    return [], []
+                # 判断是否超出表格范围，超出则清除所有选中的项，并抛出异常
+                if row_index > row_max or row_index < row_min: 
+                    self.RB_QTableWidget0.clearSelection()      
+                    raise Exception(f"已超出表格范围: {row_index}")
                 else:
                     item = self.RB_QTableWidget0.item(row_index, col_index)
-                    if item and item.text():
-                        item.setSelected(True)  # 选中当前单元格
-                        # 构建图片完整路径
-                        file_name = item.text().split('\n')[0]  # 获取文件名，修改获取方式(第一行为需要的文件名)
-                        column_name = self.RB_QTableWidget0.horizontalHeaderItem(col_index).text()
-                        current_directory = self.RT_QComboBox.currentText()  # 获取当前选中的目录
-                        full_path = (Path(current_directory).parent / column_name / file_name).as_posix()
-                        
-                        if os.path.isfile(full_path):
-                            file_paths.append(full_path)  # 只有在是有效文件时才添加到列表中
-                        else:
-                            print(f"无效文件路径: {full_path}")  # 输出无效文件路径的提示   
+                    if not item:
+                        raise Exception(f"item is None")
                     else:
-                        print(f"item is None or item.text() is None")
+                        # 选中当前单元格，并构建图片完整路径
+                        item.setSelected(True)  
+                        full_path = self.paths_list[col_index][row_index]
+                        
+                        # 判断是否是有效文件
+                        file_paths.append(full_path) if os.path.isfile(full_path) else print(f"[press_space_and_b_get_selected_file_paths]-->无效文件路径: {full_path}")
 
-                # 如果选中项的列数和图片列数相等，则打印当前处理图片张数
+                # 先检查image_index_max是否有效，再获取当前图片张数
                 if not self.image_index_max: # 如果image_index_max为空，则初始化为当前表格的最大行数
-                    print("image_index_max is None")
                     self.image_index_max = [self.RB_QTableWidget0.rowCount()] * self.RB_QTableWidget0.columnCount()
-                if row_index+1 > self.image_index_max[col_index]:
-                    pass
-                else:
+                if row_index+1 <= self.image_index_max[col_index]:
                     current_image_index.append(f"{row_index+1}/{self.image_index_max[col_index]}")
-
 
             # 将选中的单元格滚动到视图中间位置
             self.RB_QTableWidget0.scrollToItem(item, QAbstractItemView.PositionAtCenter)
 
-            
-            return file_paths, current_image_index  # 返回文件路径列表
+            # 返回文件路径列表和当前图片张数列表
+            return file_paths, current_image_index  
         except Exception as e:
             print(f"[press_space_and_b_get_selected_file_paths]-->处理键盘按下事件时发生错误: {e}")
             return [], []
