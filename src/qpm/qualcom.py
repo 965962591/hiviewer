@@ -1,39 +1,36 @@
 # -*- coding: utf-8 -*-
-import subprocess
 from PyQt5.QtCore import pyqtSignal, QThread
 
-class CommandThread(QThread):
+class QualcomThread(QThread):
     """执行高通图片解析工具独立线程类"""
-    finished = pyqtSignal(bool, str, str)  # 添加 images_path 参数
+    finished = pyqtSignal(bool, str, str) 
 
-    def __init__(self, command, images_path):
+    def __init__(self, qualcom_path, images_path):
         super().__init__()
-        self.command = command
+        self.qualcom_path = qualcom_path
         self.images_path = images_path
 
     def run(self):
         try:
-            if False:
-                result = subprocess.run(
-                    self.command, 
-                    check=True, 
-                    stdout=subprocess.PIPE, 
-                    stderr=subprocess.PIPE, 
-                    text=True, 
-                    encoding='utf-8')
-                self.finished.emit(result.returncode == 0, result.stderr, self.images_path)  # 发射信号，传递结果
+            # 使用高通工具解析图片
+            from src.qpm.dump import process_images_in_folder
+            process_images_in_folder(self.qualcom_path, self.images_path)
             
-            # 使用 /c 参数，命令执行完成后关闭窗口，直接独立线程
-            result = subprocess.run(
-                f'start /wait cmd /c {self.command}',  # /wait 等待新窗口关闭
-                shell=True,
-                stdout=subprocess.PIPE,  # 捕获标准输出
-                stderr=subprocess.PIPE,  # 捕获标准错误
-                text=True  # 将输出解码为字符串
-            )
-            
+            # 解析xml文件
+            from src.qpm.parse import parse_main
+            parse_main(self.images_path)
+
             # 发射信号，传递结果
-            self.finished.emit(result.returncode == 0, result.stderr, self.images_path)
+            self.finished.emit(True, "", self.images_path)
             
         except Exception as e:
-            self.finished.emit(False, str(e), self.images_path)  # 发射信号，传递错误信息
+            # 发射信号，传递错误信息
+            self.finished.emit(False, str(e), self.images_path)  
+
+
+
+if __name__ == "__main__":
+    qualcom_path = r"C:\Qualcomm\Chromatix7\7.3.01.36\Chromatix.exe"
+    images_path = r"D:\Tuning\O19\0_pic\02_IN_pic\2025.6.19-IN-一供验证 ISP\NOMAL\O19"
+    qualcom_thread = QualcomThread(qualcom_path, images_path)
+    qualcom_thread.start()

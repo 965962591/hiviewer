@@ -67,7 +67,6 @@ from src.common.font_manager import MultiFontManager                        # �
 from src.common.version_Init import version_init                            # 版本号初始化
 from src.common.settings_ColorAndExif import load_color_settings            # 导入自定义json配置文件
 from src.common.log_files import setup_logging                              # 导入日志文件初始化
-from src.qpm.qualcom import CommandThread                                   # 导入高通图片解析工具独立线程类
 from src.utils.raw2jpg import Mipi2RawConverterApp                          # 导入MIPI RAW文件转换为JPG文件的类
 from src.utils.update import check_update, pre_check_update                 # 导入自动更新检查程序
 from src.utils.hisnot import WScreenshot                                    # 导入截图工具类
@@ -3093,26 +3092,18 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 dict_info = dialog.get_data()
                 qualcom_path = dict_info.get("Qualcom工具路径","")
                 images_path = dict_info.get("Image文件夹路径","")
-                metadata_path = os.path.join(os.path.dirname(__file__), "resource", "tools", "metadata.exe")
 
                 # 拼接参数命令字符串
-                if qualcom_path and images_path and os.path.exists(metadata_path) and os.path.exists(images_path) and os.path.exists(qualcom_path):
-                    command = f"{metadata_path} --chromatix \"{qualcom_path}\" --folder \"{images_path}\""
-
-                    # 检查图片文件夹目录下是否存在xml文件，不存在则启动线程解析图片
-                    xml_exists = any(f for f in os.listdir(images_path) if f.endswith('_new.xml'))
+                if qualcom_path and images_path and os.path.exists(images_path) and os.path.exists(qualcom_path):
+                    show_message_box("正在使用高通工具后台解析图片Exif信息...", "提示", 1000)
 
                     # 创建线程，必须在主线程中连接信号
-                    self.command_thread = CommandThread(command, images_path)
-                    self.command_thread.finished.connect(self.on_command_finished)  
+                    self.time_qualcom = time.time()
+                    from src.qpm.qualcom import QualcomThread
+                    self.qualcom_thread = QualcomThread(qualcom_path, images_path)
+                    self.qualcom_thread.start()
+                    self.qualcom_thread.finished.connect(self.on_qualcom_finished)  
 
-                    # 如果xml文件不存在，则启动线程解析图片；否则提取xml信息保存到excel文件
-                    if not xml_exists:
-                        self.command_thread.start()   # 启动线程
-                        show_message_box("正在使用高通工具后台解析图片Exif信息...", "提示", 1000)
-                    else:
-                        show_message_box("已有xml文件, 无须解析图片", "提示", 1000)
-                        save_excel_data(images_path)  # 解析xml文件将其保存到excel中去
 
             # 无论对话框是接受还是取消，都手动销毁对话框
             dialog.deleteLater()
@@ -3123,22 +3114,24 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             return
 
 
-    def on_command_finished(self, success, error_message, images_path=None):
+    def on_qualcom_finished(self, success, error_message, images_path=None):
         """处理命令执行完成的信号"""
         try:
             if success and images_path:
                 # 解析xml文件将其保存到excel中去
-                save_excel_data(images_path)
-                # 提示
-                show_message_box("高通工具后台解析图片成功！", "提示", 1000)
-                print(f"[on_command_finished]-->高通工具后台解析图片成功！")
+                use_time = time.time() - self.time_qualcom
+                xml_exists = any(f for f in os.listdir(images_path) if f.endswith('_new.xml'))
+                if not xml_exists:
+                    save_excel_data(images_path)
+                show_message_box(f"高通工具后台解析图片成功！用时: {use_time:.2f}秒", "提示", 1000)
+                print(f"[on_qualcom_finished]-->高通工具后台解析图片成功！用时: {use_time:.2f}秒")
             else:
                 show_message_box(f"高通工具后台解析图片失败: {error_message}", "提示", 2000)
-                print(f"[on_command_finished]-->高通工具后台解析图片失败: {error_message}")
+                print(f"[on_qualcom_finished]-->高通工具后台解析图片失败: {error_message}")
 
         except Exception as e:
             show_message_box(f"高通工具后台解析图片失败: {error_message}", "提示", 2000)
-            print(f"[on_command_finished]-->高通工具后台解析图片成功失败: {e}")
+            print(f"[on_qualcom_finished]-->高通工具后台解析图片失败: {e}")
             return
 
 
