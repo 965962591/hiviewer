@@ -20,15 +20,21 @@ os.path.dirname(os.path.abspath(sys.argv[0]))
 BASEICONPATH = Path(sys.argv[0]).parent
 '''
 
+"""记录程序启动时间"""
+import time
+flag_start = time.time()
+
 """导入python内置模块"""
 import gc
 import os
 import sys
-import time
 import json
 import subprocess
 from pathlib import Path
 from itertools import zip_longest
+from functools import lru_cache
+import shutil
+import stat
 
 """导入python第三方模块"""
 from PyQt5.QtGui import QIcon, QKeySequence, QPixmap
@@ -40,6 +46,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import (
     Qt, QDir, QSize, QTimer, QThreadPool, QUrl, QSize, 
     QMimeData, QPropertyAnimation, QItemSelection, QItemSelectionModel)
+
 
 """导入用户自定义的模块"""
 from src.components.ui_main import Ui_MainWindow                            # 假设你的主窗口类名为Ui_MainWindow
@@ -72,8 +79,8 @@ from src.utils.heic import extract_jpg_from_heic                            # �
 from src.utils.video import extract_video_first_frame                       # 导入视频预览工具类
 from src.utils.image import ImageProcessor                                  # 导入图片处理工具类
 from src.utils.sort import sort_by_custom                                   # 导入文件排序工具类
-from src.view.sub_search_view import SearchOverlay                                  # 导入图片搜索工具类(ctrl+f)
-from src.utils.decorator import CC_TimeDec                                  # 导入自定义装饰器
+from src.view.sub_search_view import SearchOverlay                          # 导入图片搜索工具类(ctrl+f)
+from src.common.decorator import CC_TimeDec                                 # 导入自定义装饰器
 from src.utils.aeboxlink import (check_process_running,                     # 导入自定义装饰器
     urlencode_folder_path, get_api_data)
 
@@ -85,9 +92,10 @@ from src.utils.aeboxlink import (check_process_running,                     # �
 class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def __init__(self, parent=None):
         super(HiviewerMainwindow, self).__init__(parent)
-        
+
         # 记录程序启动时间；设置图标路径；读取本地版本信息，并初始化新版本信息
-        self.start_time = time.time()        
+        self.start_time = flag_start
+        print(f"----------[程序预启动时间]----------: {(time.time()-self.start_time):.2f} 秒")
         self.base_icon_path = Path(__file__).parent / "resource" / "icons"
         self.version_info, self.new_version_info = version_init(), False     
         
@@ -485,11 +493,11 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 添加常用操作
         show_file_action = self.treeview_context_menu.addAction(
             "显示所有文件" if not self.left_tree_file_display else "隐藏所有文件")
-        open_action = self.treeview_context_menu.addAction("打开所在位置")
-        open_aebox = self.treeview_context_menu.addAction("打开aebox")
         send_path_to_aebox = self.treeview_context_menu.addAction("发送到aebox")
-        copy_path_action = self.treeview_context_menu.addAction("复制路径")
+        delete_action = self.treeview_context_menu.addAction("删除")
+        open_action = self.treeview_context_menu.addAction("打开")
         rename_action = self.treeview_context_menu.addAction("重命名")  
+        copy_path_action = self.treeview_context_menu.addAction("复制路径")
         
         # 获取选中的文件信息
         index = self.Left_QTreeView.indexAt(pos)
@@ -502,7 +510,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             send_path_to_aebox.triggered.connect(lambda: self.send_file_path_to_aebox(file_path))
             rename_action.triggered.connect(lambda: self.rename_file(file_path))
             show_file_action.triggered.connect(self.show_file_visibility)
-            open_aebox.triggered.connect(lambda: self.open_aebox(file_path))
+            delete_action.triggered.connect(lambda: self.delete_file(file_path))
 
 
             # 设置右键菜单绑定左侧文件浏览器
@@ -645,10 +653,10 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 添加快捷键 F1，打开MIPI RAW文件转换为JPG文件工具
         self.f1_shortcut = QShortcut(QKeySequence(Qt.Key_F1), self)
         self.f1_shortcut.activated.connect(self.on_f1_pressed)
-        # 添加快捷键，打开批量执行命令工具
+        # 添加快捷键F2，打开单个或多个文件重命名对话框
         self.f2_shortcut = QShortcut(QKeySequence(Qt.Key_F2), self)
         self.f2_shortcut.activated.connect(self.on_f2_pressed)
-        # 添加快捷键，打开批量重命名工具
+        # 添加快捷键F4，打开批量执行命令工具
         self.f4_shortcut = QShortcut(QKeySequence(Qt.Key_F4), self)
         self.f4_shortcut.activated.connect(self.on_f4_pressed)
         # 添加快捷键 F5,刷新表格
@@ -725,77 +733,25 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         else:
             self.file_system_model.setFilter(QDir.NoDot | QDir.NoDotDot |QDir.AllEntries)  # 显示所有文件和文件夹
 
-
-    def open_aebox(self,selected_option):
-        # 创建并显示自定义对话框,传入图片列表
+    def delete_file(self, path):
+        """安全删除文件/文件夹"""
         try:
-            # 初始化自定义的对话框
-            dialog = Qualcom_Dialog(selected_option)
+            if not os.path.exists(path):
+                return
+                
+            # Windows系统处理只读属性
+            def remove_readonly(func, path, _):
+                os.chmod(path, stat.S_IWRITE)
+                func(path)
 
-            # 设置窗口标题
-            dialog.setWindowTitle("打开AEBOX工具")
-            # 设置窗口大小
-            dialog.setFixedSize(1200, 100)
-            # 隐藏对话框的按钮
-            dialog.button_box.setVisible(False)
-            dialog.label1.setVisible(False)
-            dialog.text_input1.setVisible(False)
-            dialog.load_button.setVisible(False)
-            dialog.status_button1.setVisible(False)
-            dialog.label3.setVisible(False)
-            dialog.text_input3.setVisible(False)
-            dialog.load_images_button.setVisible(False)
-            dialog.status_button3.setVisible(False)
-            
-            # 显示对话框
-            if dialog.exec_() == QDialog.Accepted:
-
-                # 执行命名
-                dict_info = dialog.get_data()
-                # print(f"用户加载的路径信息: {dict_info}")
-
-                qualcom_path = dict_info.get("Qualcom工具路径","")
-                images_path = dict_info.get("Image文件夹路径","")
-                metadata_path = os.path.join(os.path.dirname(__file__), "resource", "tools", "metadata.exe")
-
-                # 拼接参数命令字符串
-                if qualcom_path and images_path and os.path.exists(metadata_path) and os.path.exists(images_path) and os.path.exists(qualcom_path):
-                    command = f"{metadata_path} --chromatix \"{qualcom_path}\" --folder \"{images_path}\""
-
-                    """
-                    # 添加检查 图片文件夹目录下是否已存在xml文件，不存在则启动线程解析图片
-                    # xml_exists = [f for f in os.listdir(images_path) if f.endswith('_new.xml')]
-
-                    针对上面的代码，优化了检查'_new.xml'文件的逻辑:
-                    1. os.listdir(images_path) 列出文件夹中的所有文件
-                    2. os.path.exists(os.path.join(images_path, f)) 检查文件是否存在
-                    3. any() 函数会在找到第一个符合条件的文件时立即返回 True, 避免不必要的遍历
-                    """
-                    # 检查图片文件夹目录下是否存在xml文件，不存在则启动线程解析图片
-                    xml_exists = any(f for f in os.listdir(images_path) if f.endswith('_new.xml'))
-
-                    # 创建线程，必须在主线程中连接信号
-                    self.command_thread = CommandThread(command, images_path)
-                    self.command_thread.finished.connect(self.on_command_finished)  # 连接信号
-                    # self.command_thread.finished.connect(self.cleanup_thread)  # 连接清理槽
-
-                    if not xml_exists:
-                        self.command_thread.start()  # 启动线程
-                        show_message_box("正在使用高通工具后台解析图片Exif信息...", "提示", 1000)
-                    else:
-                        show_message_box("已有xml文件, 无须解析图片", "提示", 1000)
-
-                        # 解析xml文件将其保存到excel中去
-                        save_excel_data(images_path)
-
-            # 无论对话框是接受还是取消，都手动销毁对话框
-            dialog.deleteLater()
-            dialog = None
+            if os.path.isfile(path): # 移除只读属性, 删除文件
+                os.chmod(path, stat.S_IWRITE)
+                os.remove(path)
+            else: # 删除文件夹
+                shutil.rmtree(path, onerror=remove_readonly if os.name == 'nt' else None)
 
         except Exception as e:
-            print(f"on_i_pressed()-error--处理i键按下事件失败: {e}")
-            return
-
+            show_message_box(f"删除失败: {str(e)}", "错误", 2000)
 
     def open_file_location(self, path):
         """在资源管理器中打开路径(适用于window系统)"""
@@ -2946,9 +2902,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     row_index += step_row[col_index]
                 elif key_type == 'b':      
                     row_index -= step_row[col_index]
-                else:
-                    print("没有按下space和b键")
-
+                    
                 # 判断是否超出表格范围，超出则清除所有选中的项，并抛出异常
                 if row_index > row_max or row_index < row_min: 
                     self.RB_QTableWidget0.clearSelection()      
@@ -2992,29 +2946,25 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     """键盘按下事件处理""" 
     def on_f2_pressed(self):
         """处理F2键按下事件"""
-        selected_items = self.RB_QTableWidget0.selectedItems()  # 获取选中的项
-        if not selected_items:
-            show_message_box("没有选中的项！", "提示", 500)
-            return
-            
-        current_folder, _ = self.press_space_and_b_get_selected_file_paths('test')
-        if not current_folder:
-            show_message_box("没有选中的项！", "提示", 500)
-            return
-
         try:    
-            if len(selected_items) == 1:
-                # 单文件重命名
+            # 获取选中的项
+            selected_items = self.RB_QTableWidget0.selectedItems() 
+            if not selected_items:
+                show_message_box("没有选中的项！", "提示", 500)
+                return
+            # 获取选中的文件路径列表, 从类属性paths_list中获取选中的文件夹路径列表
+            if self.paths_list:
+                current_folder = [self.paths_list[item.column()][item.row()] for item in selected_items]
+            
+            # 单文件重命名
+            if len(selected_items) == 1:    
                 dialog = SingleFileRenameDialog(current_folder[0], self)
                 if dialog.exec_() == QDialog.Accepted:
-                    
                     # 获取新的文件路径
                     new_file_path = dialog.get_new_file_path()
-                    
                     if new_file_path:
-                        # 获取新的文件名
+                        # 获取新的文件名，选中的单元格
                         new_file_name = os.path.basename(new_file_path)
-                        # 获取选中的单元格
                         item = selected_items[0]
                         row = item.row()
                         col = item.column() 
@@ -3031,8 +2981,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                             
                         # 设置新的单元格文本
                         self.RB_QTableWidget0.item(row, col).setText(new_text)
-            else:
-                # 多文件重命名
+            # 多文件重命名
+            else: 
+                # 打开重命名工具
                 self.open_rename_tool(current_folder)
 
         except Exception as e:

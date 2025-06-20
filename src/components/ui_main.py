@@ -11,7 +11,8 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 # 导入自定义的QComboBox类 & QDragTableWidget类
 from .custom_qCombox_spinner import CustomComboBox
 from .custom_qTableWidget_drag import DragTableWidget
-from src.utils.decorator import CC_TimeDec
+# 导入自定义装饰器
+from src.common.decorator import CC_TimeDec
 
 
 class Ui_MainWindow(object):

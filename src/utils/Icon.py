@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import re
 import time
 import json
 import shutil
@@ -251,7 +252,6 @@ class IconCache:
             
             # 检查图标文件是否存在
             if default_icon_path.exists():
-                print(f"图标文件{default_icon_path}存在")
                 try:
                     cls._default_icon = QIcon(default_icon_path._str)
                     if cls._default_icon.isNull():
@@ -261,9 +261,8 @@ class IconCache:
                     # 创建备用图标
                     cls._default_icon = cls._create_fallback_icon()
             else:
-                print(f"图标文件不存在: {default_icon_path}")
-                cls._default_icon = cls._create_fallback_icon()
-                return cls._default_icon
+                raise ValueError(f"图标文件不存在: {default_icon_path}")
+
                 
             # 处理图标尺寸
             if icon_size:
@@ -273,13 +272,13 @@ class IconCache:
                         raise ValueError("调整图标尺寸失败")
                     return QIcon(pixmap)
                 except Exception as e:
-                    print(f"调整图标尺寸失败: {str(e)}")
+                    print(f"[get_default_icon]-->调整图标尺寸失败: {str(e)}")
                     return cls._default_icon
                     
             return cls._default_icon
             
         except Exception as e:
-            print(f"获取默认图标时发生错误: {str(e)}")
+            print(f"[get_default_icon]-->获取默认图标时发生错误: {str(e)}")
             return cls._create_fallback_icon()
 
     @classmethod
@@ -356,30 +355,47 @@ class IconCache:
 
         except Exception as e:
             print(f"保存图标缓存失败: {e}")
-            
+
     @classmethod
     def _update_cache_index(cls, file_path):
         """更新缓存索引"""
         try:
-            # 读取现有索引
+            # 使用临时文件保证写入原子性
+            temp_index_file = cls._cache_index_file.with_suffix('.tmp')
+            
+            # 读取现有索引（增加容错机制）
             index = {}
             if cls._cache_index_file.exists():
-                with open(cls._cache_index_file, 'r', encoding='utf-8', errors='ignore') as f:
-                    index = json.load(f)
+                try:
+                    with open(cls._cache_index_file, 'r', encoding='utf-8') as f:
+                        raw_data = f.read()
+                        # 自动修复常见JSON格式错误
+                        raw_data = raw_data.replace("'", "\"")  # 替换单引号
+                        raw_data = re.sub(r',(\s*[}\]])', r'\1', raw_data)  # 修复多余逗号
+                        index = json.loads(raw_data)
+                except json.JSONDecodeError as e:
+                    print(f"检测到损坏的索引文件，正在重建... 错误详情：{e}")
+                    cls._cache_index_file.unlink()  # 删除损坏文件
 
             # 更新索引
             cache_path = cls._get_cache_path(file_path)
             index[cache_path] = {
-                'original_path': file_path,
-                'timestamp': time.time()
+                "original_path": file_path,  # 确保键名使用双引号
+                "timestamp": time.time()
             }
 
-            # 保存索引
-            with open(cls._cache_index_file, 'w', encoding='utf-8', errors='ignore') as f:
-                json.dump(index, f, ensure_ascii=False, indent=4)
+            # 写入临时文件
+            with open(temp_index_file, 'w', encoding='utf-8') as f:
+                json.dump(index, f, ensure_ascii=True, indent=4)  # 强制ASCII编码
+                
+            # 原子替换文件
+            temp_index_file.replace(cls._cache_index_file)
 
         except Exception as e:
             print(f"更新缓存索引失败: {e}")
+            # 清理临时文件
+            if temp_index_file.exists():
+                temp_index_file.unlink()
 
     @classmethod
     def clear_cache(cls):

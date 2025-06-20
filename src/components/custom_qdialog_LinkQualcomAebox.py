@@ -4,6 +4,7 @@ import sys
 import json
 from PyQt5.QtWidgets import (QApplication, QLabel, QDialogButtonBox, QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog)
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon
 
 # 新增运行模式判断，是单独调试该模块，还是被其它模块调用
 is_standalone = os.path.basename(sys.argv[0]).lower() == "dialog_qualcom_aebox.py"
@@ -15,7 +16,7 @@ if is_standalone:
 
 """导入自定义的模块"""
 from src.common.font_manager import SingleFontManager
-from src.utils.aeboxlink import test_aebox_link,launch_aebox,urlencode_folder_path,get_api_data
+from src.utils.aeboxlink import launch_aebox,urlencode_folder_path,get_api_data
 
 
 """设置本项目的入口路径,全局变量BasePath"""
@@ -77,10 +78,10 @@ class Qualcom_Dialog(QDialog):
     def init_ui(self):
         """初始化对话框UI"""
 
-        # 设置窗口标题
+        # 设置窗口标题，窗口大小，窗口图标
         self.setWindowTitle("Qualcom(AEC10)工具解析图片接口")
-        # 设置窗口大小
-        self.setFixedSize(1200, 300)  # 设置对话框大小
+        self.setFixedSize(1200, 300)
+        self.setWindowIcon(QIcon(os.path.join(BasePath, "resource", "icons", "viewer_3.ico")))
         
         # 设置保存的json路径
         self.json_path = os.path.join(BasePath, "cache", "Qualcom_exif_settings.json")
@@ -187,9 +188,8 @@ class Qualcom_Dialog(QDialog):
         tool_path = self.text_input1.text()
         if not tool_path:
             print("请先加载正确的高通工具路径")
-            # 设置按钮文本信息
+            # 设置按钮文本信息,设置悬浮提示信息
             self.status_button1.setText("❌")
-            # 设置悬浮提示信息
             self.status_button1.setToolTip(f"请先加载正确的高通工具路径")
             
             return
@@ -218,18 +218,19 @@ class Qualcom_Dialog(QDialog):
         if not tool_path or not os.path.exists(tool_path):
             print("请先选择AEBOX工具路径")
             self.status_button2.setText("❌")
-            self.status_button2.setToolTip(f"❌当前AEBOX工具路径不存在，请加载正确的工具路径")
+            self.status_button2.setToolTip(f"❌当前AEBOX工具路径不存在,请加载正确的工具路径")
             return
         
-        # 检查当前程序tool_path，是否在运行 test_aebox_link,launch_aebox
+        # 检查aebox工具是否在运行
         list_url = self.get_url()
-        if list_url and test_aebox_link(list_url):
+        from src.utils.aeboxlink import check_process_running
+        if list_url and check_process_running("aebox.exe"): # and test_aebox_link(list_url):
             self.status_button2.setText("✅")
-            self.status_button2.setToolTip(f"✅当前AEBOX工具路径有效，连接测试通过")
+            self.status_button2.setToolTip(f"✅当前AEBOX工具路径有效,程序已启动")
             return
 
         self.status_button2.setText("🚀")
-        self.status_button2.setToolTip(f"🚀当前AEBOX工具路径有效，程序未启动，点击按钮启动AEBOX")
+        self.status_button2.setToolTip(f"🚀当前AEBOX工具路径有效,程序未启动,点击按钮启动AEBOX")
 
 
     def get_url(self):
@@ -269,9 +270,8 @@ class Qualcom_Dialog(QDialog):
         try:
             # 这里可以添加实际的连接测试逻辑
             if current_text == "🚀" and tool_path and os.path.exists(tool_path):
-                # 启动aebox工具
+                # 启动aebox工具,启动后自动测试连接
                 launch_aebox(tool_path)
-                # test
                 self.test_connection()
 
             image_path = self.text_input3.text()
@@ -284,11 +284,11 @@ class Qualcom_Dialog(QDialog):
                 # 发送文件夹到aebox
                 response = get_api_data(url=image_path_url, timeout=3)
                 if response:
-                    print("click_button2():发送文件成功")
+                    print("[click_button2]-->发送文件成功")
                 else:
-                    print("click_button2():发送文件失败")
+                    print("[click_button2]-->发送文件失败")
         except Exception as e:
-            print(f"click_button2()--发生错误: {e}")
+            print(f"[click_button2]-->发生错误: {e}")
                 
 
     def test_button3(self):

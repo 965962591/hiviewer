@@ -4,7 +4,7 @@ import sys
 from PyQt5.QtGui import  QFontDatabase, QFont
 
 # 导入自定义装饰器
-from src.utils.decorator import CC_TimeDec
+from src.common.decorator import CC_TimeDec
 
 
 """设置根目录"""

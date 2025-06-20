@@ -10,17 +10,20 @@
         "D:/Tuning/O19/0_pic/0515",
         "D:/Tuning/O19/0_pic/0515/O19",
         "D:/Tuning/O19/0_pic/02_IN_pic/2025.6.13-IN-原图",
-        "D:/Tuning/O19/0_pic/02_IN_pic/2025.6.10-IN-一供测试原图2/hdr/N19"
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.6.10-IN-一供测试原图2/hdr/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.6.18自测2/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.6.18自测2/O19_改2",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.6.18自测2/O19_改前",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.6.18自测2/O19_改后"
     ],
-    "current_directory": "D:/Tuning/O19/0_pic/02_IN_pic/2025.6.10-IN-一供测试原图2/hdr/N19",
+    "current_directory": "D:/Tuning/O19/0_pic/02_IN_pic/2025.6.18自测2/N19",
     "file_type_option": "显示图片文件",
-    "combobox1_checked_items": [
-        "O19",
-        "VIVO"
-    ],
+    "combobox1_checked_items": [],
     "combobox1_all_items": [
-        "O19",
-        "VIVO"
+        "O19_改前",
+        "O19_改后",
+        "V50",
+        "video自测"
     ],
     "sort_option": "按文件名称排序",
     "theme_option": "默认主题",

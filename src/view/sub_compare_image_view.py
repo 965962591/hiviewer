@@ -5,7 +5,7 @@
 @Time         :2025/06/04
 @Author       :diamond_cz@163.com
 @Version      :release-v3.5.1
-@Description  :hiviewer看图工具看图界面
+@Description  :hiviewer看图子界面
 '''
 
 """导入python内置模块"""
@@ -47,8 +47,8 @@ from src.utils.hisnot import WScreenshot                                # 看图
 from src.utils.aeboxlink import check_process_running, get_api_data     # 导入与AEBOX通信的模块函数
 from src.utils.heic import extract_jpg_from_heic                        # 导入heic图片转换为jpg图片的模块
 from src.utils.p3_converter import ColorSpaceConverter                  # 导入色彩空间转换配置类
-from src.utils.decorator import CC_TimeDec                              # 导入自定义装饰器
-from src.utils.rectangleprogress import RectangleProgress               # 导入自定义进度条
+from src.common.decorator import CC_TimeDec                             # 导入自定义装饰器
+from src.common.roundprogress import RoundProgress                      # 导入自定义进度条
 
 """设置本项目的入口路径,全局变量BasePath"""
 # 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块

@@ -1,19 +1,19 @@
 # -*- coding: utf-8 -*-
 from lxml import etree as ET
 import os
-import sys
 import xml.sax.saxutils as saxutils
 import concurrent.futures
 import copy
 from functools import lru_cache
-import time  # 添加在文件开头的import部分
+import time
 from io import BytesIO
+from pathlib import Path
 import gc
-import configparser  # 添加configparser导入
+import configparser
 
 
 # 设置SA.ini文件路径
-SA_CONFIG_FILE = os.path.join(os.path.dirname(sys.argv[0]), "SA.ini")
+SA_CONFIG_FILE = Path(__file__).parent.parent.parent / "resource" / "tools" / "SA.ini"
 
 # 预编译XPath表达式
 XPATHS = {
@@ -47,17 +47,16 @@ XPATHS = {
     "channels_list_1": ET.XPath('.//AECX_CoreStats/Channels_List[@Index="1"]'),
     "channel_data": ET.XPath('Channel_Data[@ID="6"]'),
     "value_grid": ET.XPath("Value_Grid"),
-    "r_gain": ET.XPath(
-        './/Tuning_AWB_Data/AWB_Gains[@Index="0"]'
-    ),  # 新增 r_gain 的XPath
-    "b_gain": ET.XPath(
-        './/Tuning_AWB_Data/AWB_Gains[@Index="2"]'
-    ),  # 新增 b_gain 的XPath
+    "r_gain": ET.XPath('.//Tuning_AWB_Data/AWB_Gains[@Index="0"]'),
+    "b_gain": ET.XPath('.//Tuning_AWB_Data/AWB_Gains[@Index="2"]'),
     "triangle_index": ET.XPath(".//AWB_TriangleGainAdjust/Triangle_Index"),
-    "awb_sagen1data": ET.XPath(".//AWB_SAGen1Data"),  # 添加AWB_SAGen1Data的XPath
-    "sa_description": ET.XPath("./SA_Description"),  # 添加SA_Description的XPath
+    "awb_sagen1data": ET.XPath(".//AWB_SAGen1Data"),
+    "sa_description": ET.XPath("./SA_Description"),
     "assist_data": ET.XPath(".//AWB_SA_Face_Assist/Face_Assist_Confidence"),
-    "aec_settled": ET.XPath(".//AEC_Settled"),  # 添加对AEC_Settled的XPath
+    "aec_settled": ET.XPath(".//AEC_Settled"),
+    # 新增 R_G_Ratio 和 B_G_Ratio 的 XPath
+    "r_g_ratio": ET.XPath('.//AWB_Decision_Data[@ID="4"]/Point[@ID="1"]/R_G_Ratio'),
+    "b_g_ratio": ET.XPath('.//AWB_Decision_Data[@ID="4"]/Point[@ID="1"]/B_G_Ratio'),
 }
 
 # 在文件开头添加模板定义
@@ -290,18 +289,9 @@ def calculate_safe_exp_values(
 
     # 获取必需SA的值
     framesa_values = sa_values_dict.get("FrameSA")
-    # SatPrevSA_values = sa_values_dict.get("SatPrevSA")
-    # DarkPrevSA_values = sa_values_dict.get("DarkPrevSA")
-    # BrightenImgSA_values = sa_values_dict.get("BrightenImgSA")
-    # YHistSA_values = sa_values_dict.get("YHistSA")
     SafeAggSA_values = sa_values_dict.get("SafeAggSA")
     ShortAggSA_values = sa_values_dict.get("ShortAggSA")
     LongAggSA_values = sa_values_dict.get("LongAggSA")
-
-    # 获取可选SA的值 (根据需要自行添加)
-    FaceSA_values = sa_values_dict.get("FaceSA")
-    ShortSatPrevSA_values = sa_values_dict.get("ShortSatPrevSA")
-    LongDarkPrevSA_values = sa_values_dict.get("LongDarkPrevSA")
 
     # 解包FrameSA的值
     (
@@ -319,258 +309,142 @@ def calculate_safe_exp_values(
         Frame_operators_method,
     ) = framesa_values
 
-    # 解包其他必需SA的值，如果存在
+    # 解包SafeAggSA的值
     if SafeAggSA_values:
-        SafeAgg_adjratio_start = SafeAggSA_values[7]
+        SafeAgg_adjratio_start = float(SafeAggSA_values[7])
     else:
          raise ValueError("SafeAggSA is required") # Or handle missing case
+    
+    # 解包ShortAggSA的值
     if ShortAggSA_values:
-        ShortAgg_adjratio_start = ShortAggSA_values[7]
+        ShortAgg_adjratio_start = float(ShortAggSA_values[7])
     else:
          raise ValueError("ShortAggSA is required") # Or handle missing case
 
-    # 初始化 active_sa_list (此部分在您的示例中缺失，需要根据原始逻辑或新需求添加)
-    # 例如，可以像之前一样添加 base_sa 和 optional_sa
+    # 初始化活动SA列表
     active_sa_list = []
-    # (需要添加填充 active_sa_list 的逻辑)
-    # 示例填充逻辑 (需要根据实际情况调整):
-    base_sa_names = ["SatPrevSA", "DarkPrevSA", "BrightenImgSA"] # 示例
-    for sa_name in base_sa_names:
-         sa_value = sa_values_dict.get(sa_name)
-         if sa_value is not None and len(sa_value) >= 9: # Check length
-             active_sa_list.append((sa_value, sa_value[5], sa_value[7], sa_value[8], sa_name)) # confidence, start, end, name
-
-    optional_sa_pairs = [] # Store optional SA pairs for later use in save_results_to_xml
-    for sa_name in optional_sas:
+    
+    # 将所有可能参与聚合的SA添加到active_sa_list
+    for sa_name in agg_sas:
         sa_value = sa_values_dict.get(sa_name)
         if sa_value is not None and len(sa_value) >= 9:
-            optional_sa_pairs.append((sa_value, sa_name)) # Store pair
-            if sa_name != "FaceSA": # Exclude FaceSA initially
-                active_sa_list.append((sa_value, sa_value[5], sa_value[7], sa_value[8], sa_name))
+            active_sa_list.append((sa_value, sa_value[5], sa_value[7], sa_value[8], sa_name))
 
-
+    # 初始化结果列表
     results_str = []
     result = []
     result_confidence = []
     name_list = []
+    
+    # 计算FrameSA的贡献
     framesa_adjratio = float(Frame_adjratio_start) * float(Frame_confidence)
     framesa_adjratio = round(framesa_adjratio, 5)
 
-    # 判断是否为人脸场景并获取FaceSA的值
-    is_face_scene = False
-    face_sa_values = None # Renamed to avoid conflict
-    FaceSA_data = sa_values_dict.get("FaceSA") # Get FaceSA data using the correct key
+    print("\n--- 统一聚合处理 ---")
+    print(f"SafeAggSA AdjRatio Start (基准值): {SafeAgg_adjratio_start}")
+    print(f"FrameSA Confidence: {Frame_confidence}, AdjRatio Start: {Frame_adjratio_start}, AdjRatio End: {Frame_adjratio_end}")
+    
+    # 遍历所有活动的SA进行计算
+    print("  - 遍历活动的SA (基于SafeAggSA区间):")
+    for (
+        sa_data,
+        confidence,
+        adjratio_start,
+        adjratio_end,
+        sa_name,
+    ) in active_sa_list:
+        print(f"    - 正在检查 SA: {sa_name}")
+        # 基本检查
+        if float(confidence) == 0:
+            print(f"      - 跳过 {sa_name}: Confidence 为 0")
+            continue
+        if float(adjratio_start) < 0 or float(adjratio_end) < 0:
+            print(f"      - 跳过 {sa_name}: AdjRatio 包含负值 ({adjratio_start}, {adjratio_end})")
+            continue
 
-    if (
-        FaceSA_data is not None
-        and isinstance(FaceSA_data, tuple)
-        and len(FaceSA_data) >= 12
-    ):
-        try:
-            face_confidence_val = float(FaceSA_data[5]) # Use a different variable name
-            if face_confidence_val != 0:
-                is_face_scene = True
-                face_sa_values = FaceSA_data # Assign the actual data
-        except (ValueError, TypeError) as e:
-            print(f"Warning: Error processing FaceSA: {str(e)}")
-
-    if is_face_scene and face_sa_values is not None:
-        # 人脸场景逻辑
-        face_confidence = float(face_sa_values[5])
-        face_adjratio_start = float(face_sa_values[7])
-        face_adjratio_end = float(face_sa_values[8])
-
-        print("\n--- 人脸场景处理 ---")
-        print(f"FaceSA Confidence: {face_confidence}, AdjRatio Start: {face_adjratio_start}, AdjRatio End: {face_adjratio_end}")
-
-        # 先计算FaceSA的值
-        name_list.append("FaceSA") # FaceSA 始终先添加
-        # 使用 face_adjratio_start 进行计算 (根据您的代码片段)
-        face_calc_value = face_confidence * face_adjratio_start
-        face_cal_str = f"{face_confidence} * {face_adjratio_start} = {round(face_calc_value, 5)}"
-        print(f"  - 添加 FaceSA 到计算: {face_cal_str}")
-        results_str.append(face_cal_str)
-        result.append(face_calc_value)
-        result_confidence.append(face_confidence)
-
-        # 遍历其他SA进计算（排除FaceSA）
-        print("  - 遍历其他活动的SA (基于FaceSA区间):")
-        for (
-            sa_data, # Use sa_data to avoid confusion
-            confidence,
-            adjratio_start,
-            adjratio_end,
-            sa_name,
-        ) in active_sa_list:
-             print(f"    - 正在检查 SA: {sa_name}")
-             # Basic checks (confidence > 0, adjratio non-negative)
-             if float(confidence) == 0:
-                 print(f"      - 跳过 {sa_name}: Confidence 为 0")
-                 continue
-             if float(adjratio_start) < 0 or float(adjratio_end) < 0:
-                 print(f"      - 跳过 {sa_name}: AdjRatio 包含负值 ({adjratio_start}, {adjratio_end})")
-                 continue
-
-             # 人脸场景区间判断 (检查是否在 agg_sas 中)
-             if sa_name in agg_sas:
-                 if float(adjratio_start) >= face_adjratio_end:
-                     print(f"        - {adjratio_start} >= {face_adjratio_end} 且 {sa_name} 在 agg_sas 中，使用 adjratio_start ({adjratio_start})")
-                     if sa_name not in name_list: # 避免重复添加名称和值
-                         name_list.append(sa_name)
-                         calc_value = float(confidence) * float(adjratio_start)
-                         cal_str = f"{confidence} * {adjratio_start} = {round(calc_value, 5)}"
-                         results_str.append(cal_str)
-                         result.append(calc_value)
-                         result_confidence.append(float(confidence))
-                 elif float(adjratio_end) <= face_adjratio_start:
-                     print(f"        - {adjratio_end} <= {face_adjratio_start} 且 {sa_name} 在 agg_sas 中，使用 adjratio_end ({adjratio_end})")
-                     if sa_name not in name_list: # 避免重复添加名称和值
-                         name_list.append(sa_name)
-                         calc_value = float(confidence) * float(adjratio_end)
-                         cal_str = f"{confidence} * {adjratio_end} = {round(calc_value, 5)}"
-                         results_str.append(cal_str)
-                         result.append(calc_value)
-                         result_confidence.append(float(confidence))
-                 else:
-                     print(f"        - {sa_name} 在 agg_sas 中但区间重叠，跳过")
-             else:
-                 print(f"      - 跳过 {sa_name}: 不在 agg_sas 列表中")
-
-    else:
-        # 无人脸场景逻辑
-        print("\n--- 非人脸场景处理 ---")
-        print(f"FrameSA Confidence: {Frame_confidence}, AdjRatio Start: {Frame_adjratio_start}, AdjRatio End: {Frame_adjratio_end}")
-        print("  - 遍历活动的SA (基于FrameSA区间):")
-        for (
-            sa_data, # Use sa_data
-            confidence,
-            adjratio_start,
-            adjratio_end,
-            sa_name,
-        ) in active_sa_list:
-            print(f"    - 正在检查 SA: {sa_name}")
-            # Basic checks
-            if float(confidence) == 0:
-                 print(f"      - 跳过 {sa_name}: Confidence 为 0")
-                 continue
-            if float(adjratio_start) < 0 or float(adjratio_end) < 0:
-                 print(f"      - 跳过 {sa_name}: AdjRatio 包含负值 ({adjratio_start}, {adjratio_end})")
-                 continue
-
-            # 非人脸场景区间判断 (检查是否在 agg_sas 中)
-            if sa_name in agg_sas:
-                if float(adjratio_start) >= float(Frame_adjratio_end):
-                    print(f"        - {adjratio_start} >= {Frame_adjratio_end} 且 {sa_name} 在 agg_sas 中，使用 adjratio_start ({adjratio_start})")
-                    if sa_name not in name_list: # 避免重复添加名称和值
-                        name_list.append(sa_name)
-                        calc_value = float(confidence) * float(adjratio_start)
-                        cal_str = f"{confidence} * {adjratio_start} = {round(calc_value, 5)}"
-                        results_str.append(cal_str)
-                        result.append(calc_value)
-                        result_confidence.append(float(confidence))
-                elif float(adjratio_end) <= float(Frame_adjratio_start):
-                    print(f"        - {adjratio_end} <= {Frame_adjratio_start} 且 {sa_name} 在 agg_sas 中，使用 adjratio_end ({adjratio_end})")
-                    if sa_name not in name_list: # 避免重复添加名称和值
-                        name_list.append(sa_name)
-                        calc_value = float(confidence) * float(adjratio_end)
-                        cal_str = f"{confidence} * {adjratio_end} = {round(calc_value, 5)}"
-                        results_str.append(cal_str)
-                        result.append(calc_value)
-                        result_confidence.append(float(confidence))
-                else:
-                     print(f"        - {sa_name} 在 agg_sas 中但区间重叠，跳过")
-            else:
-                 print(f"      - 跳过 {sa_name}: 不在 agg_sas 列表中")
-
+        # 使用SafeAggSA的adjratio_start作为基准进行区间判断
+        if float(adjratio_start) >= SafeAgg_adjratio_start:
+            print(f"        - {adjratio_start} >= {SafeAgg_adjratio_start}，使用 adjratio_start ({adjratio_start})")
+            if sa_name not in name_list:
+                name_list.append(sa_name)
+                calc_value = float(confidence) * float(adjratio_start)
+                cal_str = f"{confidence} * {adjratio_start} = {round(calc_value, 5)}"
+                results_str.append(cal_str)
+                result.append(calc_value)
+                result_confidence.append(float(confidence))
+        elif float(adjratio_end) <= SafeAgg_adjratio_start:
+            print(f"        - {adjratio_end} <= {SafeAgg_adjratio_start}，使用 adjratio_end ({adjratio_end})")
+            if sa_name not in name_list:
+                name_list.append(sa_name)
+                calc_value = float(confidence) * float(adjratio_end)
+                cal_str = f"{confidence} * {adjratio_end} = {round(calc_value, 5)}"
+                results_str.append(cal_str)
+                result.append(calc_value)
+                result_confidence.append(float(confidence))
+        else:
+            print(f"        - {sa_name} 与 SafeAggSA 区间重叠，跳过")
 
     # --- 聚合计算逻辑 (FrameSA 始终参与) ---
-    safe_agg_value_from_sa = round(float(SafeAgg_adjratio_start), 5) # 使用之前解包的值
+    safe_agg_value_from_sa = round(float(SafeAgg_adjratio_start), 5)
 
-    # 聚合计算 (可能包含FaceSA或其他SA, 且始终包含FrameSA)
-    if is_face_scene:
-        # 人脸场景: 聚合 result (含FaceSA) 和 result_confidence (含FaceSA), 再加上 FrameSA
-        print("\n--- 聚合计算 (人脸 + FrameSA) ---")
-        result_sum = sum(result) + framesa_adjratio # Add FrameSA contribution
-        confidence_sum = sum(float(conf) for conf in result_confidence) + float(Frame_confidence) # Add FrameSA contribution
-        contributing_sas_other = name_list # name_list contains FaceSA + others qualified
-        contributing_sas_all_names = contributing_sas_other + ['FrameSA']
-        
-        if confidence_sum == 0:
-                calculated_agg_ratio = 0 # Avoid division by zero
-                print("警告: 人脸场景聚合 confidence 总和为 0")
-        else:
-                calculated_agg_ratio = result_sum / confidence_sum
-
-        # Format the string to show all contributing SAs including FrameSA
-        str_1 = f"adjratio({' + '.join(map(str, contributing_sas_all_names))})/confidence({' + '.join(map(str, contributing_sas_all_names))})"
-        res_str = f"{str_1}=\n({' + '.join(map(lambda x: str(round(float(x), 5)), result))} + {round(framesa_adjratio, 5)}) / ({' + '.join(map(lambda x: str(round(float(x), 5)), result_confidence))} + {round(float(Frame_confidence), 5)}) = {safe_agg_value_from_sa}"
-
+    # 聚合计算 (包含所有符合条件的SA和FrameSA)
+    print("\n--- 聚合计算 ---")
+    result_sum = sum(result) + framesa_adjratio
+    confidence_sum = sum(float(conf) for conf in result_confidence) + float(Frame_confidence)
+    contributing_sas = name_list
+    contributing_sas_all_names = contributing_sas + ['FrameSA']
+    
+    if confidence_sum == 0:
+        calculated_agg_ratio = 0
+        print("警告: 聚合 confidence 总和为 0")
     else:
-        # 非人脸场景: 聚合 result, result_confidence 并加上 FrameSA (逻辑不变)
-        print("\n--- 聚合计算 (非人脸 + FrameSA) ---")
-        result_sum = sum(result) + framesa_adjratio
-        confidence_sum = sum(float(conf) for conf in result_confidence) + float(Frame_confidence)
-        contributing_sas = name_list
-        contributing_sas_all_names = contributing_sas + ['FrameSA']
-        
-        if confidence_sum == 0:
-            calculated_agg_ratio = 0
-            print("警告: 非人脸场景聚合 confidence 总和为 0")
-        else:
-            calculated_agg_ratio = result_sum / confidence_sum
+        calculated_agg_ratio = result_sum / confidence_sum
 
-        str_1 = f"adjratio({' + '.join(map(str, contributing_sas))} +FrameSA)/confidence({' + '.join(map(str, contributing_sas))} + FrameSA)"
-        # Note: The string formatting for non-face case already included FrameSA correctly
-        res_str = f"{str_1}=\n({' + '.join(map(lambda x: str(round(float(x), 5)), result))} + {round(framesa_adjratio, 5)}) / ({' + '.join(map(lambda x: str(round(float(x), 5)), result_confidence))} + {round(float(Frame_confidence), 5)}) = {safe_agg_value_from_sa}"
+    str_1 = f"adjratio({' + '.join(map(str, contributing_sas_all_names))})/confidence({' + '.join(map(str, contributing_sas_all_names))})"
+    res_str = f"{str_1}=\n({' + '.join(map(lambda x: str(round(float(x), 5)), result))} + {round(framesa_adjratio, 5)}) / ({' + '.join(map(lambda x: str(round(float(x), 5)), result_confidence))} + {round(float(Frame_confidence), 5)}) = {safe_agg_value_from_sa}"
 
-
-    # 获取ShortAgg和SafeAgg的adjratio值 (使用之前解包的值)
-    short = float(ShortAgg_adjratio_start)
-    safe = float(SafeAgg_adjratio_start) # This is the value reported by SafeAggSA
+    # 获取ShortAgg和SafeAgg的adjratio值
+    short = ShortAgg_adjratio_start
+    safe = SafeAgg_adjratio_start
 
     print(f"ShortAgg AdjRatio Start: {short}, SafeAgg AdjRatio Start (Reported): {safe}")
     
-    # DRC Gain Calculation: Use the reported SafeAgg value / ShortAgg value
+    # DRC Gain Calculation
     if short == 0:
-        adrc_gain = 0 # Avoid division by zero
+        adrc_gain = 0
         print("警告: ShortAgg AdjRatio 为 0，DRC Gain 设为 0")
     else:
         adrc_gain = safe / short
         adrc_gain = round(adrc_gain, 2)
         
     adrc_gain_str = f"{safe} / {short} = {adrc_gain}"
-    framesa_adjratio_str = (
-        f"{Frame_adjratio_start} * {Frame_confidence} = {framesa_adjratio}"
-    )
+    framesa_adjratio_str = f"{Frame_adjratio_start} * {Frame_confidence} = {framesa_adjratio}"
 
     # Extract lux and sat values using the passed root
     lux_values = extract_lux_values(root)
     sat_values = extract_sat_values(root)
 
     # 创建包含所有必需和有效可选SA的列表用于保存结果
-    # (需要确保使用正确的变量名和检查)
     final_sa_values_for_xml = []
-    all_sa_names_in_order = sa_order # Use order from config
+    all_sa_names_in_order = sa_order
 
     for sa_name in all_sa_names_in_order:
         sa_data = sa_values_dict.get(sa_name)
         if sa_data is not None and isinstance(sa_data, tuple):
              final_sa_values_for_xml.append(sa_data)
-        # else: # Optional: Log missing SAs for the XML output list
-        #     print(f"Info: SA '{sa_name}' from order config not found or invalid, skipping for XML output.")
 
     save_results_to_xml(
-        root, # Pass the root element
+        root,
         lux_values,
         sat_values,
-        final_sa_values_for_xml, # Pass the ordered list
+        final_sa_values_for_xml,
         framesa_adjratio_str,
         res_str,
         adrc_gain_str,
         file_name_without_ext,
         file_path,
-        short, # Pass ShortAgg value
-        safe,  # Pass SafeAgg value
+        short,
+        safe,
     )
 
 
@@ -606,42 +480,48 @@ def save_results_to_xml(
         add_element(output_root, "sat_ratio", sat_ratio)
         add_element(output_root, "dark_ratio", dark_ratio)
 
-        # 提取额外信息 - 使用传入的root
-        # parsed_root = parse_xml(file_path) # Remove redundant parse
-
         # 提取并添加CCT和gain值
-        cct_value = XPATHS["awb_cct"](root) # Use the passed root
+        cct_value = XPATHS["awb_cct"](root)
         if cct_value:
             add_element(output_root, "CCT", cct_value[0].text)
 
+        # 提取并添加 R_G_Ratio 和 B_G_Ratio 值
+        r_g_ratio = XPATHS["r_g_ratio"](root)
+        if r_g_ratio:
+            add_element(output_root, "R_G_Ratio", r_g_ratio[0].text)
+
+        b_g_ratio = XPATHS["b_g_ratio"](root)
+        if b_g_ratio:
+            add_element(output_root, "B_G_Ratio", b_g_ratio[0].text)
+
         # 提取gain值
-        short_gain = XPATHS["short_gain"](root) # Use the passed root
+        short_gain = XPATHS["short_gain"](root)
         if short_gain:
             add_element(output_root, "short_gain", short_gain[0].text)
 
-        long_gain = XPATHS["long_gain"](root) # Use the passed root
+        long_gain = XPATHS["long_gain"](root)
         if long_gain:
             add_element(output_root, "long_gain", long_gain[0].text)
 
-        safe_gain = XPATHS["safe_gain"](root) # Use the passed root
+        safe_gain = XPATHS["safe_gain"](root)
         if safe_gain:
             add_element(output_root, "safe_gain", safe_gain[0].text)
 
         # 提取并添加 r_gain 和 b_gain 值
-        r_gain = XPATHS["r_gain"](root) # Use the passed root
+        r_gain = XPATHS["r_gain"](root)
         if r_gain:
             add_element(output_root, "r_gain", r_gain[0].text)
 
-        b_gain = XPATHS["b_gain"](root) # Use the passed root
+        b_gain = XPATHS["b_gain"](root)
         if b_gain:
             add_element(output_root, "b_gain", b_gain[0].text)
 
         # 提取并添加AEC_Settled值
-        aec_settled = XPATHS["aec_settled"](root) # Use the passed root
+        aec_settled = XPATHS["aec_settled"](root)
         if aec_settled and len(aec_settled) > 0:
             add_element(output_root, "aec_settled", aec_settled[0].text)
 
-        triangle_index = XPATHS["triangle_index"](root) # Use the passed root
+        triangle_index = XPATHS["triangle_index"](root)
         if triangle_index:
             add_element(output_root, "triangle_index", triangle_index[0].text)
 
@@ -823,14 +703,13 @@ def parse_main(folder_path, log_callback=None):
         batch_end = min(batch_start + batch_size, len(file_list))
         batch = file_list[batch_start:batch_end]
 
-        # 使用有限的线程池处理批次
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        # 使用进程池替代线程池来绕过GIL，并设置8个工作进程
+        with concurrent.futures.ProcessPoolExecutor(max_workers=8) as executor:
             futures = {
                 executor.submit(
                     process_file,
                     os.path.join(folder_path, filename),
                     folder_path,
-                    log_callback,
                 ): filename
                 for filename in batch
             }
@@ -838,7 +717,10 @@ def parse_main(folder_path, log_callback=None):
             for future in concurrent.futures.as_completed(futures):
                 filename = futures[future]
                 try:
-                    result = future.result()
+                    result, messages = future.result()
+                    if log_callback:
+                        for msg in messages:
+                            log_callback(msg)
                     if result:
                         processed_files += 1
                 except Exception as e:
@@ -863,9 +745,10 @@ def parse_main(folder_path, log_callback=None):
         log_callback(f"总耗时: {total_time:.2f}秒 | 平均速度: {speed:.2f} 文件/秒")
 
 
-def process_file(filename, folder_path, log_callback=None):
+def process_file(filename, folder_path):
+    messages = []
     if os.path.isdir(filename):
-        return False
+        return False, messages
 
     file_name_without_ext = os.path.splitext(os.path.basename(filename))[0]
 
@@ -874,13 +757,12 @@ def process_file(filename, folder_path, log_callback=None):
     if os.path.exists(new_xml_file):
         message = f"Skipping file: {filename} as {file_name_without_ext}_new.xml already exists."
         print(message)
-        if log_callback:
-            log_callback(message)
-        return False
+        messages.append(message)
+        return False, messages
 
     message = f"Processing file: {filename}"
-    if log_callback:
-        log_callback(message)
+    print(message)
+    messages.append(message)
 
     try:
         # 从配置文件加载SA配置
@@ -905,9 +787,8 @@ def process_file(filename, folder_path, log_callback=None):
         except Exception as e:
             message = f"Error: Could not parse XML file {filename}: {str(e)}"
             print(message)
-            if log_callback:
-                log_callback(message)
-            return False
+            messages.append(message)
+            return False, messages
 
         sa_values = {}
         missing_required_sa = False
@@ -918,8 +799,7 @@ def process_file(filename, folder_path, log_callback=None):
             sa_values["FrameSA"] = frame_sa_data
             message = f"找到 FrameSA"
             print(message)
-            if log_callback:
-                log_callback(message)
+            messages.append(message)
         else:
             # 如果 FrameSA 未找到，尝试查找 EVFrameSA
             evframe_sa_data = extract_SA_values(root, "EVFrameSA")
@@ -927,20 +807,18 @@ def process_file(filename, folder_path, log_callback=None):
                 sa_values["FrameSA"] = evframe_sa_data
                 message = f"未找到 FrameSA，使用 EVFrameSA 作为替代"
                 print(message)
-                if log_callback:
-                    log_callback(message)
+                messages.append(message)
             else:
                 # 如果 FrameSA 和 EVFrameSA 都未找到
                 message = f"Error: 必需的 SA FrameSA 或 EVFrameSA 未找到"
                 print(message)
                 missing_required_sa = True
-                if log_callback:
-                    log_callback(message)
+                messages.append(message)
 
         if missing_required_sa:
             root = None
             gc.collect()
-            return False
+            return False, messages
         # --- 结束 FrameSA 或 EVFrameSA 的备选逻辑 ---
 
 
@@ -960,7 +838,7 @@ def process_file(filename, folder_path, log_callback=None):
             # Clear root reference to potentially free memory sooner
             root = None
             gc.collect()
-            return False
+            return False, messages
 
         # 检查可选的SAs - 如果不存在则使用None值
         for sa_name in optional_sas:
@@ -996,7 +874,7 @@ def process_file(filename, folder_path, log_callback=None):
                 # Clear root reference on error
                 root = None
                 gc.collect()
-                return False
+                return False, messages
         else:
              # This case should ideally be caught by missing_required_sa check,
              # but added for robustness
@@ -1005,22 +883,22 @@ def process_file(filename, folder_path, log_callback=None):
              # Clear root reference on error
              root = None
              gc.collect()
-             return False
+             return False, messages
 
 
         # Clear root reference after successful processing
         root = None
         gc.collect()
 
-        return True  # 处理成功
+        return True, messages  # 处理成功
     except Exception as e:
         message = f"Error processing file {filename}: {str(e)}"
-        if log_callback:
-            log_callback(message)
+        print(message)
+        messages.append(message)
         # Ensure root is cleared even for unexpected errors
         root = None
         gc.collect()
-        return False
+        return False, messages
 
 
 def extract_channel_values(root):
@@ -1115,10 +993,6 @@ def load_sa_config(config_file=SA_CONFIG_FILE):
     """
     config = configparser.ConfigParser()
     try:
-        # 如果配置文件不存在，则使用默认配置
-        if not os.path.exists(config_file):
-            raise FileNotFoundError(f"配置文件 {config_file} 不存在")
-        
         # 显式指定使用UTF-8编码读取配置文件
         with open(config_file, 'r', encoding='utf-8') as f:
             config.read_file(f)
@@ -1145,5 +1019,5 @@ def load_sa_config(config_file=SA_CONFIG_FILE):
 
 
 if __name__ == "__main__":
-    file_path = r"C:\Users\chenyang3\Downloads\11"
+    file_path = r"D:\Tuning\O19\0_pic\02_IN_pic\2025.6.19-IN-一供验证 ISP\NOMAL\111"
     parse_main(file_path)
