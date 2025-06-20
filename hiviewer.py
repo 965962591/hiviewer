@@ -493,11 +493,17 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         show_file_action = self.treeview_context_menu.addAction(
             "显示所有文件" if not self.left_tree_file_display else "隐藏所有文件")
         send_path_to_aebox = self.treeview_context_menu.addAction("发送到aebox")
+
+        zoom_action = self.treeview_context_menu.addAction("按zoom分类")
+        size_action = self.treeview_context_menu.addAction("按size分类")
+
+        copy_path_action = self.treeview_context_menu.addAction("复制路径")
+        rename_action = self.treeview_context_menu.addAction("重命名")
         delete_action = self.treeview_context_menu.addAction("删除")
         open_action = self.treeview_context_menu.addAction("打开")
-        rename_action = self.treeview_context_menu.addAction("重命名")  
-        copy_path_action = self.treeview_context_menu.addAction("复制路径")
-        
+
+
+          
         # 获取选中的文件信息
         index = self.Left_QTreeView.indexAt(pos)
         if index.isValid():
@@ -510,6 +516,10 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             rename_action.triggered.connect(lambda: self.rename_file(file_path))
             show_file_action.triggered.connect(self.show_file_visibility)
             delete_action.triggered.connect(lambda: self.delete_file(file_path))
+
+            # 连接zoom值分类信号槽函数
+            zoom_action.triggered.connect(lambda: self.zoom_file(file_path))
+            size_action.triggered.connect(lambda: self.size_file(file_path))
 
 
             # 设置右键菜单绑定左侧文件浏览器
@@ -731,6 +741,17 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.file_system_model.setFilter(QDir.NoDot | QDir.NoDotDot | QDir.AllDirs)    # 使用QDir的过滤器,只显示文件夹  
         else:
             self.file_system_model.setFilter(QDir.NoDot | QDir.NoDotDot |QDir.AllEntries)  # 显示所有文件和文件夹
+
+    def zoom_file(self, path):
+        """按zoom值分类"""
+        from src.utils.cls_zoom_size import classify_images_by_zoom
+        classify_images_by_zoom(path)
+
+    def size_file(self, path):
+        """按尺寸分类"""
+        from src.utils.cls_zoom_size import classify_images_by_size
+        classify_images_by_size(path)
+
 
     def delete_file(self, path):
         """安全删除文件/文件夹"""
