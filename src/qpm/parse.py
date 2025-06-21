@@ -7,12 +7,12 @@ import copy
 from functools import lru_cache
 import time
 from io import BytesIO
-from pathlib import Path
 import gc
 import configparser
 
 
 # 设置SA.ini文件路径
+from pathlib import Path
 SA_CONFIG_FILE = Path(__file__).parent.parent.parent / "resource" / "tools" / "SA.ini"
 
 # 预编译XPath表达式
@@ -43,8 +43,7 @@ XPATHS = {
     "short_gain": ET.XPath('.//Exposure_Information[@Index="0"]/Gain'),
     "long_gain": ET.XPath('.//Exposure_Information[@Index="1"]/Gain'),
     "safe_gain": ET.XPath('.//Exposure_Information[@Index="2"]/Gain'),
-    "channels_list_0": ET.XPath('.//AECX_CoreStats/Channels_List[@Index="0"]'),
-    "channels_list_1": ET.XPath('.//AECX_CoreStats/Channels_List[@Index="1"]'),
+    "all_channels_lists": ET.XPath('.//AECX_CoreStats/Channels_List'),
     "channel_data": ET.XPath('Channel_Data[@ID="6"]'),
     "value_grid": ET.XPath("Value_Grid"),
     "r_gain": ET.XPath('.//Tuning_AWB_Data/AWB_Gains[@Index="0"]'),
@@ -52,6 +51,7 @@ XPATHS = {
     "triangle_index": ET.XPath(".//AWB_TriangleGainAdjust/Triangle_Index"),
     "awb_sagen1data": ET.XPath(".//AWB_SAGen1Data"),
     "sa_description": ET.XPath("./SA_Description"),
+    "awb_descriptions_direct": ET.XPath(".//AWB_SAGen1Data/SA_Description"),
     "assist_data": ET.XPath(".//AWB_SA_Face_Assist/Face_Assist_Confidence"),
     "aec_settled": ET.XPath(".//AEC_Settled"),
     # 新增 R_G_Ratio 和 B_G_Ratio 的 XPath
@@ -84,6 +84,47 @@ OPERATOR_TEMPLATE = ET.fromstring("""
 </operator>
 """)
 
+
+# 新增：用于 save_results_to_xml 的配置字典
+SINGLE_VALUE_CONFIG = [
+    ("awb_cct", "CCT"),
+    ("r_g_ratio", "R_G_Ratio"),
+    ("b_g_ratio", "B_G_Ratio"),
+    ("short_gain", "short_gain"),
+    ("long_gain", "long_gain"),
+    ("safe_gain", "safe_gain"),
+    ("r_gain", "r_gain"),
+    ("b_gain", "b_gain"),
+    ("aec_settled", "aec_settled"),
+    ("triangle_index", "triangle_index"),
+]
+
+SA_TEMPLATE_MAP = {
+    "id": "id",
+    "luma": "luma",
+    "target/start": "target_start",
+    "target/end": "target_end",
+    "confidence": "confidence",
+    "adjratio/start": "adjratio_start",
+    "adjratio/end": "adjratio_end",
+}
+
+
+
+# 优化 calculate_operation 的性能
+OPERATION_HANDLERS = {
+    "Division(3)": lambda op, out: f"{op[0]} * {op[1]} / {op[2]} * {op[3]} = {out}",
+    "Multiplication(2)": lambda op, out: f"{op[0]} * {op[1]} * {op[2]} * {op[3]} = {out}",
+    "Addition(0)": lambda op, out: f"{op[0]} * {op[1]} + {op[2]} * {op[3]} = {out}",
+    "Subtraction(1)": lambda op, out: f"{op[0]} * {op[1]} - {op[2]} * {op[3]} = {out}",
+    "Min(5)": lambda op, out: f"min({op[0]} * {op[1]}, {op[2]} * {op[3]}) = {out}",
+    "Max(4)": lambda op, out: f"max({op[0]} * {op[1]},{op[2]} * {op[3]}) = {out}",
+    "CondSmaller(13)": lambda op, out: f"({op[0]} 小于 {op[1]} ? {op[2]} : {op[3]}) = {cond_smaller(op[0], op[1], op[2], op[3])}",
+    "CondLarger(12)": lambda op, out: f"({op[0]} 大于 {op[1]} ? {op[2]} : {op[3]}) = {cond_larger(op[0], op[1], op[2], op[3])}",
+    "CondEqual(14)": lambda op, out: f"({op[0]} 等于 {op[1]} ? {op[2]} : {op[3]}) = {cond_equal(op[0], op[1], op[2], op[3])}",
+    "Largest(8)": lambda op, out: f"max({op[0]},{op[1]},{op[2]},{op[3]}) = {out}",
+    "Smallest(6)": lambda op, out: f"min({op[0]},{op[1]},{op[2]},{op[3]}) = {out}",
+}
 
 @lru_cache(maxsize=128)
 def get_sa_template():
@@ -156,19 +197,13 @@ def extract_sat_values(root):
     return sat_ratio, dark_ratio
 
 
-def extract_SA_values(root, sa_name):
-    general_sas = XPATHS["general_sas"](root)
-    target_sa = None
-
-    # 使用更高效的查找而不是循环所有SA
-    for sa in general_sas:
-        analyzer_name = XPATHS["analyzer_name"](sa)
-        if analyzer_name and analyzer_name[0].text == sa_name:
-            target_sa = sa
-            break
+def extract_SA_values(sa_nodes_map, sa_name):
+    """
+    从预先构建的SA节点字典中提取单个SA的值。
+    """
+    target_sa = sa_nodes_map.get(sa_name)
 
     if target_sa is None:
-        print(f"Error: Required SA {sa_name} not found")
         return None
 
     # 批量获取数据而不是多次调用XPath
@@ -182,7 +217,7 @@ def extract_SA_values(root, sa_name):
         adjratio_start = XPATHS["adjustment_ratio_start"](target_sa)[0].text
         adjratio_end = XPATHS["adjustment_ratio_end"](target_sa)[0].text
     except (IndexError, AttributeError):
-        print(f"Error: Missing required data in {sa_name}")
+        print(f"Error: Missing required data in {SA_name}")
         return None
 
     operators_name, calculations, operators_num, operators_method = [], [], [], []
@@ -209,45 +244,29 @@ def extract_SA_values(root, sa_name):
         
     # print(f"sa name:{SA_name},id:{id},luma:{luma},target start:{target_start},target end:{target_end},confidence:{confidence}")
     
-    return (
-        SA_name,
-        id,
-        luma,
-        target_start,
-      target_end,
-        confidence,
-        operators_name,
-        adjratio_start,
-        adjratio_end,
-        calculations,
-        operators_num,
-        operators_method,
-    )
+    # 返回字典而不是元组，以提高可读性和可维护性
+    return {
+        "name": SA_name,
+        "id": id,
+        "luma": luma,
+        "target_start": target_start,
+        "target_end": target_end,
+        "confidence": confidence,
+        "operators_name": operators_name,
+        "adjratio_start": adjratio_start,
+        "adjratio_end": adjratio_end,
+        "calculations": calculations,
+        "operators_num": operators_num,
+        "operators_method": operators_method,
+    }
+
+
 
 
 def calculate_operation(operands, operation_method, output_value):
-    if operation_method == "Division(3)":
-        return f"{operands[0]} * {operands[1]} / {operands[2]} * {operands[3]} = {output_value}"
-    elif operation_method == "Multiplication(2)":
-        return f"{operands[0]} * {operands[1]} * {operands[2]} * {operands[3]} = {output_value}"
-    elif operation_method == "Addition(0)":
-        return f"{operands[0]} * {operands[1]} + {operands[2]} * {operands[3]} = {output_value}"
-    elif operation_method == "Subtraction(1)":
-        return f"{operands[0]} * {operands[1]} - {operands[2]} * {operands[3]} = {output_value}"
-    elif operation_method == "Min(5)":
-        return f"min({operands[0]} * {operands[1]}, {operands[2]} * {operands[3]}) = {output_value}"
-    elif operation_method == "Max(4)":
-        return f"max({operands[0]} * {operands[1]},{operands[2]} * {operands[3]}) = {output_value}"
-    elif operation_method == "CondSmaller(13)":
-        return f"({operands[0]} 小于 {operands[1]} ? {operands[2]} : {operands[3]}) = {cond_smaller(operands[0], operands[1], operands[2], operands[3])}"
-    elif operation_method == "CondLarger(12)":
-        return f"({operands[0]} 大于 {operands[1]} ? {operands[2]} : {operands[3]}) = {cond_larger(operands[0], operands[1], operands[2], operands[3])}"
-    elif operation_method == "CondEqual(14)":
-        return f"({operands[0]} 等于 {operands[1]} ? {operands[2]} : {operands[3]}) = {cond_equal(operands[0], operands[1], operands[2], operands[3])}"
-    elif operation_method == "Largest(8)":
-        return f"max({operands[0]},{operands[1]},{operands[2]},{operands[3]}) = {output_value}"
-    elif operation_method == "Smallest(6)":
-        return f"min({operands[0]},{operands[1]},{operands[2]},{operands[3]}) = {output_value}"
+    handler = OPERATION_HANDLERS.get(operation_method)
+    if handler:
+        return handler(operands, output_value)
     else:
         return f"Unknown operation method: {operation_method}"
 
@@ -273,124 +292,83 @@ def calculate_safe_exp_values(
     # 从配置文件加载SA配置
     required_sas, optional_sas, sa_order, agg_sas = load_sa_config()
 
-    # 创建SA值字典，用于之后查找
-    sa_values_dict = {}
-
-    # 从kwargs中提取所有SA值
-    for sa_name in required_sas + optional_sas:
-        param_name = f"{sa_name}_values"
-        if param_name in kwargs:
-            sa_values_dict[sa_name] = kwargs[param_name]
+    # kwargs 包含了所有以 "_values" 结尾的SA数据，其值现在是字典
+    sa_values_dict = {sa_name: kwargs.get(f"{sa_name}_values") for sa_name in required_sas + optional_sas}
 
     # 检查必需的参数是否存在
-    missing_required = [sa for sa in required_sas if sa not in sa_values_dict or sa_values_dict[sa] is None]
+    missing_required = [sa for sa in required_sas if sa_values_dict.get(sa) is None]
     if missing_required:
         raise ValueError(f"缺少必需的SA参数: {', '.join(missing_required)}")
 
-    # 获取必需SA的值
-    framesa_values = sa_values_dict.get("FrameSA")
-    SafeAggSA_values = sa_values_dict.get("SafeAggSA")
-    ShortAggSA_values = sa_values_dict.get("ShortAggSA")
-    LongAggSA_values = sa_values_dict.get("LongAggSA")
+    # 使用字典键访问，提高可读性和健壮性
+    framesa_values = sa_values_dict["FrameSA"]
+    SafeAggSA_values = sa_values_dict["SafeAggSA"]
+    ShortAggSA_values = sa_values_dict["ShortAggSA"]
 
-    # 解包FrameSA的值
-    (
-        FrameSA,
-        Frame_id,
-        Frame_luma,
-        Frame_target_start,
-        Frame_target_end,
-        Frame_confidence,
-        Frame_operators_name,
-        Frame_adjratio_start,
-        Frame_adjratio_end,
-        Frame_calculations,
-        Frame_operators_num,
-        Frame_operators_method,
-    ) = framesa_values
-
-    # 解包SafeAggSA的值
-    if SafeAggSA_values:
-        SafeAgg_adjratio_start = float(SafeAggSA_values[7])
-    else:
-         raise ValueError("SafeAggSA is required") # Or handle missing case
-    
-    # 解包ShortAggSA的值
-    if ShortAggSA_values:
-        ShortAgg_adjratio_start = float(ShortAggSA_values[7])
-    else:
-         raise ValueError("ShortAggSA is required") # Or handle missing case
-
-    # 初始化活动SA列表
-    active_sa_list = []
-    
-    # 将所有可能参与聚合的SA添加到active_sa_list
-    for sa_name in agg_sas:
-        sa_value = sa_values_dict.get(sa_name)
-        if sa_value is not None and len(sa_value) >= 9:
-            active_sa_list.append((sa_value, sa_value[5], sa_value[7], sa_value[8], sa_name))
+    # 直接从字典获取值，避免了大量的位置解包
+    Frame_confidence = float(framesa_values['confidence'])
+    Frame_adjratio_start = float(framesa_values['adjratio_start'])
+    Frame_adjratio_end = float(framesa_values['adjratio_end'])
+    SafeAgg_adjratio_start = float(SafeAggSA_values['adjratio_start'])
+    ShortAgg_adjratio_start = float(ShortAggSA_values['adjratio_start'])
 
     # 初始化结果列表
-    results_str = []
-    result = []
-    result_confidence = []
-    name_list = []
+    results_str, result, result_confidence, name_list = [], [], [], []
     
     # 计算FrameSA的贡献
-    framesa_adjratio = float(Frame_adjratio_start) * float(Frame_confidence)
+    framesa_adjratio = Frame_confidence * Frame_adjratio_start
     framesa_adjratio = round(framesa_adjratio, 5)
 
     print("\n--- 统一聚合处理 ---")
     print(f"SafeAggSA AdjRatio Start (基准值): {SafeAgg_adjratio_start}")
     print(f"FrameSA Confidence: {Frame_confidence}, AdjRatio Start: {Frame_adjratio_start}, AdjRatio End: {Frame_adjratio_end}")
     
-    # 遍历所有活动的SA进行计算
+    # 遍历所有活动的SA进行计算，逻辑更清晰
     print("  - 遍历活动的SA (基于SafeAggSA区间):")
-    for (
-        sa_data,
-        confidence,
-        adjratio_start,
-        adjratio_end,
-        sa_name,
-    ) in active_sa_list:
+    for sa_name in agg_sas:
+        sa_data = sa_values_dict.get(sa_name)
+        if not sa_data:
+            continue
+
+        confidence = float(sa_data['confidence'])
+        adjratio_start = float(sa_data['adjratio_start'])
+        adjratio_end = float(sa_data['adjratio_end'])
+
         print(f"    - 正在检查 SA: {sa_name}")
-        # 基本检查
-        if float(confidence) == 0:
+        if confidence == 0:
             print(f"      - 跳过 {sa_name}: Confidence 为 0")
             continue
-        if float(adjratio_start) < 0 or float(adjratio_end) < 0:
+        if adjratio_start < 0 or adjratio_end < 0:
             print(f"      - 跳过 {sa_name}: AdjRatio 包含负值 ({adjratio_start}, {adjratio_end})")
             continue
 
-        # 使用SafeAggSA的adjratio_start作为基准进行区间判断
-        if float(adjratio_start) >= SafeAgg_adjratio_start:
+        # 判断应该使用哪个adjratio
+        chosen_adjratio = None
+        if adjratio_start >= SafeAgg_adjratio_start:
+            chosen_adjratio = adjratio_start
             print(f"        - {adjratio_start} >= {SafeAgg_adjratio_start}，使用 adjratio_start ({adjratio_start})")
-            if sa_name not in name_list:
-                name_list.append(sa_name)
-                calc_value = float(confidence) * float(adjratio_start)
-                cal_str = f"{confidence} * {adjratio_start} = {round(calc_value, 5)}"
-                results_str.append(cal_str)
-                result.append(calc_value)
-                result_confidence.append(float(confidence))
-        elif float(adjratio_end) <= SafeAgg_adjratio_start:
+        elif adjratio_end <= SafeAgg_adjratio_start:
+            chosen_adjratio = adjratio_end
             print(f"        - {adjratio_end} <= {SafeAgg_adjratio_start}，使用 adjratio_end ({adjratio_end})")
-            if sa_name not in name_list:
-                name_list.append(sa_name)
-                calc_value = float(confidence) * float(adjratio_end)
-                cal_str = f"{confidence} * {adjratio_end} = {round(calc_value, 5)}"
-                results_str.append(cal_str)
-                result.append(calc_value)
-                result_confidence.append(float(confidence))
         else:
             print(f"        - {sa_name} 与 SafeAggSA 区间重叠，跳过")
+        
+        # 如果选定了adjratio，则进行计算
+        if chosen_adjratio is not None and sa_name not in name_list:
+            name_list.append(sa_name)
+            calc_value = confidence * chosen_adjratio
+            cal_str = f"{confidence} * {chosen_adjratio} = {round(calc_value, 5)}"
+            results_str.append(cal_str)
+            result.append(calc_value)
+            result_confidence.append(confidence)
 
     # --- 聚合计算逻辑 (FrameSA 始终参与) ---
-    safe_agg_value_from_sa = round(float(SafeAgg_adjratio_start), 5)
+    safe_agg_value_from_sa = round(SafeAgg_adjratio_start, 5)
 
     # 聚合计算 (包含所有符合条件的SA和FrameSA)
     print("\n--- 聚合计算 ---")
     result_sum = sum(result) + framesa_adjratio
-    confidence_sum = sum(float(conf) for conf in result_confidence) + float(Frame_confidence)
+    confidence_sum = sum(result_confidence) + Frame_confidence
     contributing_sas = name_list
     contributing_sas_all_names = contributing_sas + ['FrameSA']
     
@@ -401,7 +379,7 @@ def calculate_safe_exp_values(
         calculated_agg_ratio = result_sum / confidence_sum
 
     str_1 = f"adjratio({' + '.join(map(str, contributing_sas_all_names))})/confidence({' + '.join(map(str, contributing_sas_all_names))})"
-    res_str = f"{str_1}=\n({' + '.join(map(lambda x: str(round(float(x), 5)), result))} + {round(framesa_adjratio, 5)}) / ({' + '.join(map(lambda x: str(round(float(x), 5)), result_confidence))} + {round(float(Frame_confidence), 5)}) = {safe_agg_value_from_sa}"
+    res_str = f"{str_1}=\n({' + '.join(map(lambda x: str(round(float(x), 5)), result))} + {framesa_adjratio}) / ({' + '.join(map(lambda x: str(round(float(x), 5)), result_confidence))} + {round(Frame_confidence, 5)}) = {safe_agg_value_from_sa}"
 
     # 获取ShortAgg和SafeAgg的adjratio值
     short = ShortAgg_adjratio_start
@@ -430,7 +408,7 @@ def calculate_safe_exp_values(
 
     for sa_name in all_sa_names_in_order:
         sa_data = sa_values_dict.get(sa_name)
-        if sa_data is not None and isinstance(sa_data, tuple):
+        if sa_data is not None and isinstance(sa_data, dict):
              final_sa_values_for_xml.append(sa_data)
 
     save_results_to_xml(
@@ -480,50 +458,11 @@ def save_results_to_xml(
         add_element(output_root, "sat_ratio", sat_ratio)
         add_element(output_root, "dark_ratio", dark_ratio)
 
-        # 提取并添加CCT和gain值
-        cct_value = XPATHS["awb_cct"](root)
-        if cct_value:
-            add_element(output_root, "CCT", cct_value[0].text)
-
-        # 提取并添加 R_G_Ratio 和 B_G_Ratio 值
-        r_g_ratio = XPATHS["r_g_ratio"](root)
-        if r_g_ratio:
-            add_element(output_root, "R_G_Ratio", r_g_ratio[0].text)
-
-        b_g_ratio = XPATHS["b_g_ratio"](root)
-        if b_g_ratio:
-            add_element(output_root, "B_G_Ratio", b_g_ratio[0].text)
-
-        # 提取gain值
-        short_gain = XPATHS["short_gain"](root)
-        if short_gain:
-            add_element(output_root, "short_gain", short_gain[0].text)
-
-        long_gain = XPATHS["long_gain"](root)
-        if long_gain:
-            add_element(output_root, "long_gain", long_gain[0].text)
-
-        safe_gain = XPATHS["safe_gain"](root)
-        if safe_gain:
-            add_element(output_root, "safe_gain", safe_gain[0].text)
-
-        # 提取并添加 r_gain 和 b_gain 值
-        r_gain = XPATHS["r_gain"](root)
-        if r_gain:
-            add_element(output_root, "r_gain", r_gain[0].text)
-
-        b_gain = XPATHS["b_gain"](root)
-        if b_gain:
-            add_element(output_root, "b_gain", b_gain[0].text)
-
-        # 提取并添加AEC_Settled值
-        aec_settled = XPATHS["aec_settled"](root)
-        if aec_settled and len(aec_settled) > 0:
-            add_element(output_root, "aec_settled", aec_settled[0].text)
-
-        triangle_index = XPATHS["triangle_index"](root)
-        if triangle_index:
-            add_element(output_root, "triangle_index", triangle_index[0].text)
+        # 统一处理所有单值元素的提取和添加
+        for xpath_key, tag_name in SINGLE_VALUE_CONFIG:
+            elements = XPATHS[xpath_key](root)
+            if elements and len(elements) > 0 and elements[0].text:
+                add_element(output_root, tag_name, elements[0].text)
 
         # 从配置文件加载SA顺序
         _, _, sa_order, agg_sas = load_sa_config()
@@ -534,14 +473,8 @@ def save_results_to_xml(
         # 创建SA值的字典，方便查找
         sa_dict = {}
         for sa_value in sa_values:
-            if isinstance(sa_value, tuple) and len(sa_value) >= 1:
-                try:
-                    SA_name = sa_value[0]
-                    sa_dict[SA_name] = sa_value
-                    # print(f"添加到sa_dict: {SA_name}")  # 调试信息
-                except Exception as e:
-                    print(f"Warning: Error processing SA value: {str(e)}")
-                    continue
+            if isinstance(sa_value, dict):
+                sa_dict[sa_value["name"]] = sa_value
 
         # 打印字典中所有的SA名称
         # print(f"sa_dict中的所有SA: {', '.join(sa_dict.keys())}")
@@ -551,44 +484,20 @@ def save_results_to_xml(
             if sa_name in sa_dict:
                 sa_value = sa_dict[sa_name]
                 try:
-                    (
-                        SA_name,
-                        id,
-                        luma,
-                        target_start,
-                        target_end,
-                        confidence,
-                        operators_name,
-                        adjratio_start,
-                        adjratio_end,
-                        calculations,
-                        operators_num,
-                        operators_method,
-                    ) = sa_value
-
-                    # print(f"正在写入SA: {SA_name}")  # 添加调试信息
-
                     # 使用模板创建SA元素
                     sa_item = copy.deepcopy(get_sa_template())
-                    sa_item.tag = SA_name  # 修改标签名为SA名称
+                    sa_item.tag = sa_value["name"]  # SA_name from dictionary
 
-                    # 填充模板数据
-                    sa_item.find("id").text = saxutils.escape(str(id))
-                    sa_item.find("luma").text = saxutils.escape(str(luma))
-                    sa_item.find("target/start").text = saxutils.escape(
-                        str(target_start)
-                    )
-                    sa_item.find("target/end").text = saxutils.escape(str(target_end))
-                    sa_item.find("confidence").text = saxutils.escape(str(confidence))
-                    sa_item.find("adjratio/start").text = saxutils.escape(
-                        str(adjratio_start)
-                    )
-                    sa_item.find("adjratio/end").text = saxutils.escape(
-                        str(adjratio_end)
-                    )
+                    # 使用配置字典和键名来填充模板数据
+                    for tag, key in SA_TEMPLATE_MAP.items():
+                        sa_item.find(tag).text = saxutils.escape(str(sa_value[key]))
 
                     # 处理操作符
                     step_elem = sa_item.find("step")
+                    operators_name = sa_value["operators_name"]
+                    calculations = sa_value["calculations"]
+                    operators_num = sa_value["operators_num"]
+                    operators_method = sa_value["operators_method"]
                     if operators_name and calculations and operators_num and operators_method:
                         for op_name, calc, nums, method in zip(
                             operators_name, calculations, operators_num, operators_method
@@ -682,22 +591,35 @@ def save_results_to_xml(
 def parse_main(folder_path, log_callback=None):
     start_time = time.time()
     processed_files = 0
-    total_files = 0
 
     # 从配置文件加载SA配置
     required_sas, optional_sas, sa_order, agg_sas = load_sa_config()
 
-    # 获取需要处理的文件列表
-    file_list = [
-        f
-        for f in os.listdir(folder_path)
-        if f.endswith(".xml") and not f.endswith("_new.xml")
-    ]
-
+    # 获取需要处理的文件列表 (使用集合操作优化)
+    all_files = set(os.listdir(folder_path))
+    
+    # 找出所有XML文件和_new.xml文件
+    xml_files = {f for f in all_files if f.endswith(".xml") and not f.endswith("_new.xml")}
+    new_xml_files = {f for f in all_files if f.endswith("_new.xml")}
+    
+    # 提取基本文件名
+    xml_basenames = {os.path.splitext(f)[0] for f in xml_files}
+    processed_basenames = {os.path.splitext(f)[0][:-4] if os.path.splitext(f)[0].endswith("_new") 
+                          else os.path.splitext(f)[0] for f in new_xml_files}
+    
+    # 找出需要处理的文件
+    to_process_basenames = xml_basenames - processed_basenames
+    file_list = [f for f in xml_files if os.path.splitext(f)[0] in to_process_basenames]
+    
     total_files = len(file_list)
+    
+    # 打印调试信息
+    print(f"找到 {total_files} 个需要处理的XML文件")
+    if total_files == 0:
+        print("警告: 没有找到需要处理的XML文件，请检查文件夹路径和文件名格式")
 
     # 分批处理文件，减少内存占用
-    batch_size = 50  # 根据系统性能调整批处理大小
+    batch_size = 100  # 根据系统性能调整批处理大小
 
     for batch_start in range(0, len(file_list), batch_size):
         batch_end = min(batch_start + batch_size, len(file_list))
@@ -745,20 +667,71 @@ def parse_main(folder_path, log_callback=None):
         log_callback(f"总耗时: {total_time:.2f}秒 | 平均速度: {speed:.2f} 文件/秒")
 
 
+def parse_single_main(image_path, log_callback=None):
+    """
+    处理与指定图片同名的XML文件
+    
+    Args:
+        image_path: 图片文件路径
+        log_callback: 日志回调函数
+    """
+    start_time = time.time()
+    processed_files = 0
+
+    if not os.path.isfile(image_path):
+        msg = f"错误：图片文件不存在 {image_path}"
+        print(msg)
+        if log_callback:
+            log_callback(msg)
+        return
+    
+    # 获取图片所在文件夹和文件名（不含扩展名）
+    folder_path = os.path.dirname(image_path)
+    file_name_without_ext = os.path.splitext(os.path.basename(image_path))[0]
+    
+    # 构建同名XML文件路径
+    xml_file_path = os.path.join(folder_path, f"{file_name_without_ext}.xml")
+    
+    if not os.path.isfile(xml_file_path):
+        msg = f"错误：对应的XML文件不存在 {xml_file_path}"
+        print(msg)
+        if log_callback:
+            log_callback(msg)
+        return
+    
+    try:
+        result, messages = process_file(xml_file_path, folder_path)
+        if log_callback:
+            for msg in messages:
+                log_callback(msg)
+        if result:
+            processed_files = 1
+    except Exception as e:
+        message = f"处理文件时出错 {xml_file_path}: {str(e)}"
+        print(message)
+        if log_callback:
+            log_callback(message)
+
+    end_time = time.time()
+    total_time = end_time - start_time
+    speed = processed_files / total_time if total_time > 0 else 0
+
+    print(f"\n处理完成 | 总文件: 1 | 成功处理: {processed_files}")
+    print(f"总耗时: {total_time:.2f}秒 | 平均速度: {speed:.2f} 文件/秒")
+
+    if log_callback:
+        log_callback(
+            f"\n处理完成 | 总文件: 1 | 成功处理: {processed_files}"
+        )
+        log_callback(f"总耗时: {total_time:.2f}秒 | 平均速度: {speed:.2f} 文件/秒")
+
+
 def process_file(filename, folder_path):
     messages = []
     if os.path.isdir(filename):
         return False, messages
 
     file_name_without_ext = os.path.splitext(os.path.basename(filename))[0]
-
-    # 检查是否存在对应的 _new.xml 文件
-    new_xml_file = os.path.join(folder_path, f"{file_name_without_ext}_new.xml")
-    if os.path.exists(new_xml_file):
-        message = f"Skipping file: {filename} as {file_name_without_ext}_new.xml already exists."
-        print(message)
-        messages.append(message)
-        return False, messages
 
     message = f"Processing file: {filename}"
     print(message)
@@ -773,28 +746,25 @@ def process_file(filename, folder_path):
         try:
             root = parse_xml(filename)
 
-            # 提取并打印AWB_SAGen1Data中的SA_Description
-            # awb_descriptions = extract_awb_sa_descriptions(root) # Moved to save_results_to_xml
-
-            # Extract channel values early to ensure they're available
-            # channel_values = extract_channel_values(root) # Moved to save_results_to_xml
-            # if channel_values is None:
-            #     message = f"Warning: Could not extract channel values from {filename}"
-            #     print(message)
-            #     if log_callback:
-            #         log_callback(message)
-
         except Exception as e:
             message = f"Error: Could not parse XML file {filename}: {str(e)}"
             print(message)
             messages.append(message)
             return False, messages
 
+        # --- 优化点：预处理所有SA，构建名称到节点的映射 ---
+        general_sas = XPATHS["general_sas"](root)
+        sa_nodes_map = {
+            XPATHS["analyzer_name"](sa)[0].text: sa
+            for sa in general_sas
+            if XPATHS["analyzer_name"](sa) and XPATHS["analyzer_name"](sa)[0].text
+        }
+
         sa_values = {}
         missing_required_sa = False
 
         # --- 处理 FrameSA 或 EVFrameSA 的备选逻辑 ---
-        frame_sa_data = extract_SA_values(root, "FrameSA")
+        frame_sa_data = extract_SA_values(sa_nodes_map, "FrameSA")
         if frame_sa_data:
             sa_values["FrameSA"] = frame_sa_data
             message = f"找到 FrameSA"
@@ -802,7 +772,7 @@ def process_file(filename, folder_path):
             messages.append(message)
         else:
             # 如果 FrameSA 未找到，尝试查找 EVFrameSA
-            evframe_sa_data = extract_SA_values(root, "EVFrameSA")
+            evframe_sa_data = extract_SA_values(sa_nodes_map, "EVFrameSA")
             if evframe_sa_data:
                 sa_values["FrameSA"] = evframe_sa_data
                 message = f"未找到 FrameSA，使用 EVFrameSA 作为替代"
@@ -826,7 +796,7 @@ def process_file(filename, folder_path):
         for sa_name in required_sas:
             if sa_name == "FrameSA": # FrameSA 已在上面处理
                 continue
-            sa_value = extract_SA_values(root, sa_name)
+            sa_value = extract_SA_values(sa_nodes_map, sa_name)
             if sa_value is None:
                 message = f"Error: Required SA {sa_name} not found"
                 print(message)
@@ -842,7 +812,7 @@ def process_file(filename, folder_path):
 
         # 检查可选的SAs - 如果不存在则使用None值
         for sa_name in optional_sas:
-            sa_value = extract_SA_values(root, sa_name)
+            sa_value = extract_SA_values(sa_nodes_map, sa_name)
             sa_values[sa_name] = sa_value  # 如果不存在就是None
             # if sa_name == "FaceDarkSA":
             #     print(f"FaceDarkSA提取结果: {sa_value is not None}")  # 调试信息
@@ -902,41 +872,30 @@ def process_file(filename, folder_path):
 
 
 def extract_channel_values(root):
-    """提取Index为0和1的Channels_List中Channel_Data的Value_Grid值（只提取前256个）"""
+    """提取Index为0和1的Channels_List中Channel_Data的Value_Grid值"""
     try:
-        # 创建字典存储不同Index的channel数据
         channel_data = {}
+        # 配置信息：索引 -> (新名称, 数量限制)
+        channel_configs = {
+            "0": ("channel_0_gridRGratio", 256),
+            "1": ("channel_1_gridBGratio", 255),
+        }
 
-        # 提取Index=0的channel数据
-        channel_0 = XPATHS["channels_list_0"](root)
-        if channel_0:
-            # 直接使用gridRGratio作为通道0的名称
-            channel_data_0 = XPATHS["channel_data"](channel_0[0])
-            if channel_data_0:
-                value_grids_0 = XPATHS["value_grid"](channel_data_0[0])
-                values_0 = []
-                # 只提取前256个值
-                for i, grid in enumerate(value_grids_0):
-                    if i >= 256:  # 达到255个后停止
-                        break
-                    values_0.append(float(grid.text))
-                channel_data["channel_0_gridRGratio"] = values_0  # 修改这里的名称
+        # 一次性找到所有Channels_List节点
+        all_lists = XPATHS["all_channels_lists"](root)
 
-        # 提取Index=1的channel数据
-        channel_1 = XPATHS["channels_list_1"](root)
-        if channel_1:
-            # 直接使用gridBGratio作为通道1的名称
-            channel_data_1 = XPATHS["channel_data"](channel_1[0])
-            if channel_data_1:
-                value_grids_1 = XPATHS["value_grid"](channel_data_1[0])
-                values_1 = []
-                # 只提取前255个值
-                for i, grid in enumerate(value_grids_1):
-                    if i >= 255:  # 达到255个后停止
-                        break
-                    values_1.append(float(grid.text))
-                channel_data["channel_1_gridBGratio"] = values_1  # 修改这里的名称
-
+        for node in all_lists:
+            index = node.get("Index")
+            if index in channel_configs:
+                name, limit = channel_configs[index]
+                
+                channel_data_node = XPATHS["channel_data"](node)
+                if channel_data_node:
+                    value_grids = XPATHS["value_grid"](channel_data_node[0])
+                    # 使用列表推导式和切片来高效地提取数据
+                    values = [float(grid.text) for grid in value_grids[:limit]]
+                    channel_data[name] = values
+        
         return channel_data
 
     except Exception as e:
@@ -954,30 +913,18 @@ def extract_awb_sa_descriptions(root):
     Returns:
         包含所有非空SA_Description的列表
     """
-    descriptions = []
-
-    # 使用XPath获取所有AWB_SAGen1Data节点
-    sagen1data_nodes = XPATHS["awb_sagen1data"](root)
-
-    if not sagen1data_nodes:
-        print("未找到AWB_SAGen1Data节点")
-        return descriptions
-
-    print(f"找到 {len(sagen1data_nodes)} 个AWB_SAGen1Data节点")
-
-    # 遍历每个AWB_SAGen1Data节点
-    for i, node in enumerate(sagen1data_nodes):
-        # 获取SA_Description子节点
-        sa_desc_nodes = XPATHS["sa_description"](node)
-
-        for desc in sa_desc_nodes:
-            if desc is not None and desc.text and desc.text.strip():
-                print(f"AWB_SAGen1Data[{i}] SA_Description: {desc.text.strip()}")
-                descriptions.append(desc.text.strip())
-
-    if not descriptions:
+    # 使用一个更直接的XPath来获取所有描述节点
+    descriptions = [
+        desc.text.strip()
+        for desc in XPATHS["awb_descriptions_direct"](root)
+        if desc.text and desc.text.strip()
+    ]
+    
+    if descriptions:
+        print(f"找到 {len(descriptions)} 个AWB SA Descriptions: {', '.join(descriptions)}")
+    else:
         print("未找到非空的SA_Description")
-
+        
     return descriptions
 
 
@@ -986,7 +933,7 @@ def load_sa_config(config_file=SA_CONFIG_FILE):
     从配置文件中读取SA相关的配置
     
     Args:
-        config_file: 配置文件路径，默认为'SA.ini'
+        config_file: 配置文件路径，默认为SA_CONFIG_FILE
         
     Returns:
         tuple: (required_sas, optional_sas, sa_order, agg_sas)
@@ -1019,5 +966,5 @@ def load_sa_config(config_file=SA_CONFIG_FILE):
 
 
 if __name__ == "__main__":
-    file_path = r"D:\Tuning\O19\0_pic\02_IN_pic\2025.6.19-IN-一供验证 ISP\NOMAL\111"
+    file_path = r"D:\Tuning\O19\0_pic\02_IN_pic\2025.6.13回归，参数不对\2025.6.13-IN-一供测试-超夜（改参）\O19"
     parse_main(file_path)

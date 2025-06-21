@@ -44,16 +44,23 @@ def process_images_in_folder(dptool_exe, folder_path):
         return
 
     # 筛选出没有对应 .xml 文件的文件
-    files_in_folder = os.listdir(folder_path)
-    xml_files = {
-        os.path.splitext(f)[0] for f in files_in_folder if f.lower().endswith(".xml")
-    }
+    other_files = {}
+    xml_basenames = set()
+
+    for f in os.listdir(folder_path):
+        if not os.path.isfile(os.path.join(folder_path, f)):
+            continue
+        
+        basename, ext = os.path.splitext(f)
+        if ext.lower() == ".xml":
+            xml_basenames.add(basename)
+        else:
+            other_files[basename] = f
+            
     files_to_process = [
-        f
-        for f in files_in_folder
-        if os.path.isfile(os.path.join(folder_path, f))
-        and not f.lower().endswith(".xml")
-        and os.path.splitext(f)[0] not in xml_files
+        filename
+        for basename, filename in other_files.items()
+        if basename not in xml_basenames
     ]
 
     if not files_to_process:

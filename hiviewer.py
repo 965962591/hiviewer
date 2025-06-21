@@ -499,8 +499,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
         copy_path_action = self.treeview_context_menu.addAction("复制路径")
         rename_action = self.treeview_context_menu.addAction("重命名")
-        delete_action = self.treeview_context_menu.addAction("删除")
         open_action = self.treeview_context_menu.addAction("打开")
+        delete_action = self.treeview_context_menu.addAction("删除")
 
 
           
@@ -570,8 +570,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.verticalLayout_left_2
         modify by diamond_cz 20250403 移除self.L_radioButton1 | self.L_radioButton2 | self.L_pushButton1 | self.L_pushButton2
         """  
-
-
         # self.Left_QTreeView
         self.file_system_model = QFileSystemModel(self)
         self.file_system_model.setRootPath('')  # 设置根路径为空，表示显示所有磁盘和文件夹
@@ -593,7 +591,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.RT_QComboBox0 | self.RT_QComboBox1 | self.RT_QComboBox2 | self.RT_QComboBox3 | self.RT_QPushButton5 | self.RT_QPushbutton6
         self.RB_QTableWidget0 
         """
-
         self.RT_QPushButton3.setText("清除")
         self.RT_QPushButton5.setText("对比")
 
@@ -629,9 +626,10 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.RT_QComboBox3.addItem("暗黑主题")
 
         """RT_QComboBox1待完善功能: 在下拉框中多次选择复选框后再收起下拉框; modify by 2025-01-21, 在main_ui.py中使用自定义的 ComboBox已解决"""
-        self.RT_QComboBox1.setEditable(True)  # 设置可编辑
-        self.RT_QComboBox1.lineEdit().setReadOnly(True)  # 设置不可编辑
-        self.RT_QComboBox1.lineEdit().setPlaceholderText("请选择")  # 设置提示文本
+        # 设置下拉框可编辑，设置下拉框文本不可编辑，设置下拉框提示文本
+        self.RT_QComboBox1.setEditable(True)
+        self.RT_QComboBox1.lineEdit().setReadOnly(True)  
+        self.RT_QComboBox1.lineEdit().setPlaceholderText("请选择") 
         
 
     def set_shortcut(self):
@@ -3117,6 +3115,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 # 拼接参数命令字符串
                 if qualcom_path and images_path and os.path.exists(images_path) and os.path.exists(qualcom_path):
                     show_message_box("正在使用高通工具后台解析图片Exif信息...", "提示", 1000)
+                    print(f"[on_i_pressed]-->正在使用高通工具后台解析图片Exif信息...")
 
                     # 创建线程，必须在主线程中连接信号
                     self.time_qualcom = time.time()
