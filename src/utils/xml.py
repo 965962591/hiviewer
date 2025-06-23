@@ -28,6 +28,7 @@ def save_excel_data(images_path):
         [
             "文件名",
             "Lux",
+            "BL",
             "DRCgain",
             "Safe_gain",
             "Short_gain",
@@ -85,8 +86,8 @@ def save_excel_data(images_path):
         adjusted_width = (max_length + 2)  # 加2以增加一些额外的空间
         ws.column_dimensions[column_letter].width = adjusted_width
 
-    wb.save(excel_path)  # 保存为Excel文件
-    print(f"数据已保存到 {excel_path}")
+    wb.save(excel_path)
+    print(f"[save_excel_data]-->数据成功写入到 {excel_path}")
 
 
 def load_xml_data(xml_path):
@@ -96,12 +97,29 @@ def load_xml_data(xml_path):
         tree = ET.parse(xml_path)
         root = tree.getroot()
 
+        """提取背光值"""
+        # 获取FrameSA的luma值
+        luma_frame = root.find('.//SA/FrameSA/luma').text if root.find('.//SA/FrameSA/luma') is not None else None
+        luma_frame_ev = root.find('.//SA/EVFrameSA/luma').text if root.find('.//SA/EVFrameSA/luma') is not None else None
+        frame_luma = luma_frame if luma_frame else luma_frame_ev if luma_frame_ev else 0.0001
+        
+        # 获取FaceSA的luma值
+        luma_face = root.find('.//SA/FaceSA/luma').text if root.find('.//SA/FaceSA/luma') is not None else None
+        face_luma = luma_face if luma_face else 0.0001
+
+        # 计算背光值
+        backlight = float(face_luma)/float(frame_luma) if frame_luma and face_luma else 0.0
+
+    
+
         # 提取值并转换为列表
         result_list = [
             # 文件名
             str(os.path.basename(xml_path).split('_new.xml')[0]+".jpg"),
             # Lux
-            float(root.find('lux_index').text) if root.find('lux_index') is not None else None,
+            float(root.find('lux_index').text) if root.find('lux_index') is not None else None, 
+            # BL
+            backlight,
             # DRCgain
             root.find('DRCgain').text if root.find('DRCgain') is not None else None,
             # Safe_gain

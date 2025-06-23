@@ -39,16 +39,16 @@ from PyQt5.QtWidgets import (
 from src.components.ui_sub_image import Ui_MainWindow                   # 看图子界面，导入界面UI
 from src.components.custom_qMbox_showinfo import show_message_box       # 导入消息框类
 from src.components.custom_qdialog_problems import ProblemsDialog       # 导入问题对话框类
-from src.common.settings_ColorAndExif import (load_exif_settings,       # 导入json配置模块
+from src.common.manager_color_exif import (load_exif_settings,          # 导入json配置模块
     load_color_settings)                                                
-from src.common.font_manager import SingleFontManager                   # 看图子界面，导入字体管理器
-from src.utils.aitips import CustomLLM_Siliconflow                      # 看图子界面，AI提示看图复选框功能模块
+from src.common.manager_font import SingleFontManager                   # 看图子界面，导入字体管理器
+from src.utils.ai_tips import CustomLLM_Siliconflow                     # 看图子界面，AI提示看图复选框功能模块
 from src.utils.hisnot import WScreenshot                                # 看图子界面，导入自定义截图的类
-from src.utils.aeboxlink import check_process_running, get_api_data     # 导入与AEBOX通信的模块函数
+from src.utils.aebox_link import check_process_running, get_api_data    # 导入与AEBOX通信的模块函数
 from src.utils.heic import extract_jpg_from_heic                        # 导入heic图片转换为jpg图片的模块
 from src.utils.p3_converter import ColorSpaceConverter                  # 导入色彩空间转换配置类
 from src.common.decorator import CC_TimeDec                             # 导入自定义装饰器
-from src.common.roundprogress import RoundProgress                      # 导入自定义进度条
+from src.common.progress_round import RoundProgress                     # 导入自定义进度条
 
 """设置本项目的入口路径,全局变量BasePath"""
 # 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块

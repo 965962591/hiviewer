@@ -966,5 +966,5 @@ def load_sa_config(config_file=SA_CONFIG_FILE):
 
 
 if __name__ == "__main__":
-    file_path = r"D:\Tuning\O19\0_pic\02_IN_pic\2025.6.13回归，参数不对\2025.6.13-IN-一供测试-超夜（改参）\O19"
+    file_path = r"D:\Tuning\O19\0_pic\02_IN_pic\2025.6.18自测图\O19_改后"
     parse_main(file_path)

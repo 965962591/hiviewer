@@ -21,7 +21,7 @@ from PyQt5.QtWidgets import (QLabel, QComboBox, QLineEdit, QPushButton, QDialogB
 
 """导入项目自定义模块"""
 from src.utils.stitchimg import stitch_images  # 导入拼接图片工具
-from src.common.font_manager import SingleFontManager  # 导入字体管理器
+from src.common.manager_font import SingleFontManager  # 导入字体管理器
 from src.components.custom_qMbox_showinfo import show_message_box  # 导入消息框类
 
 """设置本项目的入口路径,全局变量BasePath"""

@@ -15,8 +15,8 @@ if is_standalone:
 
 
 """导入自定义的模块"""
-from src.common.font_manager import SingleFontManager
-from src.utils.aeboxlink import launch_aebox,urlencode_folder_path,get_api_data
+from src.common.manager_font import SingleFontManager
+from src.utils.aebox_link import launch_aebox,urlencode_folder_path,get_api_data
 
 
 """设置本项目的入口路径,全局变量BasePath"""
@@ -223,7 +223,7 @@ class Qualcom_Dialog(QDialog):
         
         # 检查aebox工具是否在运行
         list_url = self.get_url()
-        from src.utils.aeboxlink import check_process_running
+        from src.utils.aebox_link import check_process_running
         if list_url and check_process_running("aebox.exe"): # and test_aebox_link(list_url):
             self.status_button2.setText("✅")
             self.status_button2.setToolTip(f"✅当前AEBOX工具路径有效,程序已启动")

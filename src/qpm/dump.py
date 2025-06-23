@@ -104,5 +104,5 @@ def process_images_in_folder(dptool_exe, folder_path):
 # 示例调用
 if __name__ == "__main__":
     dptool_exe = r"C:/Qualcomm/Chromatix7/7.3.01.36/Chromatix.exe"
-    folder_path = r"D:/Tuning/O19/0_pic/02_IN_pic/2025.6.19-IN-一供验证 ISP/NOMAL/O19"
+    folder_path = r"D:\Tuning\O19\0_pic\02_IN_pic\2025.6.18自测图\O19_改后"
     process_images_in_folder(dptool_exe, folder_path)

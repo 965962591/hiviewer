@@ -7,9 +7,9 @@ from PyQt5.QtGui import QIcon, QDesktopServices
 from PyQt5.QtCore import QUrl, Qt
 
 """导入自定义模块,主函数调用"""
-from src.common.font_manager import SingleFontManager
+from src.common.manager_font import SingleFontManager
 from src.utils.update import check_update
-from src.common.version_Init import version_init
+from src.common.manager_version import version_init
 
 """
 在本项目结构中正确导入自定义模块的方法：

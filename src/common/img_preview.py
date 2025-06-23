@@ -1,4 +1,13 @@
-# -*- coding: utf-8 -*-
+# -*- encoding: utf-8 -*-
+'''
+@File         :ImagePreview.py
+@Time         :2025/06/21 15:15:56
+@Author       :diamond_cz@163.com
+@Version      :1.0
+@Description  :图片预览组件
+'''
+
+
 from pathlib import Path
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsPixmapItem
 from PyQt5.QtGui import QColor, QPixmap, QPainter, QImageReader

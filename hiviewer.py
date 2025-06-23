@@ -49,12 +49,13 @@ from PyQt5.QtCore import (
 
 
 """导入用户自定义的模块"""
-from src.components.ui_main import Ui_MainWindow                            # 假设你的主窗口类名为Ui_MainWindow
 from src.view.sub_compare_image_view import SubMainWindow                   # 假设这是你的子窗口类名
 from src.view.sub_compare_video_view import VideoWall                       # 假设这是你的子窗口类名 
 from src.view.sub_rename_view import FileOrganizer                          # 添加这行以导入批量重名名类名
 from src.view.sub_image_process_view import SubCompare                      # 确保导入 SubCompare 类
 from src.view.sub_bat_view import LogVerboseMaskApp                         # 导入批量执行命令的类
+from src.components.ui_main import Ui_MainWindow                            # 假设你的主窗口类名为Ui_MainWindow
+from src.common.img_preview import ImageViewer                              # 导入自定义图片预览组件
 from src.components.custom_qMbox_showinfo import show_message_box           # 导入消息框类
 from src.components.custom_qdialog_about import AboutDialog                 # 导入关于对话框类,显示帮助信息
 from src.components.custom_qdialog_LinkQualcomAebox import Qualcom_Dialog   # 导入自定义对话框的类
@@ -63,14 +64,13 @@ from src.components.custom_qCombox_spinner import (CheckBoxListModel,       # �
 from src.components.custom_qdialog_rename import SingleFileRenameDialog     # 导入自定义重命名对话框类
 from src.components.custom_qdialog_progress import (ProgressDialog,         # 导入自定义压缩进度对话框类
     CompressWorker)         
-from src.common.font_manager import MultiFontManager                        # 字体管理器
-from src.common.version_Init import version_init                            # 版本号初始化
-from src.common.settings_ColorAndExif import load_color_settings            # 导入自定义json配置文件
-from src.common.log_files import setup_logging                              # 导入日志文件初始化
+from src.common.manager_font import MultiFontManager                        # 字体管理器
+from src.common.manager_version import version_init                         # 版本号初始化
+from src.common.manager_color_exif import load_color_settings               # 导入自定义json配置文件
+from src.common.manager_log import setup_logging                            # 导入日志文件初始化
 from src.utils.raw2jpg import Mipi2RawConverterApp                          # 导入MIPI RAW文件转换为JPG文件的类
 from src.utils.update import check_update, pre_check_update                 # 导入自动更新检查程序
 from src.utils.hisnot import WScreenshot                                    # 导入截图工具类
-from src.utils.ImagePreview import ImageViewer                              # 导入自定义图片预览组件
 from src.utils.xml import save_excel_data                                   # 导入xml文件解析工具类
 from src.utils.delete import force_delete_folder                            # 导入强制删除文件夹的功能函数
 from src.utils.Icon import IconCache, ImagePreloader                        # 导入文件Icon图标加载类
@@ -80,7 +80,7 @@ from src.utils.image import ImageProcessor                                  # �
 from src.utils.sort import sort_by_custom                                   # 导入文件排序工具类
 from src.view.sub_search_view import SearchOverlay                          # 导入图片搜索工具类(ctrl+f)
 from src.common.decorator import CC_TimeDec                                 # 导入自定义装饰器
-from src.utils.aeboxlink import (check_process_running,                     # 导入自定义装饰器
+from src.utils.aebox_link import (check_process_running,                    # 导入自定义装饰器
     urlencode_folder_path, get_api_data)
 
 
@@ -3141,7 +3141,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 # 解析xml文件将其保存到excel中去
                 use_time = time.time() - self.time_qualcom
                 xml_exists = any(f for f in os.listdir(images_path) if f.endswith('_new.xml'))
-                if not xml_exists:
+                if xml_exists:
                     save_excel_data(images_path)
                 show_message_box(f"高通工具后台解析图片成功！用时: {use_time:.2f}秒", "提示", 1000)
                 print(f"[on_qualcom_finished]-->高通工具后台解析图片成功！用时: {use_time:.2f}秒")
