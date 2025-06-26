@@ -1346,8 +1346,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     show_message_box(f"删除文件失败: {file_path}, 错误: {e}", "提示", 500)
 
             # 删除表格中的行，可以直接更新表格
-            self.update_RB_QTableWidget0()
             show_message_box(f"{len(file_paths_to_delete)} 个文件已从列表中删除并删除原文件", "提示", 1000)
+            self.update_RB_QTableWidget0()
 
         except Exception as e:
             print(f"delete_from_file()-error--删除失败: {e}")
@@ -1655,7 +1655,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.dirnames_list = dir_name_list     # 初始化选中的同级文件夹列表
 
         # 先初始化表格结构和内容，不加载图标,并获取图片列有效行最大值
-        self.image_index_max = self.init_table_structure(file_infos_list, dir_name_list)       
+        self.image_index_max = self.init_table_structure(file_infos_list, dir_name_list)    
+        # 重绘表格
+        self.RB_QTableWidget0.repaint()
 
         # 对file_paths进行转置,实现加载图标按行加载，并初始化预加载图标线程前的问价排列列表
         file_name_paths = [path for column in zip_longest(*file_paths, fillvalue=None) for path in column if path is not None]
