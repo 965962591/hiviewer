@@ -94,11 +94,11 @@ class ImagePreloader(QRunnable):
 
 class IconCache:
     """图标缓存类"""
-    _cache = {}
+    _max_cache_size = 200  # 最大缓存数量，超过会删除最旧的缓存
     _cache_base_dir = BASEICONPATH / "cache"
     _cache_dir = BASEICONPATH / "cache" / "icons"
     _cache_index_file = BASEICONPATH / "cache" / "icons.json"
-    _max_cache_size = 1000  # 最大缓存数量，超过会删除最旧的缓存
+    
     # 视频文件格式
     VIDEO_FORMATS = ('.mp4', '.avi', '.mov', '.wmv', '.mpeg', '.mpg', '.mkv') 
     # 图片文件格式
@@ -114,24 +114,17 @@ class IconCache:
     def get_icon(cls, file_path):
         """获取图标，优先从缓存获取"""
         try:
-            # 检查内存缓存
-            if file_path in cls._cache:
-                # print("获取图标, 进入读缓存")
-                return cls._cache[file_path]
-
             # 检查文件缓存
             cache_path = cls._get_cache_path(file_path)
             if Path(cache_path).exists():
-                # print("获取图标, 进入文件缓存")
+                print("获取图标, 进入文件缓存")
                 icon = QIcon(cache_path)
-                cls._cache[file_path] = icon
                 return icon
 
             # 生成新图标 
             icon = cls._generate_icon(file_path)
             if icon:
-                # print("获取图标, 进入生成新图标")
-                cls._cache[file_path] = icon
+                print("获取图标, 进入生成新图标")
                 cls._save_to_cache(file_path, icon)
             
             return icon
@@ -403,9 +396,6 @@ class IconCache:
         try:
             # 清除lru_cache的缓存
             cls.get_icon.cache_clear()  
-
-            # 清理内存缓存
-            cls._cache.clear()
 
             # 清理文件缓存
             if cls._cache_base_dir.exists():
