@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import sys
 import re
 import time
 import json
@@ -9,6 +10,7 @@ import threading
 from pathlib import Path
 from functools import lru_cache
 from typing import Optional, Tuple
+
 
 # 三方库
 from PIL import Image
@@ -117,14 +119,14 @@ class IconCache:
             # 检查文件缓存
             cache_path = cls._get_cache_path(file_path)
             if Path(cache_path).exists():
-                print("获取图标, 进入文件缓存")
+                # print("获取图标, 进入文件缓存")
                 icon = QIcon(cache_path)
                 return icon
 
             # 生成新图标 
             icon = cls._generate_icon(file_path)
             if icon:
-                print("获取图标, 进入生成新图标")
+                # print("获取图标, 进入生成新图标")
                 cls._save_to_cache(file_path, icon)
             
             return icon
@@ -187,7 +189,7 @@ class IconCache:
             QIcon: 处理后的图标对象
         """
         try:
-            # 方案一：使用QImageReader高效加载
+            # 方案一：使用QImageReader高效加载   
             reader = QImageReader(file_path)
             reader.setAutoTransform(True)     # 设置自动转换（处理EXIF方向信息）
             reader.setQuality(100)            # 设置高质量缩放

@@ -500,6 +500,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         copy_path_action = self.treeview_context_menu.addAction("复制路径")
         rename_action = self.treeview_context_menu.addAction("重命名")
         open_action = self.treeview_context_menu.addAction("打开")
+        breakup_acton = self.treeview_context_menu.addAction("解散")
         delete_action = self.treeview_context_menu.addAction("删除")
 
 
@@ -515,6 +516,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             send_path_to_aebox.triggered.connect(lambda: self.send_file_path_to_aebox(file_path))
             rename_action.triggered.connect(lambda: self.rename_file(file_path))
             show_file_action.triggered.connect(self.show_file_visibility)
+            breakup_acton.triggered.connect(lambda: self.breakup_folder(file_path))
             delete_action.triggered.connect(lambda: self.delete_file(file_path))
 
             # 连接zoom值分类信号槽函数
@@ -750,6 +752,67 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         from src.utils.cls_zoom_size import classify_images_by_size
         classify_images_by_size(path)
 
+
+    def breakup_folder(self, folder_path):
+        """解散选中的文件夹，将文件夹中的所有文件移动到上一级文件夹后删除空文件夹"""
+        try:
+            # 检查路径是否存在且为文件夹
+            if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
+                return
+
+            # 获取父文件夹路径
+            parent_folder = os.path.dirname(folder_path)
+
+            # 获取文件夹中的所有文件（包括子文件夹中的文件）
+            all_files = []
+            for root, dirs, files in os.walk(folder_path):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    # 计算相对路径，用于在父文件夹中重建目录结构
+                    rel_path = os.path.relpath(file_path, folder_path)
+                    all_files.append((file_path, rel_path))
+
+            # 如果文件夹为空，直接删除
+            if not all_files:
+                os.rmdir(folder_path)
+                return
+
+            # 移动所有文件
+            for file_path, rel_path in all_files:
+                try:
+                    # 构建目标路径
+                    target_path = os.path.join(parent_folder, rel_path)
+                    target_dir = os.path.dirname(target_path)
+
+                    # 创建目标目录（如果不存在）
+                    if not os.path.exists(target_dir):
+                        os.makedirs(target_dir, exist_ok=True)
+
+                    # 处理文件名冲突
+                    if os.path.exists(target_path):
+                        base_name, ext = os.path.splitext(target_path)
+                        counter = 1
+                        while os.path.exists(target_path):
+                            target_path = f"{base_name}_{counter}{ext}"
+                            counter += 1
+
+                    # 移动文件
+                    shutil.move(file_path, target_path)
+
+                except Exception as e:
+                    print(f"移动文件失败 {file_path}: {e}")
+                    continue
+
+            # 删除原文件夹（现在应该是空的）
+            shutil.rmtree(folder_path, ignore_errors=True)
+
+            # 刷新文件系统模型和表格
+            self.file_system_model.setRootPath('')
+            self.Left_QTreeView.viewport().update()
+            self.update_RB_QTableWidget0()
+
+        except Exception as e:
+            print(f"[breakup_folder]-->解散文件夹失败: {e}")
 
     def delete_file(self, path):
         """安全删除文件/文件夹"""
@@ -3581,6 +3644,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.cleanup()        # 清除内存
         print("接受主界面关闭事件, 保存关闭前的配置并清理内存")
         event.accept()
+
 
 
 
