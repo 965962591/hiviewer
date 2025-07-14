@@ -14,7 +14,8 @@ str风格图片路径:
     icon_path._str          # 原始字符串 'd:\\Image_process\\hiviewer\\resource\\icons\\setting.png'
 实现进展：
     1. 初步实现设置界面ui设计,待完善 add by diamond_cz@163.com 2025/05/30
-    2. 添加双击分割器切换导航区显示状态功能 add by diamond_cz@163.com 2025/05/30
+    2. 添加双击分割器切换导航区显示状态功能 add by diamond_cz@163.com 2025/06/30
+    3. 添加具体分区内容，适配看图子界面 add by diamond_cz@163.com 2025/07/11
     
 
 '''
@@ -22,15 +23,16 @@ import os
 import sys
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                            QHBoxLayout, QSplitter, QListWidget, QGraphicsView,
-                           QGraphicsScene, QToolBar, QPushButton, QFileDialog,
+                           QGraphicsScene, QToolBar, QPushButton, QAbstractItemView,
                            QMessageBox, QLabel, QTableWidget, QScrollArea,
                            QMenu, QAction, QFrame, QListWidgetItem, QSizePolicy,
                            QComboBox, QCheckBox, QSlider, QRadioButton, QButtonGroup,
                            QLineEdit,QGridLayout)
-from PyQt5.QtCore import Qt, QSize, pyqtSignal, QUrl, QTimer, QRectF, QPropertyAnimation, QObject, QEvent
-from PyQt5.QtGui import QImage, QPixmap, QPainter, QIcon, QMouseEvent
+from PyQt5.QtCore import Qt, QSize, pyqtSignal, QMimeData, QTimer, QRectF, QPropertyAnimation, QObject, QEvent, QPoint
+from PyQt5.QtGui import QImage, QDrag, QPainter, QIcon, QMouseEvent, QCursor
 from pathlib import Path
 import xml.etree.ElementTree as ET
+
 
 
 # 设置项目根路径
@@ -47,6 +49,210 @@ class CustomSplitter(QSplitter):
             self.doubleClicked.emit()
         super().mouseDoubleClickEvent(event)
 
+
+class DraggableCheckBox(QWidget):
+    dragStarted = pyqtSignal(QWidget)
+    dragMoved = pyqtSignal(QPoint)
+    dragFinished = pyqtSignal(QWidget, QPoint)
+
+    def __init__(self, text, checked=False, parent=None):
+        super().__init__(parent)
+        self.checkbox = QCheckBox(text)
+        self.checkbox.setChecked(checked)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.checkbox)
+        self.setAcceptDrops(True)
+        self._drag_start_pos = None
+        self._dragging = False
+        self.setMouseTracking(True)
+        self.checkbox.installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        if obj is self.checkbox:
+            if event.type() == QEvent.MouseButtonPress:
+                if event.button() == Qt.LeftButton:
+                    self._drag_start_pos = event.pos()
+                    self._dragging = False
+            elif event.type() == QEvent.MouseMove:
+                if self._drag_start_pos is not None:
+                    if (event.pos() - self._drag_start_pos).manhattanLength() > 5:
+                        # 开始拖拽
+                        if not self._dragging:
+                            self._dragging = True
+                            self.dragStarted.emit(self)
+                        self.dragMoved.emit(self.mapToParent(event.pos()))
+                        return True  # 阻止QCheckBox处理，防止勾选
+            elif event.type() == QEvent.MouseButtonRelease:
+                if self._dragging:
+                    self.dragFinished.emit(self, self.mapToParent(event.pos()))
+                    self._dragging = False
+                    self._drag_start_pos = None
+                    return True  # 阻止QCheckBox处理
+                self._drag_start_pos = None
+            elif event.type() == QEvent.Enter:
+                self.setCursor(Qt.ArrowCursor)
+            elif event.type() == QEvent.Leave:
+                self.setCursor(Qt.OpenHandCursor)
+        return super().eventFilter(obj, event)
+
+    def enterEvent(self, event):
+        if self._is_on_checkbox(self.mapFromGlobal(QCursor.pos())):
+            self.setCursor(Qt.ArrowCursor)
+        else:
+            self.setCursor(Qt.OpenHandCursor)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.unsetCursor()
+        super().leaveEvent(event)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._drag_start_pos = event.pos()
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._is_on_checkbox(event.pos()):
+            self.setCursor(Qt.ArrowCursor)
+        else:
+            self.setCursor(Qt.OpenHandCursor)
+        if self._drag_start_pos is not None and not self._dragging:
+            if (event.pos() - self._drag_start_pos).manhattanLength() > 5 and not self._is_on_checkbox(self._drag_start_pos):
+                self._dragging = True
+                self.dragStarted.emit(self)
+        if self._dragging:
+            self.dragMoved.emit(self.mapToParent(event.pos()))
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if self._dragging:
+            self.dragFinished.emit(self, self.mapToParent(event.pos()))
+        self._drag_start_pos = None
+        self._dragging = False
+        super().mouseReleaseEvent(event)
+
+    def _is_on_checkbox(self, pos):
+        return self.checkbox.geometry().contains(pos)
+
+    def setChecked(self, checked):
+        self.checkbox.setChecked(checked)
+
+    def isChecked(self):
+        return self.checkbox.isChecked()
+
+    def text(self):
+        return self.checkbox.text()
+
+class ExifGridWidget(QWidget):
+    def __init__(self, exif_field_status, parent=None):
+        super().__init__(parent)
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setSpacing(8)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.widgets = []
+        self.placeholder = QWidget()
+        self.placeholder.setFixedHeight(32)
+        self.placeholder.setStyleSheet("background: #b3d8fd; border: 1px dashed #409eff; min-height: 28px; border-radius: 8px;")
+        
+        # 创建所有复选框
+        for key, checked in exif_field_status.items():
+            w = DraggableCheckBox(key, checked)
+            w.dragStarted.connect(self.on_drag_started)
+            w.dragMoved.connect(self.on_drag_moved)
+            w.dragFinished.connect(self.on_drag_finished)
+            self.main_layout.addWidget(w)
+            self.widgets.append(w)
+        
+        self.dragging_widget = None
+        self.dragging_index = None
+        self.setMouseTracking(True)
+        self._last_placeholder_index = None
+        self._drag_offset = None
+
+    def on_drag_started(self, widget):
+        # 记录原始索引
+        self.dragging_index = self.widgets.index(widget)
+        self.dragging_widget = widget
+        
+        # 在原位置插入占位符
+        self.main_layout.insertWidget(self.dragging_index, self.placeholder)
+        self.main_layout.removeWidget(widget)
+        widget.setParent(self)
+        widget.raise_()
+        widget.show()
+        
+        # 计算拖拽偏移
+        cursor_pos = QCursor.pos()
+        widget_pos = widget.mapToGlobal(widget.rect().topLeft())
+        self._drag_offset = cursor_pos - widget_pos
+        self._last_placeholder_index = self.dragging_index
+
+    def on_drag_moved(self, pos):
+        # 让被拖动控件跟随鼠标
+        if self.dragging_widget and self._drag_offset is not None:
+            global_pos = self.mapToGlobal(pos)
+            widget_pos = self.mapFromGlobal(global_pos - self._drag_offset)
+            self.dragging_widget.move(widget_pos)
+        
+        # 计算目标插入位置
+        global_pos = self.mapToGlobal(pos)
+        mouse_y = self.mapFromGlobal(global_pos).y()
+        
+        # 找到最近的插入点（引入粘滞区，只有鼠标距离中心线超过10像素才移动）
+        insert_idx = len(self.widgets)
+        sticky_threshold = 10  # 粘滞区阈值
+        
+        for i in range(self.main_layout.count()):
+            item = self.main_layout.itemAt(i)
+            if item.widget() == self.placeholder:
+                continue
+            w = item.widget()
+            if w:
+                center = w.mapTo(self, w.rect().center())
+                dist = mouse_y - center.y()
+                if abs(dist) < sticky_threshold:
+                    # 在粘滞区内，不移动
+                    insert_idx = None
+                    break
+                if mouse_y < center.y():
+                    insert_idx = i
+                    break
+        
+        # 只有当插入点和上次不同且不在粘滞区时才移动占位符
+        if insert_idx is not None and insert_idx != self._last_placeholder_index:
+            if self.main_layout.indexOf(self.placeholder) != -1:
+                self.main_layout.removeWidget(self.placeholder)
+            if insert_idx > self.main_layout.count():
+                insert_idx = self.main_layout.count()
+            self.main_layout.insertWidget(insert_idx, self.placeholder)
+            self._last_placeholder_index = insert_idx
+
+    def on_drag_finished(self, widget, pos):
+        # 移除占位符
+        idx = self.main_layout.indexOf(self.placeholder)
+        if idx != -1:
+            self.main_layout.removeWidget(self.placeholder)
+            # 插入到目标位置
+            self.main_layout.insertWidget(idx, widget)
+            # 更新widgets列表顺序
+            self.widgets.remove(widget)
+            self.widgets.insert(idx, widget)
+        
+        widget.setParent(self)
+        widget.move(0, 0)
+        widget.show()
+        
+        self.dragging_widget = None
+        self.dragging_index = None
+        self._last_placeholder_index = None
+        self._drag_offset = None
+
+    def get_status_dict(self):
+        result = {}
+        for w in self.widgets:
+            result[w.text()] = w.isChecked()
+        return result
 
 class setting_Window(QMainWindow):
     def __init__(self, main_window=None):
@@ -155,8 +361,10 @@ class setting_Window(QMainWindow):
 
             # 右侧内容区添加: 标题组件
             self.content_layout.addWidget(title_label)
+            
             # 右侧内容区添加: 具体内容组件,主要实现集中在这一部分;
             self.add_section_content(sec)
+
             # 右侧内容区添加: 分隔线（最后一个分区不添加横线）
             if i < len(self.sections) - 1:
                 separator = QFrame()
@@ -516,22 +724,32 @@ class setting_Window(QMainWindow):
         title_layout.addWidget(title_label)
         title_layout.addStretch(1)
         save_button = QPushButton("一键重置")
-        save_button.setMinimumSize(120, 44)
-        save_button.setMaximumHeight(48)
+        save_button.setMinimumSize(120, 50)
+        save_button.setMaximumHeight(60)
         save_button.setStyleSheet("""
-                                  QPushButton {
-                                    font-size: 19px; 
-                                    padding: 10px 36px; 
-                                    border-radius: 8px; 
-                                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #409eff, stop:1 #66b1ff); 
-                                    color: white; 
-                                    font-weight: bold; 
-                                    letter-spacing: 2px; 
-                                  } 
-                                  QPushButton:hover { 
-                                    background: #66b1ff; 
-                                    color: black;
-                                  }""")
+            QPushButton {
+                font-size: 19px; 
+                padding: 10px 36px; 
+                border-radius: 8px; 
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #409eff, stop:1 #66b1ff); 
+                color: white; 
+                font-weight: bold; 
+                letter-spacing: 2px; 
+            } 
+            QPushButton:hover { 
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #66b1ff, stop:1 #85c1ff); 
+                color: white;
+            }     
+            QPushButton:pressed { 
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #3a8ee6, stop:1 #5a9ee6); 
+                color: #e6f3ff;
+                padding: 8px 34px;
+            }
+            QPushButton:focus {
+                outline: none;
+                border: 2px solid #66b1ff;
+            }                  
+        """)
         title_layout.addWidget(save_button)
         color_group.layout().insertLayout(0, title_layout)
         # radio_layout中设置互斥分组
@@ -596,82 +814,76 @@ class setting_Window(QMainWindow):
         layout.addWidget(settings_container)
 
     def add_exif_settings_content(self, layout):
-        """添加EXIF显示设置内容，支持根据字典动态生成复选框并设置状态，两列显示，并在exif_group标题右上角添加更大号的保存按钮"""
+        """添加EXIF显示设置内容，支持两列复选框拖动排序，保存时返回新顺序和勾选状态"""
         exif_field_status = {
-            "图片名称": True,
-            "品牌": False,
-            "型号": True,
-            "图片张数": True,
-            "图片大小": True,
-            "图片尺寸": True,
-            "曝光时间": True,
-            "光圈值": False,
-            "ISO值": True,
-            "原始时间": False,
-            "测光模式": False,
-            "HDR": True,
-            "Zoom": True,
-            "Lux": True,
-            "CCT": True,
-            "FaceSA": True,
-            "DRCgain": True,
-            "Awb_sa": False,
-            "Triangle_index": False,
-            "R_gain": False,
-            "B_gain": False,
-            "Safe_gain": False,
-            "Short_gain": False,
-            "Long_gain": False
+            "图片名称": True, "品牌": False, "型号": True, "图片张数": True, "图片大小": True,
+            "图片尺寸": True, "曝光时间": True, "光圈值": False, "ISO值": True, "原始时间": False,
+            "测光模式": False, "HDR": True, "Zoom": True, "Lux": True, "CCT": True,
+            "FaceSA": True, "DRCgain": True, "Awb_sa": False, "Triangle_index": False,
+            "R_gain": False, "B_gain": False, "Safe_gain": False, "Short_gain": False, "Long_gain": False
         }
+
         settings_container = QWidget()
         settings_layout = QVBoxLayout(settings_container)
         settings_layout.setSpacing(15)
-
-        # EXIF信息显示
         exif_group = self.create_setting_group("", "")
-        # 标题和保存按钮横向布局
-        title_layout = QHBoxLayout()
+
+        # 标题和保存按钮
+        title_widget = QWidget()
+        title_layout = QHBoxLayout(title_widget)
+        title_layout.setContentsMargins(0, 0, 0, 0)
         title_label = QLabel("EXIF信息显示")
-        title_label.setStyleSheet("font-size: 20px; font-weight: bold; color: #22262A;")
-        title_layout.addWidget(title_label)
-        title_layout.addStretch(1)
+        title_label.setStyleSheet("font-size: 20px; font-weight: bold; background: #FFFFFF; color: #22262A;")
         save_button = QPushButton("保存")
         save_button.setMinimumSize(120, 44)
         save_button.setMaximumHeight(48)
         save_button.setStyleSheet("""
-                                  QPushButton {
-                                    font-size: 19px; 
-                                    padding: 10px 36px; 
-                                    border-radius: 8px; 
-                                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #409eff, stop:1 #66b1ff); 
-                                    color: white; 
-                                    font-weight: bold; 
-                                    letter-spacing: 2px; 
-                                  } 
-                                  QPushButton:hover { 
-                                    background: #66b1ff; 
-                                    color: black;
-                                  }""")
+            QPushButton {
+                font-size: 20px; 
+                 
+                margin: 0px 0px 0px 0px; /* 设置外边距:上右下左 */
+                border-radius: 8px; 
+                border: none;
+                background: #409eff;  
+                color: white; 
+                font-weight: bold; 
+                letter-spacing: 2px;
+            } 
+            QPushButton:hover { 
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #66b1ff, stop:1 #85c1ff); 
+                color: white;
+            }     
+            QPushButton:pressed { 
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #3a8ee6, stop:1 #5a9ee6); 
+                color: #e6f3ff;
+                padding: 8px 34px;
+            }
+            QPushButton:focus {
+                outline: none;
+                border: 2px solid #66b1ff;
+            }   
+        """)
+        title_layout.addWidget(title_label)
+        title_layout.addStretch(1)
         title_layout.addWidget(save_button)
-        exif_group.layout().insertLayout(0, title_layout)
+        title_widget.setStyleSheet("""
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 0px 0px 0px 0px;
+            border: 1px solid #b3d8fd;
+        """)
+        exif_group.layout().insertWidget(0, title_widget)
 
-        # 两列布局
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(30)
-        grid.setVerticalSpacing(8)
-        exif_checkboxes = {}
-        keys = list(exif_field_status.keys())
-        n = len(keys)
-        n_col = 2
-        n_row = (n + 1) // n_col
-        for idx, (key, checked) in enumerate(exif_field_status.items()):
-            row = idx % n_row
-            col = idx // n_row
-            cb = QCheckBox(key)
-            cb.setChecked(checked)
-            grid.addWidget(cb, row, col)
-            exif_checkboxes[key] = cb
-        exif_group.layout().addLayout(grid)
+        # 拖拽排序的两列复选框
+        exif_grid = ExifGridWidget(exif_field_status)
+        exif_group.layout().addWidget(exif_grid)
+
+        def on_save():
+            result = exif_grid.get_status_dict()
+            print("EXIF新顺序和勾选状态：", result)
+            # 你可以emit信号或其它处理
+
+        save_button.clicked.connect(on_save)
         settings_layout.addWidget(exif_group)
         layout.addWidget(settings_container)
 
