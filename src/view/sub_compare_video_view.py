@@ -593,7 +593,7 @@ class VideoPlayer(QWidget):
                     f"(fps:{self.fps:.2f}) ({self.size_[0]}x{self.size_[-1]})"
         self.filename_label.setText(_label_temp)
         self.filename_label.setStyleSheet(label_style_top)
-        self.filename_label.setAlignment(Qt.AlignCenter)
+        self.filename_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.filename_label.setMargin(5)
         self.filename_label.setFont(self.font_manager)
 

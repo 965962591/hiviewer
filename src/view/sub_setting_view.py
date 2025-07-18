@@ -154,8 +154,7 @@ class ExifGridWidget(QWidget):
         self.placeholder = QWidget()
         self.placeholder.setFixedHeight(32)
         self.placeholder.setStyleSheet("background: #b3d8fd; border: 1px dashed #409eff; min-height: 28px; border-radius: 8px;")
-        
-        # 创建所有复选框
+        self.placeholder.hide()  # 初始隐藏
         for key, checked in exif_field_status.items():
             w = DraggableCheckBox(key, checked)
             w.dragStarted.connect(self.on_drag_started)
@@ -163,90 +162,135 @@ class ExifGridWidget(QWidget):
             w.dragFinished.connect(self.on_drag_finished)
             self.main_layout.addWidget(w)
             self.widgets.append(w)
-        
         self.dragging_widget = None
         self.dragging_index = None
         self.setMouseTracking(True)
         self._last_placeholder_index = None
         self._drag_offset = None
+        self._dragging = False
 
     def on_drag_started(self, widget):
-        # 记录原始索引
         self.dragging_index = self.widgets.index(widget)
         self.dragging_widget = widget
-        
-        # 在原位置插入占位符
+        self._dragging = True
+        # 插入占位符并移除原控件
         self.main_layout.insertWidget(self.dragging_index, self.placeholder)
+        self.placeholder.show()
         self.main_layout.removeWidget(widget)
         widget.setParent(self)
         widget.raise_()
         widget.show()
-        
         # 计算拖拽偏移
         cursor_pos = QCursor.pos()
         widget_pos = widget.mapToGlobal(widget.rect().topLeft())
         self._drag_offset = cursor_pos - widget_pos
         self._last_placeholder_index = self.dragging_index
+        # 拖拽时设置悬浮样式
+        widget.setStyleSheet("background: rgba(102,177,255,0.18); border-radius: 8px;")
 
     def on_drag_moved(self, pos):
-        # 让被拖动控件跟随鼠标
-        if self.dragging_widget and self._drag_offset is not None:
-            global_pos = self.mapToGlobal(pos)
-            widget_pos = self.mapFromGlobal(global_pos - self._drag_offset)
-            self.dragging_widget.move(widget_pos)
-        
-        # 计算目标插入位置
+        if not self._dragging or not self.dragging_widget:
+            return
+        # 跟随鼠标移动
         global_pos = self.mapToGlobal(pos)
+        widget_pos = self.mapFromGlobal(global_pos - self._drag_offset)
+        self.dragging_widget.move(widget_pos)
+        self.dragging_widget.raise_()
+        # 计算插入点
         mouse_y = self.mapFromGlobal(global_pos).y()
+        sticky_threshold = 24
+        dead_zone = sticky_threshold // 2
+        count = self.main_layout.count()
+        min_dist = float('inf')
+        best_idx = self._last_placeholder_index if self._last_placeholder_index is not None else len(self.widgets)
+        if count > 0:
+            first_item = self.main_layout.itemAt(0)
+            first_widget = first_item.widget()
+            if first_widget and first_widget != self.placeholder:
+                first_rect = first_widget.geometry()
+                first_top = first_widget.mapTo(self, first_rect.topLeft()).y()
+                first_bottom = first_widget.mapTo(self, first_rect.bottomLeft()).y()
+
+                print(f"mouse_y:{mouse_y}_first_top:{first_top}_first_bottom:{first_bottom}")
+
+                # 鼠标在第一个控件top之上，直接插入到0
+                if mouse_y < first_top:
+                    best_idx = 0
+                    if best_idx == self._last_placeholder_index:
+                        return
+                    if self.main_layout.indexOf(self.placeholder) != -1:
+                        self.main_layout.removeWidget(self.placeholder)
+                    self.main_layout.insertWidget(best_idx, self.placeholder)
+                    self._last_placeholder_index = best_idx
+                    return
+                # 鼠标在第一个控件top~bottom之间，直接插入到0
+                if first_top <= mouse_y < first_bottom:
+                    best_idx = 0
+                    if best_idx == self._last_placeholder_index:
+                        return
+                    if self.main_layout.indexOf(self.placeholder) != -1:
+                        self.main_layout.removeWidget(self.placeholder)
+                    self.main_layout.insertWidget(best_idx, self.placeholder)
+                    self._last_placeholder_index = best_idx
+                    return
+                # 鼠标在第一个控件bottom~bottom+dead_zone之间，插入到1
+                if first_bottom <= mouse_y < first_bottom + dead_zone:
+                    best_idx = 1
+                    if best_idx == self._last_placeholder_index:
+                        return
+                    if self.main_layout.indexOf(self.placeholder) != -1:
+                        self.main_layout.removeWidget(self.placeholder)
+                    self.main_layout.insertWidget(best_idx, self.placeholder)
+                    self._last_placeholder_index = best_idx
+                    return
+            
+
         
-        # 找到最近的插入点（引入粘滞区，只有鼠标距离中心线超过10像素才移动）
-        insert_idx = len(self.widgets)
-        sticky_threshold = 10  # 粘滞区阈值
-        
-        for i in range(self.main_layout.count()):
+        # 其余控件正常判断
+        for i in range(1, count):
             item = self.main_layout.itemAt(i)
-            if item.widget() == self.placeholder:
-                continue
             w = item.widget()
-            if w:
-                center = w.mapTo(self, w.rect().center())
-                dist = mouse_y - center.y()
-                if abs(dist) < sticky_threshold:
-                    # 在粘滞区内，不移动
-                    insert_idx = None
-                    break
-                if mouse_y < center.y():
-                    insert_idx = i
-                    break
-        
-        # 只有当插入点和上次不同且不在粘滞区时才移动占位符
-        if insert_idx is not None and insert_idx != self._last_placeholder_index:
+            if w == self.placeholder:
+                continue
+            center = w.mapTo(self, w.rect().center())
+            dist = abs(mouse_y - center.y())
+            if dist < min_dist:
+                min_dist = dist
+                best_idx = i if mouse_y < center.y() else i + 1
+        # 边界保护：如果在首位或末位且占位符已在该位置，不再插入
+        if (best_idx == 0 or best_idx == count) and best_idx == self._last_placeholder_index:
+            return
+        # 只有当鼠标距离最近控件中心线超过粘滞区，且插入点变化时才移动占位符
+        if min_dist > sticky_threshold and best_idx != self._last_placeholder_index:
             if self.main_layout.indexOf(self.placeholder) != -1:
                 self.main_layout.removeWidget(self.placeholder)
-            if insert_idx > self.main_layout.count():
-                insert_idx = self.main_layout.count()
-            self.main_layout.insertWidget(insert_idx, self.placeholder)
-            self._last_placeholder_index = insert_idx
+            if best_idx > self.main_layout.count():
+                best_idx = self.main_layout.count()
+            self.main_layout.insertWidget(best_idx, self.placeholder)
+            self._last_placeholder_index = best_idx
 
     def on_drag_finished(self, widget, pos):
-        # 移除占位符
+        if not self._dragging:
+            return
         idx = self.main_layout.indexOf(self.placeholder)
+        # 彻底移除占位符
         if idx != -1:
             self.main_layout.removeWidget(self.placeholder)
+            self.placeholder.hide()
             # 插入到目标位置
             self.main_layout.insertWidget(idx, widget)
-            # 更新widgets列表顺序
             self.widgets.remove(widget)
             self.widgets.insert(idx, widget)
-        
         widget.setParent(self)
         widget.move(0, 0)
         widget.show()
-        
+        # 恢复样式
+        widget.setStyleSheet("")
         self.dragging_widget = None
         self.dragging_index = None
         self._last_placeholder_index = None
         self._drag_offset = None
+        self._dragging = False
 
     def get_status_dict(self):
         result = {}
@@ -840,7 +884,6 @@ class setting_Window(QMainWindow):
         save_button.setStyleSheet("""
             QPushButton {
                 font-size: 20px; 
-                 
                 margin: 0px 0px 0px 0px; /* 设置外边距:上右下左 */
                 border-radius: 8px; 
                 border: none;
