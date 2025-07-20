@@ -196,6 +196,7 @@ class ExifGridWidget(QWidget):
         widget_pos = self.mapFromGlobal(global_pos - self._drag_offset)
         self.dragging_widget.move(widget_pos)
         self.dragging_widget.raise_()
+        
         # 计算插入点
         mouse_y = self.mapFromGlobal(global_pos).y()
         sticky_threshold = 24
@@ -203,6 +204,17 @@ class ExifGridWidget(QWidget):
         count = self.main_layout.count()
         min_dist = float('inf')
         best_idx = self._last_placeholder_index if self._last_placeholder_index is not None else len(self.widgets)
+
+        # 边界处理：鼠标在控件区域上方，直接插入到最首位
+        if mouse_y < 0:
+            best_idx = 0
+            if best_idx != self._last_placeholder_index:
+                if self.main_layout.indexOf(self.placeholder) != -1:
+                    self.main_layout.removeWidget(self.placeholder)
+                self.main_layout.insertWidget(best_idx, self.placeholder)
+                self._last_placeholder_index = best_idx
+            return
+
         if count > 0:
             first_item = self.main_layout.itemAt(0)
             first_widget = first_item.widget()
@@ -216,36 +228,37 @@ class ExifGridWidget(QWidget):
                 # 鼠标在第一个控件top之上，直接插入到0
                 if mouse_y < first_top:
                     best_idx = 0
-                    if best_idx == self._last_placeholder_index:
-                        return
-                    if self.main_layout.indexOf(self.placeholder) != -1:
-                        self.main_layout.removeWidget(self.placeholder)
-                    self.main_layout.insertWidget(best_idx, self.placeholder)
-                    self._last_placeholder_index = best_idx
+                    if best_idx != self._last_placeholder_index:
+                        if self.main_layout.indexOf(self.placeholder) != -1:
+                            self.main_layout.removeWidget(self.placeholder)
+                        self.main_layout.insertWidget(best_idx, self.placeholder)
+                        self._last_placeholder_index = best_idx
                     return
-                # 鼠标在第一个控件top~bottom之间，直接插入到0
+                
+                # 鼠标在第一个控件范围内，但需要避免与拖拽控件冲突
                 if first_top <= mouse_y < first_bottom:
-                    best_idx = 0
-                    if best_idx == self._last_placeholder_index:
-                        return
-                    if self.main_layout.indexOf(self.placeholder) != -1:
-                        self.main_layout.removeWidget(self.placeholder)
-                    self.main_layout.insertWidget(best_idx, self.placeholder)
-                    self._last_placeholder_index = best_idx
+                    # 如果拖拽的控件原本就在第一个位置，则插入到第二个位置
+                    if self.dragging_index == 0:
+                        best_idx = 1
+                    else:
+                        best_idx = 0
+                    if best_idx != self._last_placeholder_index:
+                        if self.main_layout.indexOf(self.placeholder) != -1:
+                            self.main_layout.removeWidget(self.placeholder)
+                        self.main_layout.insertWidget(best_idx, self.placeholder)
+                        self._last_placeholder_index = best_idx
                     return
+                
                 # 鼠标在第一个控件bottom~bottom+dead_zone之间，插入到1
                 if first_bottom <= mouse_y < first_bottom + dead_zone:
                     best_idx = 1
-                    if best_idx == self._last_placeholder_index:
-                        return
-                    if self.main_layout.indexOf(self.placeholder) != -1:
-                        self.main_layout.removeWidget(self.placeholder)
-                    self.main_layout.insertWidget(best_idx, self.placeholder)
-                    self._last_placeholder_index = best_idx
+                    if best_idx != self._last_placeholder_index:
+                        if self.main_layout.indexOf(self.placeholder) != -1:
+                            self.main_layout.removeWidget(self.placeholder)
+                        self.main_layout.insertWidget(best_idx, self.placeholder)
+                        self._last_placeholder_index = best_idx
                     return
-            
 
-        
         # 其余控件正常判断
         for i in range(1, count):
             item = self.main_layout.itemAt(i)
@@ -257,9 +270,11 @@ class ExifGridWidget(QWidget):
             if dist < min_dist:
                 min_dist = dist
                 best_idx = i if mouse_y < center.y() else i + 1
+
         # 边界保护：如果在首位或末位且占位符已在该位置，不再插入
-        if (best_idx == 0 or best_idx == count) and best_idx == self._last_placeholder_index:
+        if (best_idx == count) and best_idx == self._last_placeholder_index:
             return
+        
         # 只有当鼠标距离最近控件中心线超过粘滞区，且插入点变化时才移动占位符
         if min_dist > sticky_threshold and best_idx != self._last_placeholder_index:
             if self.main_layout.indexOf(self.placeholder) != -1:
@@ -876,7 +891,7 @@ class setting_Window(QMainWindow):
         title_widget = QWidget()
         title_layout = QHBoxLayout(title_widget)
         title_layout.setContentsMargins(0, 0, 0, 0)
-        title_label = QLabel("EXIF信息显示")
+        title_label = QLabel("EXIF信息显示->>支持拖拽调整顺序")
         title_label.setStyleSheet("font-size: 20px; font-weight: bold; background: #FFFFFF; color: #22262A;")
         save_button = QPushButton("保存")
         save_button.setMinimumSize(120, 44)

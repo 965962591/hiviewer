@@ -11,10 +11,13 @@
         "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.16-IN-点检/VIVO",
         "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.16-IN-点检/O19-二供",
         "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.16-IN-点检/O19-一供",
-        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.17-IN-小数包 1/video/N19"
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.17-IN-小数包 1/video/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.17-IN-小数包 1/video/O19-二供",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.17-IN-小数包 1/normal",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.17-IN-小数包 1/video/O19-一供"
     ],
     "current_directory": "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.17-IN-小数包 1/video/N19",
-    "file_type_option": "显示视频文件",
+    "file_type_option": "显示图片文件",
     "combobox1_checked_items": [
         "O19-一供",
         "O19-二供",
