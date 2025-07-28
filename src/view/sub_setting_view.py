@@ -26,10 +26,10 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                            QGraphicsScene, QToolBar, QPushButton, QAbstractItemView,
                            QMessageBox, QLabel, QTableWidget, QScrollArea,
                            QMenu, QAction, QFrame, QListWidgetItem, QSizePolicy,
-                           QComboBox, QCheckBox, QSlider, QRadioButton, QButtonGroup,
+                           QComboBox, QCheckBox, QShortcut, QRadioButton, QButtonGroup,
                            QLineEdit,QGridLayout)
 from PyQt5.QtCore import Qt, QSize, pyqtSignal, QMimeData, QTimer, QRectF, QPropertyAnimation, QObject, QEvent, QPoint
-from PyQt5.QtGui import QImage, QDrag, QPainter, QIcon, QMouseEvent, QCursor
+from PyQt5.QtGui import QKeySequence, QDrag, QPainter, QIcon, QMouseEvent, QCursor
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
@@ -223,8 +223,6 @@ class ExifGridWidget(QWidget):
                 first_top = first_widget.mapTo(self, first_rect.topLeft()).y()
                 first_bottom = first_widget.mapTo(self, first_rect.bottomLeft()).y()
 
-                print(f"mouse_y:{mouse_y}_first_top:{first_top}_first_bottom:{first_bottom}")
-
                 # 鼠标在第一个控件top之上，直接插入到0
                 if mouse_y < first_top:
                     best_idx = 0
@@ -314,6 +312,7 @@ class ExifGridWidget(QWidget):
         return result
 
 class setting_Window(QMainWindow):
+    closed = pyqtSignal()  # 添加关闭信号
     def __init__(self, main_window=None):
         super().__init__()
         self.main_window = main_window
@@ -959,8 +958,8 @@ class setting_Window(QMainWindow):
         # 创建互斥的单选按钮
         auto_radio = QRadioButton("AUTO(自动读取ICC配置文件)")
         rgb_radio = QRadioButton("sRGB色域")
-        p3_radio = QRadioButton("Display_P3色域")
         gray_radio = QRadioButton("gray色域")
+        p3_radio = QRadioButton("Display_P3色域")
 
         # 默认选中“自动读取ICC配置文件”
         auto_radio.setChecked(True)
@@ -969,14 +968,15 @@ class setting_Window(QMainWindow):
         button_group = QButtonGroup(settings_container)
         button_group.addButton(auto_radio)
         button_group.addButton(rgb_radio)
-        button_group.addButton(p3_radio)
         button_group.addButton(gray_radio)
+        button_group.addButton(p3_radio)
+        
 
         # 添加到布局
         cm_group.layout().addWidget(auto_radio)
         cm_group.layout().addWidget(rgb_radio)
-        cm_group.layout().addWidget(p3_radio)
         cm_group.layout().addWidget(gray_radio)
+        cm_group.layout().addWidget(p3_radio)
         settings_layout.addWidget(cm_group)
         layout.addWidget(settings_container)
 
@@ -1142,6 +1142,10 @@ class setting_Window(QMainWindow):
         self.splitter.splitterMoved.connect(self.on_splitter_moved)
         self.splitter.doubleClicked.connect(self.on_splitter_double_clicked)
         self.scroll_area.verticalScrollBar().valueChanged.connect(self.on_scroll) 
+
+        # 添加ESC键退出快捷键
+        self.shortcut_esc = QShortcut(QKeySequence(Qt.Key_Escape), self)
+        self.shortcut_esc.activated.connect(self.close)
         
 
     def show_setting_ui(self):
@@ -1156,7 +1160,7 @@ class setting_Window(QMainWindow):
         x = main_window_rect.x() + (main_window_rect.width() - self.width()) // 2
         y = main_window_rect.y() + (main_window_rect.height() - self.height()) // 2
         w, h = main_window_rect.width(), main_window_rect.height()
-        w, h = int(w * 0.55), int(h * 0.50)
+        w, h = int(w * 0.55), int(h * 0.60)
 
         # 设置搜索界面位置和大小
         self.move(x, y)
@@ -1321,6 +1325,11 @@ class setting_Window(QMainWindow):
         visible_sections.sort(key=lambda x: (-x[1], x[2]))  # 按可见比例降序，然后按位置升序
         return visible_sections[0][0]
 
+
+    def closeEvent(self, event):
+        """重写设置子界面的关闭事件，发送关闭信号"""
+        self.closed.emit()
+        event.accept()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

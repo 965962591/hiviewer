@@ -14,19 +14,37 @@
         "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.17-IN-小数包 1/video/N19",
         "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.17-IN-小数包 1/video/O19-二供",
         "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.17-IN-小数包 1/normal",
-        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.17-IN-小数包 1/video/O19-一供"
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.17-IN-小数包 1/video/O19-一供",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.21-O19-IN-一供-三方/lnstagram/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.21-O19-IN-一供-三方/Messenger/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.21-O19-IN-一供-三方/normal/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.21-O19-IN-一供-三方/normal/O19-2nd",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.21-O19-IN-一供-三方/Snapchat/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.21-O19-IN-一供-三方/Telegram/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.21-O19-IN-一供-三方/TikTok",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.21-O19-IN-一供-三方/TikTok/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.21-O19-IN-一供-三方/WhatsAPP/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.21-O19-IN-一供-三方/X/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.21-O19-IN-一供-三方/视频通话/Messenger/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.21-O19-IN-一供-三方/视频通话/Snapchat/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.21-O19-IN-一供-三方/视频通话/Telegram/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.21-O19-IN-一供-三方/视频通话/WhatsAPP/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.21-O19-IN-一供-三方/Facebook/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.21-O19-IN-一供-三方/normal/O19-1st",
+        "D:/Tuning/O19/0_pic/02_IN_pic/逆光对比度低,发蒙问题澄清/0625/dump_raw/raw",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.22自测回归/N19"
     ],
-    "current_directory": "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.17-IN-小数包 1/video/N19",
+    "current_directory": "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.22自测回归/N19",
     "file_type_option": "显示图片文件",
     "combobox1_checked_items": [
-        "O19-一供",
-        "O19-二供",
-        "VIVO"
+        "O19_1st",
+        "O19_2nd",
+        "VIVO50"
     ],
     "combobox1_all_items": [
-        "O19-一供",
-        "O19-二供",
-        "VIVO"
+        "O19_1st",
+        "O19_2nd",
+        "VIVO50"
     ],
     "sort_option": "按文件名称排序",
     "theme_option": "默认主题",

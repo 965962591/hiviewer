@@ -93,13 +93,22 @@ class ColorSpaceConverter:
         }
         
         try:
-            # 设置源配置文件（假设为sRGB）
+            # 判断出入的图像文件是否为"L",是则直接返回
+            if pil_image.mode == "L":
+                return pil_image
+
+            # 设置源配置文件（先假设为sRGB）
             src_profile = ImageCms.createProfile("sRGB")
-            
-            # 检查目标配置文件是否可用
+            # 尝试读取图片的ICC配置文件并转换到sRGB色域
+            if 'icc_profile' in pil_image.info:
+                # 从图片中获取ICC配置文件
+                icc_profile = pil_image.info['icc_profile']
+                # 创建源色彩空间配置文件
+                src_profile = ImageCms.ImageCmsProfile(BytesIO(icc_profile))
+
+            # 设置目标配置文件（先检查目标配置文件是否可用）
             if target_profile not in self.icc_files or self.icc_files[target_profile] is None:
                 raise FileNotFoundError(f"未找到{target_profile}的ICC配置文件")
-            
             # 获取目标配置文件
             icc_path = self.icc_files[target_profile].as_posix()
             dst_profile = ImageCms.getOpenProfile(icc_path)
@@ -114,7 +123,7 @@ class ColorSpaceConverter:
             # 应用转换
             converted_image = ImageCms.applyTransform(pil_image, transform)
             
-            # 转换为pixmap
+            # 返回pil_image
             return converted_image
             
         except FileNotFoundError as e:
@@ -165,5 +174,44 @@ class ColorSpaceConverter:
             print(f"[get_pilimg_sRGB]-->error: {str(e)}")
             
 
+    def get_pilimg_auto(self, pil_image):
+        """
+        该函数主要是实现了自动检测pil格式图片的ICC配置文件并加载的功能.
+        Args:
+            pil_image (Image.Image): pil_image = Image.open(path).
+        Returns:
+            Image.Image: 返回自动加载ICC配置的pil_image.
+        """
+        try :
+            # 检查形参是否正确
+            if not pil_image or not isinstance(pil_image, Image.Image):
+                raise ValueError(f"传入的pil_image为None或者格式不对")
+
+            # 设置自动校准图片方向信息    
+            pil_image = ImageOps.exif_transpose(pil_image)
+
+            # 尝试读取图片的ICC配置文件并转换到sRGB色域
+            if 'icc_profile' in pil_image.info:
+                # 从图片中获取ICC配置文件
+                icc_profile = pil_image.info['icc_profile']
+                # 创建源色彩空间配置文件
+                src_profile = ImageCms.ImageCmsProfile(BytesIO(icc_profile))
+                # 创建sRGB色彩空间配置文件（作为中间转换空间）
+                # srgb_profile = ImageCms.createProfile('sRGB')
+                # 创建从sRGB到源色彩空间的转换器
+                transform = ImageCms.buildTransform(
+                    src_profile,    # 源配置文件（原始ICC）
+                    src_profile,    # 目标配置
+                    # srgb_profile,   # 目标配置文件（sRGB）
+                    'RGB',          # 输入模式
+                    'RGB'           # 输出模式
+                )
+
+                # 应用转换
+                pil_image = ImageCms.applyTransform(pil_image, transform)
+
+            return pil_image
+        except Exception as e:
+            print(f"[get_pilimg_sRGB]-->error: {str(e)}")
         
         
