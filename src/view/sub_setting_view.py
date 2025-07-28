@@ -474,6 +474,33 @@ class setting_Window(QMainWindow):
         
         self.content_layout.addWidget(content_container)
 
+
+    def toggle_screen_display(self):
+        """添加屏幕显示的槽函数"""
+        if self.normal_radio.isChecked():
+            print("切换到常规尺寸")
+            if self.main_window and bool(self.main_window.toggle_screen_display):
+                self.main_window.is_fullscreen = False      
+                self.main_window.is_norscreen = True
+                self.main_window.is_maxscreen = False
+                self.main_window.toggle_screen_display()
+            
+        elif self.maxed_radio.isChecked():
+            print("切换到最大化显示")
+            if self.main_window and bool(self.main_window.toggle_screen_display):
+                self.main_window.is_fullscreen = False      
+                self.main_window.is_norscreen = False
+                self.main_window.is_maxscreen = True
+                self.main_window.toggle_screen_display()
+        elif self.full_radio.isChecked():
+            print("切换到全屏显示")
+            if self.main_window and bool(self.main_window.toggle_screen_display):
+                self.main_window.is_fullscreen = True   
+                self.main_window.is_norscreen = False
+                self.main_window.is_maxscreen = False   
+                self.main_window.toggle_screen_display()
+
+
     def add_general_settings_content(self, layout):
         """添加通用设置内容"""
         settings_container = QWidget()
@@ -482,26 +509,31 @@ class setting_Window(QMainWindow):
 
         # 尺寸设置
         size_group = self.create_setting_group("尺寸设置", "选择看图子界面打开的尺寸")
-        normal_radio = QRadioButton("常规尺寸显示")
-        maxed_radio = QRadioButton("最大化显示")
-        full_radio = QRadioButton("全屏显示")
-        ## 设置默认设置项
-        maxed_radio.setChecked(True)
+        self.normal_radio = QRadioButton("常规尺寸显示")
+        self.maxed_radio = QRadioButton("最大化显示")
+        self.full_radio = QRadioButton("全屏显示")
+
         ## 创建互斥组
         radio_group = QButtonGroup(settings_container)
-        radio_group.addButton(normal_radio)
-        radio_group.addButton(maxed_radio)
-        radio_group.addButton(full_radio)
+        radio_group.addButton(self.normal_radio)
+        radio_group.addButton(self.maxed_radio)
+        radio_group.addButton(self.full_radio)
         ## 添加到布局
-        size_group.layout().addWidget(normal_radio)
-        size_group.layout().addWidget(maxed_radio)
-        size_group.layout().addWidget(full_radio)
+        size_group.layout().addWidget(self.normal_radio)
+        size_group.layout().addWidget(self.maxed_radio)
+        size_group.layout().addWidget(self.full_radio)
         settings_layout.addWidget(size_group)
+
+        # 设置圆形复选按钮的链接事件
+        self.normal_radio.clicked.connect(self.toggle_screen_display)
+        self.maxed_radio.clicked.connect(self.toggle_screen_display)
+        self.full_radio.clicked.connect(self.toggle_screen_display)
 
         # 主题设置
         theme_group = self.create_setting_group("主题模式", "跟随系统勾选后，应用将跟随设备的系统设置切换主题模式，可选模式置灰处理")
         ## 跟随系统
         follow_system_checkbox = QCheckBox("跟随系统")
+        follow_system_checkbox.setChecked(True)
         follow_system_checkbox.setStyleSheet("QCheckBox { font-size: 15px; margin-bottom: 2px; }")
         theme_group.layout().addWidget(follow_system_checkbox)
 
@@ -534,7 +566,7 @@ class setting_Window(QMainWindow):
         # 单选按钮
         light_radio = QRadioButton("浅色")
         light_radio.setChecked(True)
-        light_radio.setStyleSheet("QRadioButton { font-size: 15px; margin-top: 2px; }")
+        light_radio.setStyleSheet("QRadioButton { font-size: 15px; margin-top: 2px; color: #000; }")
         light_layout.addWidget(light_radio)
         light_layout.setAlignment(light_radio, Qt.AlignLeft)
 
@@ -562,6 +594,7 @@ class setting_Window(QMainWindow):
         dark_layout.addWidget(dark_preview)
         # 单选按钮
         dark_radio = QRadioButton("深色")
+        dark_radio.setChecked(False)
         dark_radio.setStyleSheet("QRadioButton { font-size: 15px; margin-top: 2px; color: #000; }")
         dark_layout.addWidget(dark_radio)
         dark_layout.setAlignment(dark_radio, Qt.AlignLeft)
@@ -571,12 +604,13 @@ class setting_Window(QMainWindow):
         theme_radio_group.addButton(light_radio)
         theme_radio_group.addButton(dark_radio)
 
+        # 添加到主题组theme_group中
         card_layout.addWidget(light_card)
         card_layout.addWidget(dark_card)
         theme_group.layout().addLayout(card_layout)
 
         # 互斥逻辑
-        def on_follow_system_changed(state):
+        def on_follow_system_changed():
             enabled = not follow_system_checkbox.isChecked()
             light_radio.setEnabled(enabled)
             dark_radio.setEnabled(enabled)
@@ -603,7 +637,6 @@ class setting_Window(QMainWindow):
                 }}
             """)
 
-        follow_system_checkbox.stateChanged.connect(on_follow_system_changed)
 
         def update_card_styles():
             if light_radio.isChecked():
@@ -652,12 +685,16 @@ class setting_Window(QMainWindow):
                         margin: 0 0 0 0;
                     }
                 """)
+
+        # 设置主题模式的槽函数
+        if follow_system_checkbox.isChecked:
+            on_follow_system_changed()
+        follow_system_checkbox.stateChanged.connect(on_follow_system_changed)
         light_radio.toggled.connect(update_card_styles)
         dark_radio.toggled.connect(update_card_styles)
 
-        # 默认样式
-        update_card_styles()
 
+        # 添加各个组件
         settings_layout.addWidget(theme_group)
         layout.addWidget(settings_container)
 
@@ -808,6 +845,12 @@ class setting_Window(QMainWindow):
                 border: 2px solid #66b1ff;
             }                  
         """)
+
+        def on_save():
+            print("一键重置：")
+            # 你可以emit信号或其它处理
+
+        # 添加组件到主layout中
         title_layout.addWidget(save_button)
         color_group.layout().insertLayout(0, title_layout)
         # radio_layout中设置互斥分组
@@ -817,6 +860,9 @@ class setting_Window(QMainWindow):
         # 添加radio_layout和color_frame到设置组
         color_group.layout().addLayout(radio_layout)
         color_group.layout().addWidget(color_frame)
+        
+        # 添加槽函数
+        save_button.clicked.connect(on_save)
         settings_layout.addWidget(color_group)
         layout.addWidget(settings_container)
 
@@ -1132,6 +1178,19 @@ class setting_Window(QMainWindow):
         self.scroll_content.setStyleSheet("background: #F0F0F0;")
         self.bottom_spacer.setStyleSheet("background: #F0F0F0;")
 
+        # 通用设置区域的相关初始化
+        if self.main_window:
+            if hasattr(self.main_window, 'is_maxscreen') and self.main_window.is_maxscreen:
+                self.maxed_radio.setChecked(True)
+            if hasattr(self.main_window, 'is_norscreen') and self.main_window.is_norscreen:
+                self.normal_radio.setChecked(True)
+            if hasattr(self.main_window, 'is_fullscreen') and self.main_window.is_fullscreen:
+                self.full_radio.setChecked(True)
+        else:
+            # 设置默认设置项
+            self.maxed_radio.setChecked(True)
+
+
 
     def set_shortcut(self):
         """设置界面的槽函数与快捷键连接函数"""
@@ -1145,6 +1204,9 @@ class setting_Window(QMainWindow):
 
         # 添加ESC键退出快捷键
         self.shortcut_esc = QShortcut(QKeySequence(Qt.Key_Escape), self)
+        self.shortcut_esc.activated.connect(self.close)
+
+        self.shortcut_esc = QShortcut(QKeySequence('i'), self)
         self.shortcut_esc.activated.connect(self.close)
         
 

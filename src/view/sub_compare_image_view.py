@@ -943,7 +943,9 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
         # 初始化roi亮度等信息统计框标志位；全屏显示标志位; 看图界面更新状态标志位
         self.roi_selection_active = False 
-        self.is_fullscreen = False         
+        self.is_fullscreen = False      
+        self.is_norscreen = False
+        self.is_maxscreen = True
         self.is_updating = False          
 
         # 初始化颜色空间相关变量，默认设置sRGB优先
@@ -991,7 +993,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         # 创建快捷键，F11 全屏
         fullscreen_shortcut = QShortcut(QKeySequence('F11'), self)
         fullscreen_shortcut.activated.connect(self.toggle_fullscreen)
-        self.is_fullscreen = False
+
         
         # 添加Ctrl+A和Ctrl+D快捷键
         self.shortcut_rotate_left = QShortcut(QKeySequence("Ctrl+A"), self)
@@ -1009,10 +1011,14 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.shortcut_p = QShortcut(QKeySequence('p'), self)
         self.shortcut_p.activated.connect(self.on_p_pressed)
 
-        # 添加V键的快捷键
+        # 添加I键的快捷键,打开设置界面(第一次打开，第二次关闭)
+        self.shortcut_p = QShortcut(QKeySequence('i'), self)
+        self.shortcut_p.activated.connect(self.open_settings_window)
+
+        # 添加V键的快捷键,细粒度缩小图片
         self.shortcut_v = QShortcut(QKeySequence('v'), self)
         self.shortcut_v.activated.connect(self.on_v_pressed)
-        # 添加N键的快捷键
+        # 添加N键的快捷键，细粒度放大图片
         self.shortcut_v = QShortcut(QKeySequence('n'), self)
         self.shortcut_v.activated.connect(self.on_n_pressed)
 
@@ -1039,7 +1045,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.statusbar_button1.clicked.connect(self.on_b_pressed)
         self.statusbar_button2.clicked.connect(self.on_space_pressed)
 
-
         # 连接AI响应信号到槽函数
         self.ai_response_signal.connect(self.update_ai_response)
 
@@ -1061,9 +1066,9 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.setWindowTitle("图片对比界面")
 
         # 获取鼠标所在屏幕，并根据当前屏幕计算界面大小与居中位置，调整大小并移动到该位置
-        x, y, w, h = self.__get_screen_geometry()
-        self.resize(int(w * 0.8), int(h * 0.65))
-        self.move(x, y)
+        # x, y, w, h = self.__get_screen_geometry()
+        # self.resize(int(w * 0.8), int(h * 0.65))
+        # self.move(x, y)
 
         # 设置第一排标签
         self.label_0.setText("提示:鼠标左键拖动所有图像,滚轮控制放大/缩小;按住Ctrl+滚轮或者鼠标右键操作单独图像")
@@ -1320,7 +1325,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             self.progress_bar.setValue(value)
             self.progress_bar.repaint()
             # QApplication.processEvents()
-
 
 
     def resizeEvent(self, event):
@@ -2363,25 +2367,79 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.is_fullscreen = not self.is_fullscreen
         try:
             if self.is_fullscreen:
-                self.showFullScreen()  # 全屏 hl_top
+                # 设置全屏，隐藏右上角组件
+                self.showFullScreen()
+                self.is_maxscreen = False
+                self.is_norscreen = False  
+
+                # 隐藏相关组件
                 self.label_bottom.setVisible(False)
-                # 隐藏
                 for i in range(self.hl_top.count()):
                     item = self.hl_top.itemAt(i)
                     if item.widget():
                         item.widget().setVisible(False)
                 
             else:
+                # 退出全屏模式，恢复Normal常规尺寸显示
+                self.showNormal()
+                x, y, w, h = self.__get_screen_geometry()
+                self.resize(int(w * 0.8), int(h * 0.70))
+                self.move(x, y)
+
+                self.is_norscreen = True
+                self.is_maxscreen = False
+                self.is_fullscreen = False
+
+                # 显示相关组件
                 self.label_bottom.setVisible(True)
-                # 显示
                 for i in range(self.hl_top.count()):
                     item = self.hl_top.itemAt(i)
                     if item.widget():
                         item.widget().setVisible(True)
-                self.showMaximized()   # 最大化
         except Exception as e:
             print(f"❌ [toggle_fullscreen]-->应用F11切换全屏时发生错误: {e}")
 
+
+
+    def toggle_screen_display(self):
+        """提供接口给设置界面使用, 切换屏幕各种尺寸显示功能"""
+        try:
+            if self.is_fullscreen:
+                # 隐藏相关组件
+                self.label_bottom.setVisible(False)
+                for i in range(self.hl_top.count()):
+                    item = self.hl_top.itemAt(i)
+                    if item.widget():
+                        item.widget().setVisible(False)
+                # 设置全屏，隐藏右上角组件
+                self.showFullScreen()  
+                
+            elif self.is_norscreen:
+                # 退出全屏模式
+                self.showNormal()
+                
+                # 显示相关组件
+                self.label_bottom.setVisible(True)
+                for i in range(self.hl_top.count()):
+                    item = self.hl_top.itemAt(i)
+                    if item.widget():
+                        item.widget().setVisible(True)
+                
+            elif self.is_maxscreen:
+                # 退出全屏模式，先恢复Normal再最大化，减少闪烁
+                self.setUpdatesEnabled(False)  # 暂停界面刷新
+                self.showMaximized()
+                self.setUpdatesEnabled(True)   # 恢复界面刷新
+                
+                # 显示相关组件
+                self.label_bottom.setVisible(True)
+                for i in range(self.hl_top.count()):
+                    item = self.hl_top.itemAt(i)
+                    if item.widget():
+                        item.widget().setVisible(True)
+                
+        except Exception as e:
+            print(f"❌ [toggle_screen_display]-->应用屏幕显示切换时发生错误: {e}")
 
     def rotate_left(self):
         try:
@@ -2608,7 +2666,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             # print(f"新的缩放因子: {self.base_scales}")  # 添加调试信息
         except Exception as e:
             print(f"❌ [on_n_pressed]-->处理N键事件时发生错误: {e}")
-
 
     def on_t_pressed(self):
         """处理T键事件"""
