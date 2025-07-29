@@ -910,8 +910,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.set_shortcut()
 
         # 显示窗口
-        self.showMaximized()
-        # self.showMinimized()
+        # self.showMaximized()
+        self.toggle_screen_display()
         # self.show()
 
         # 更新颜色样式表，放到最后，确保生效
@@ -941,12 +941,14 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         # 设置表格的宽高初始大小
         self.table_width_heigth_default = [2534,1376]
 
-        # 初始化roi亮度等信息统计框标志位；全屏显示标志位; 看图界面更新状态标志位
+        # 初始化roi亮度等信息统计框标志位；看图界面更新状态标志位
         self.roi_selection_active = False 
+        self.is_updating = False        
+
+        # 初始化看图界面尺寸显示变量  
         self.is_fullscreen = False      
         self.is_norscreen = False
-        self.is_maxscreen = True
-        self.is_updating = False          
+        self.is_maxscreen = False
 
         # 初始化颜色空间相关变量，默认设置sRGB优先
         self.auto_color_space = False  
@@ -954,7 +956,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.p3_color_space = False   
         self.gray_color_space = False
 
-        # 设置rgb颜色值字典；exif信息可见性字典; exif信息可见性字典; 均在函数load_settings中配置
+        # 设置rgb颜色值字典；exif信息可见性字典; exif信息可见性字典,解析后的Str信息; 均在函数load_settings中配置
         self.color_rgb_settings = {}
         self.dict_exif_info_visibility = {} 
         self.dict_label_info_visibility = {}
@@ -978,7 +980,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 self.parent_window.custom_font_jetbrains_small if self.parent_window.custom_font_jetbrains_small 
                 else SingleFontManager.get_font(10)
             )   
-
 
 
 
@@ -1237,18 +1238,28 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.tableWidget_medium.horizontalHeader().setStyleSheet(table_style)
 
         # 更新所有图形视图的场景背景色和EXIF标签
-        for view in self.graphics_views:
+        self.update_exif_show()
+
+
+    def update_exif_show(self):
+        """更新所有图形视图的场景背景色和EXIF标签
+        self.graphics_views
+        self.exif_texts
+        """
+        for index, view in enumerate(self.graphics_views):
             if view and view.scene():
                 # 更新场景背景色
                 qcolor = rgb_str_to_qcolor(self.background_color_table)
                 view.scene().setBackgroundBrush(QBrush(qcolor))
                 
                 # 更新EXIF标签
-                if hasattr(view, 'exif_label') and hasattr(view, 'exif_text'):
-                    exif_info = self.process_exif_info(self.dict_exif_info_visibility, view.exif_text, False)
+                if hasattr(view, 'exif_label') and self.checkBox_2.isChecked():
+                    exif_info = self.process_exif_info(self.dict_exif_info_visibility, self.exif_texts[index], False)
+                    view.exif_label.setVisible(False)
                     view.exif_label.setText(exif_info if exif_info else "解析不出exif信息!")
+                    view.exif_label.setVisible(True)
                     view.exif_label.setStyleSheet(f"color: {self.font_color_exif}; background-color: transparent; font-weight: 400;")
-
+                    
 
     def set_progress_bar(self):
         """设置进度条"""
@@ -1303,6 +1314,16 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         print("打开设置窗口...")
         from src.view.sub_setting_view import setting_Window
         self.setting_window = setting_Window(self)
+        
+        # 设置窗口标志，确保设置窗口显示在最顶层
+        self.setting_window.setWindowFlags(
+            Qt.Window |  # 独立窗口
+            Qt.WindowStaysOnTopHint |  # 保持在最顶层
+            Qt.WindowCloseButtonHint |  # 显示关闭按钮
+            Qt.WindowMinimizeButtonHint |  # 显示最小化按钮
+            Qt.WindowMaximizeButtonHint  # 显示最大化按钮
+        )
+        
         self.setting_window.show_setting_ui()
 
         # 连接设置子窗口的关闭信号
@@ -1333,9 +1354,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             self.update_progress_bar_position()
 
         # 获取表格的尺寸信息 print("table_width_heigth_default:", self.table_width_heigth_default)
-        table_width = self.tableWidget_medium.width()
-        table_height = self.tableWidget_medium.height()
-        self.table_width_heigth_default = [table_width, table_height]
+        self.table_width_heigth_default = [self.tableWidget_medium.width(), self.tableWidget_medium.height()]
 
         super(SubMainWindow, self).resizeEvent(event)
 
@@ -1437,8 +1456,12 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                         pixmap_item.setTransformOriginPoint(pixmap.rect().center())
                         scene.addItem(pixmap_item)
                         
+                        # 处理EXIF可见性字典和亮度统计信息
+                        exif_info = self.process_exif_info(self.dict_exif_info_visibility, data['exif_info'], data['hdr'])
+                        stats_info = data['stats'] if data['cv_img'] is not None else "None"
+                        
                         # 创建并设置视图
-                        view = MyGraphicsView(scene, data['exif_info'], data['stats'], self)
+                        view = MyGraphicsView(scene, exif_info, stats_info, self)
                         view.pixmap_items = [pixmap_item]
                         
                         # 设置视图的缩放，先计算基础缩放比例，再计算最终缩放比例，最后应用缩放
@@ -1611,6 +1634,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             # 使用PIL获取所需的图像信息
             with Image.open(path) as img:
                 """1. 获取pil_img的格式,确保函数get_exif_info能正确加载信息; 生成sRGB色域的pil_img和pixmap--------------------------------"""
+                img_format = img.format
                 pixmap = pil_to_pixmap((img := self.p3_converter.get_pilimg_auto(img)))
 
                 """2. 使用线程池并行生成，获取histogram, cv_img, stats, gray_pixmap, p3_pixmap等图像信息---------------------------------"""
@@ -1622,7 +1646,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             basic_info = self.get_pic_basic_info(path, img, pixmap, self.index_list[index])
 
             # piexf解析曝光时间光圈值ISO等复杂的EXIF信息
-            exif_info = self.get_exif_info(path, img.format) + basic_info
+            exif_info = self.get_exif_info(path, img_format) + basic_info
 
             # 检测是否存在同图片路径的xml文件  将lux_index、DRCgain写入到exif信息中去
             hdr_flag, xml_path = False, os.path.join(os.path.dirname(path), os.path.basename(path).split('.')[0] + "_new.xml")
@@ -1632,7 +1656,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 exif_info += exif_info_qpm
                 
             # 处理EXIF信息，根据可见性字典更新
-            exif_info = self.process_exif_info(self.dict_exif_info_visibility, exif_info, hdr_flag)
+            # self.str_exif_info = exif_info
+            # exif_info = self.process_exif_info(self.dict_exif_info_visibility, exif_info, hdr_flag)
 
             # 拼接亮度统计信息，计算亮度统计信息方法calculate_image_stats放到并行函数_generate_pixmaps_parallel中执行
             stats_text = f"亮度: {stats['avg_brightness']}\n对比度(L值标准差): {stats['contrast']}" \
@@ -1647,7 +1672,9 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 'gray_pixmap': gray_pixmap,  # pixmap格式灰度图
                 'p3_pixmap': p3_pixmap,      # pixmap格式p3色域图
                 'exif_info': exif_info,      # exif信息
+                'hdr': hdr_flag,             # 添加亮度/RGB/LAB等信息
                 'stats': stats_text,         # 添加亮度/RGB/LAB等信息
+                
             }
         except Exception as e:
             print(f"[process_image]-->error: 处理图片失败 {path}: {e}")
@@ -1850,8 +1877,9 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             while ((zoom_scale*target_width) >= sigle_table_w):
                 zoom_scale *= 0.995
 
-        # 更新当前缩放因子, zoom_scale = 0 时 直接设置为 1.0不缩放
-        zoom_scale = zoom_scale if zoom_scale != 0 else 1.0
+        # 更新当前缩放因子, zoom_scale < 0 时 直接设置为 1.0不缩放
+        zoom_scale = zoom_scale if zoom_scale > 0 else 1.0
+
 
         return zoom_scale
     
@@ -1874,8 +1902,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             if self.roi_selection_active: # 切换图片自动清除ROI信息框
                 self.roi_selection_active = False
             
-            # 关闭设置子窗口
-            self.setting_window_closed()
 
             # 清理所有列表
             self.exif_texts.clear()
@@ -2104,13 +2130,27 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
 
     def toggle_histogram_info(self, state):
-        print(f"切换直方图信息: {'显示' if state == Qt.Checked else '隐藏'}")
+        print(f"[toggle_histogram_info]-->看图界面切换直方图信息: {'显示' if state == Qt.Checked else '隐藏'}")
         try:
             for view, histogram in zip(self.graphics_views, self.histograms):
                 if histogram:
                     view.set_histogram_visibility(state == Qt.Checked)
         except Exception as e:
             print(f"❌ [toggle_histogram_info]-->处理toggle_histogram_info函数时发生错误: {e}")
+
+
+    def roi_stats_checkbox(self, state):
+        try:
+            self.stats_visible = not self.stats_visible # 控制显示开关
+            for view in self.graphics_views:
+                if view:
+                    view.set_stats_visibility(state == Qt.Checked)
+
+        except Exception as e:
+            print(f"❌ [roi_stats_checkbox]-->显示图片统计信息时发生错误: {e}")
+        finally:
+            # 延时1秒后更新is_updating为False
+            QTimer.singleShot(1000, lambda: setattr(self, 'is_updating', False))
 
     def ai_tips_info(self, state):
         try:    
@@ -2696,19 +2736,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             print(f"❌ [on_ctrl_t_pressed]-->处理Ctrl+T键事件失败:{e}")
 
-    def roi_stats_checkbox(self):
-        try:
-            self.stats_visible = not self.stats_visible # 控制显示开关
-            for view in self.graphics_views:
-                if view:
-                    view.set_stats_visibility(self.stats_visible)
-
-        except Exception as e:
-            print(f"❌ [roi_stats_checkbox]-->显示图片统计信息时发生错误: {e}")
-        finally:
-            # 延时1秒后更新is_updating为False
-            QTimer.singleShot(1000, lambda: setattr(self, 'is_updating', False))
-
 
     def on_p_pressed(self):  ## 会导致窗口闪退，当前策略是使用标志位self.is_updating锁定界面不退出
         """处理P键事件"""
@@ -2808,7 +2835,10 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
             # 根据当前组文件的格式选择调用子界面
             if is_image and not is_video:   # 调用图片显示
+                # 先更新表格尺寸后再调用图片显示
+                self.table_width_heigth_default = [self.tableWidget_medium.width(), self.tableWidget_medium.height()]
                 self.set_images(next_images, next_indexs)
+                
             elif is_video and not is_image: # 调用视频显示
                 self.parent_window.create_video_player(next_images, next_indexs)   
                 raise ValueError(f"看图子界面调用视频子界面，主动抛出异常关闭当前看图子界面")             
@@ -2863,6 +2893,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
             # 根据当前组文件的格式选择调用子界面
             if is_image and not is_video:   # 调用图片显示
+                # 先更新表格尺寸后再调用图片显示
+                self.table_width_heigth_default = [self.tableWidget_medium.width(), self.tableWidget_medium.height()]
                 self.set_images(prev_images, prev_indexs)
             elif is_video and not is_image: # 调用视频显示
                 self.parent_window.create_video_player(prev_images, prev_indexs)   
@@ -2925,14 +2957,15 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             event.ignore()
             return
         try:
-            self.save_settings()        # 保存设置
-            self.cleanup()              # 清理资源
-            self.closed.emit()          # 发送关闭信号
-            self.closed.disconnect()    # 发送后立即断开连接
-            event.accept()              # 只调用一次 accept
+            self.save_settings()         # 保存设置
+            self.setting_window_closed() # 关闭设置子窗口
+            self.cleanup()               # 清理资源
+            self.closed.emit()           # 发送关闭信号
+            self.closed.disconnect()     # 发送后立即断开连接
+            event.accept()               # 只调用一次 accept
         except Exception as e:
             print(f"❌[closeEvent]-->看图子界面-->关闭时发生错误: {e}")
-            event.accept()              # 即使出错也接受关闭事件
+            event.accept()               # 即使出错也接受关闭事件
 
     def Escape_close(self):
         """统一处理窗口关闭逻辑"""
@@ -2958,7 +2991,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             label_visable = ExifSettings.get("label_visable_settings",{})   # label具体项显示的标志位
             exif_visable = ExifSettings.get("exif_visable_setting",{})      # exif具体项显示的标志位
 
-
             # 从颜色配置中读取基础颜色
             self.font_color_default = color_settings.get("font_color_default", "rgb(0, 0, 0)")                  # 默认字体颜色_纯黑色
             self.font_color_exif = color_settings.get("font_color_exif", "rgb(255, 255, 255)")                  # Exif字体颜色_纯白色
@@ -2967,20 +2999,24 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
             # 读取rgb颜色配置
             self.color_rgb_settings = rgb_settings
-
             # 初始化exif信息可见性字典，支持用户在json配置文件中调整顺序以及是否显示该项
             self.dict_exif_info_visibility = exif_visable
 
-            # 初始化label显示变量
+            # 初始化label显示字典，并初始化相关变量
             self.dict_label_info_visibility = label_visable
-            # 读取图像颜色空间显示设置
+            # 读取图像颜色空间显示设置, 默认选择auto档
             self.p3_color_space = self.dict_label_info_visibility.get("p3_color_space", False)     
             self.gray_color_space = self.dict_label_info_visibility.get("gray_color_space", False) 
             self.srgb_color_space = self.dict_label_info_visibility.get("srgb_color_space", False) 
             self.auto_color_space = self.dict_label_info_visibility.get("auto_color_space", True) 
+            # 读取看图界面显示尺寸设置, 默认选择显示最大化尺寸
+            self.is_fullscreen = self.dict_label_info_visibility.get("is_fullscreen", False)     
+            self.is_norscreen = self.dict_label_info_visibility.get("is_norscreen", False) 
+            self.is_maxscreen = self.dict_label_info_visibility.get("is_maxscreen", True) 
             # 设置亮度统计信息的标志位；初始化ai提示标注位为False 
             self.stats_visible = self.dict_label_info_visibility.get("roi_info", False)         
-            self.ai_tips_flag = self.dict_label_info_visibility.get("ai_tips", False)          
+            self.ai_tips_flag = self.dict_label_info_visibility.get("ai_tips", False)  
+                 
 
         except Exception as e:
             print(f"❌[load_settings]-->error: 加载设置失败: {e}")
@@ -3015,14 +3051,23 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             # 2. 保存exif配置文件
             settings_exif_file = config_dir / "exif_setting.json"
             label_visable_settings = {
+                # label显示相关
                 "histogram_info": self.checkBox_1.isChecked(),
                 "exif_info": self.checkBox_2.isChecked(),
                 "roi_info": self.checkBox_3.isChecked(),
                 "ai_tips": self.checkBox_4.isChecked(),
+
+                # 色彩空间相关
                 "auto_color_space":self.auto_color_space,
                 "srgb_color_space":self.srgb_color_space,
                 "p3_color_space":self.p3_color_space,
                 "gray_color_space":self.gray_color_space,
+
+                # 屏幕显示尺寸相关
+                "is_fullscreen":self.is_fullscreen,
+                "is_norscreen":self.is_norscreen,
+                "is_maxscreen":self.is_maxscreen,
+
             }
             setting = {
                 "label_visable_settings": label_visable_settings,

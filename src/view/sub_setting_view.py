@@ -319,6 +319,15 @@ class setting_Window(QMainWindow):
         self.setWindowTitle("设置")
         self.resize(1400, 1000)
         
+        # 设置窗口标志，确保设置窗口显示在最顶层
+        self.setWindowFlags(
+            Qt.Window |  # 独立窗口
+            Qt.WindowStaysOnTopHint |  # 保持在最顶层
+            Qt.WindowCloseButtonHint |  # 显示关闭按钮
+            Qt.WindowMinimizeButtonHint |  # 显示最小化按钮
+            Qt.WindowMaximizeButtonHint  # 显示最大化按钮
+        )
+        
         # 初始化基础UI
         self.setup_ui()
         
@@ -390,8 +399,10 @@ class setting_Window(QMainWindow):
             {"name": "关于", "icon": "setting_about.png"},
             # 可继续添加更多分区
         ]
+
         # 存储每个分区的标题控件，用于滚动时高亮导航项
         self.section_title_widgets = []
+        
         # 根据自定义分区创建导航项和内容区
         for i, sec in enumerate(self.sections):
             # 左侧导航区添加: 名称+图标
@@ -400,41 +411,17 @@ class setting_Window(QMainWindow):
             item.setData(Qt.UserRole, sec["name"])
             self.nav_list.addItem(item)
             
-            # 右侧内容区设置: 分区标题，并设置对象名，便于识别
-            title_label = QLabel(f"{sec['name']}")
-            title_label.setObjectName(f"section_title_{i}")  
-            title_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-            title_label.setStyleSheet("""
-                QLabel {
-                    font-size: 28px;    /* 设置字体大小为28像素 */
-                    font-weight: bold;  /* 设置字体为粗体 */
-                    color: #2a5caa;     /* 设置字体颜色 */
-                    padding: 10px;      /* 设置内边距为10像素(文字与边框的距离) */
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #DCE6F7, stop:1 #F0F0F4);
-                    border-radius: 8px;  /* 圆角半径8像素,让标题有圆角效果 */
-                    border-left: 4px solid #2a5caa;  /* 左边框: 4像素宽的蓝色实线 */
-                    margin: 0px 5px 5px 0px;         /* 设置外边距:上右下左 */
-                }
-            """)
-
-            # 右侧内容区添加: 标题组件
+            # 右侧内容区设置: 分区标题，并设置对象名，便于识别; 右侧内容区添加: 标题组件
+            title_label = self.set_title_label(sec, i)
             self.content_layout.addWidget(title_label)
             
-            # 右侧内容区添加: 具体内容组件,主要实现集中在这一部分;
+            """右侧内容区添加: 具体内容组件,主要实现集中在这一部分""" 
             self.add_section_content(sec)
 
             # 右侧内容区添加: 分隔线（最后一个分区不添加横线）
             if i < len(self.sections) - 1:
-                separator = QFrame()
-                separator.setFrameShape(QFrame.HLine)
-                separator.setFrameShadow(QFrame.Sunken)
-                separator.setStyleSheet("""
-                    QFrame {
-                        background: #cccccc;
-                        margin: 0px 5px; /* 设置左右间距:左0右5 */
-                    }
-                """)
-                # 添加分隔线到分区layout中
+                # 设置并添加分隔线到分区layout中
+                separator = self.set_title_separator()
                 self.content_layout.addWidget(separator)
             
             # 存储每个分区的标题控件，用于滚动时高亮导航项
@@ -448,6 +435,39 @@ class setting_Window(QMainWindow):
         # 默认选中第一个分区
         if self.nav_list.count() > 0:
             self.nav_list.setCurrentRow(0)
+
+    def set_title_separator(self):
+        """设置分隔横线"""
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShadow(QFrame.Sunken)
+        separator.setStyleSheet("""
+            QFrame {
+                background: #cccccc;
+                margin: 0px 5px; /* 设置左右间距:左0右5 */
+            }
+        """)
+        return separator
+
+    def set_title_label(self, sec, i):
+        """设置内容区的标题"""
+        title_label = QLabel(f"{sec['name']}")
+        title_label.setObjectName(f"section_title_{i}")  
+        title_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        title_label.setStyleSheet("""
+            QLabel {
+                font-size: 28px;    /* 设置字体大小为28像素 */
+                font-weight: bold;  /* 设置字体为粗体 */
+                color: #2a5caa;     /* 设置字体颜色 */
+                padding: 10px;      /* 设置内边距为10像素(文字与边框的距离) */
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #DCE6F7, stop:1 #F0F0F4);
+                border-radius: 8px;  /* 圆角半径8像素,让标题有圆角效果 */
+                border-left: 4px solid #2a5caa;  /* 左边框: 4像素宽的蓝色实线 */
+                margin: 0px 5px 5px 0px;         /* 设置外边距:上右下左 */
+            }
+        """)
+        return title_label
+
 
     def add_section_content(self, section):
         """添加分区内容"""
@@ -475,30 +495,167 @@ class setting_Window(QMainWindow):
         self.content_layout.addWidget(content_container)
 
 
+
+    
+    """
+    内容区设置槽函数
+    ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+    toggle_screen_display: 通用设置--尺寸设置--相关函数
+
+    toggle_hisgram_info/toggle_exif_info/toggle_roi_info/toggle_ai_info: 显示设置--相关函数
+
+    on_title_checkbox_changed/toggle_radio_title: 显示设置--标题显示开关--相关函数
+
+    toggle_checkbox_exif: EXIF显示--相关函数
+
+    toggle_radio_colorspace: 色彩空间--相关函数
+    """
     def toggle_screen_display(self):
-        """添加屏幕显示的槽函数"""
-        if self.normal_radio.isChecked():
-            print("切换到常规尺寸")
-            if self.main_window and bool(self.main_window.toggle_screen_display):
-                self.main_window.is_fullscreen = False      
-                self.main_window.is_norscreen = True
-                self.main_window.is_maxscreen = False
-                self.main_window.toggle_screen_display()
+        """通用设置-->尺寸设置的槽函数"""
+        try:
+
+            if self.normal_radio.isChecked():
+                print("切换到常规尺寸")
+                if self.main_window and bool(self.main_window.toggle_screen_display):
+                    self.main_window.is_fullscreen = False      
+                    self.main_window.is_norscreen = True
+                    self.main_window.is_maxscreen = False
+                    self.main_window.toggle_screen_display()
+                
+            elif self.maxed_radio.isChecked():
+                print("切换到最大化显示")
+                if self.main_window and bool(self.main_window.toggle_screen_display):
+                    self.main_window.is_fullscreen = False      
+                    self.main_window.is_norscreen = False
+                    self.main_window.is_maxscreen = True
+                    self.main_window.toggle_screen_display()
+
+            elif self.full_radio.isChecked():
+                print("切换到全屏显示")
+                if self.main_window and bool(self.main_window.toggle_screen_display):
+                    self.main_window.is_fullscreen = True   
+                    self.main_window.is_norscreen = False
+                    self.main_window.is_maxscreen = False   
+                    self.main_window.toggle_screen_display()
+
+        except Exception as e:
+            print(f"[toggle_screen_display]-->设置界面-->通用设置—-尺寸设置发生错误: {e}")
+
+    def toggle_hisgram_info(self):
+        """显示设置-->显示直方图信息的槽函数"""
+        try:
+            print("设置界面->通用设置->打开->显示直方图信息" if self.hisgram_checkbox.isChecked() else "设置界面->通用设置->关闭->显示直方图信息")
+            if self.main_window and bool(self.main_window.toggle_histogram_info):            
+                self.main_window.checkBox_1.setChecked(self.hisgram_checkbox.isChecked())
+        
+        except Exception as e:
+            print(f"[toggle_hisgram_info]-->设置界面--显示设置-显示直方图信息时发生错误: {e}")
+
+    def toggle_exif_info(self):
+        """显示设置-->显示exif复选框的槽函数"""
+        try:
+            print("设置界面->通用设置->打开->显示EXIF图信息" if self.exif_checkbox.isChecked() else "设置界面->通用设置->关闭->显示EXIF图信息")
+            if self.main_window and bool(self.main_window.toggle_exif_info):            
+                self.main_window.checkBox_2.setChecked(self.exif_checkbox.isChecked())
             
-        elif self.maxed_radio.isChecked():
-            print("切换到最大化显示")
-            if self.main_window and bool(self.main_window.toggle_screen_display):
-                self.main_window.is_fullscreen = False      
-                self.main_window.is_norscreen = False
-                self.main_window.is_maxscreen = True
-                self.main_window.toggle_screen_display()
-        elif self.full_radio.isChecked():
-            print("切换到全屏显示")
-            if self.main_window and bool(self.main_window.toggle_screen_display):
-                self.main_window.is_fullscreen = True   
-                self.main_window.is_norscreen = False
-                self.main_window.is_maxscreen = False   
-                self.main_window.toggle_screen_display()
+        except Exception as e:
+            print(f"[toggle_exif_info]-->设置界面--显示设置-显示exif复选框时发生错误: {e}")
+
+    def toggle_roi_info(self):
+        """显示设置-->roi复选框的槽函数"""
+        try:
+            print("设置界面->通用设置->打开->显示ROI信息" if self.roi_checkbox.isChecked() else "设置界面->通用设置->关闭->显示ROI信息")
+            if self.main_window and bool(self.main_window.roi_stats_checkbox):            
+                self.main_window.checkBox_3.setChecked(self.roi_checkbox.isChecked())
+                
+        except Exception as e:
+            print(f"[toggle_roi_info]-->设置界面--显示设置-显示ROI信息时发生错误: {e}")
+
+    def toggle_ai_info(self):
+        """显示设置-->ai复选框的槽函数"""
+        try:
+            print("设置界面->通用设置->打开->启用AI提示看图功能" if self.ai_checkbox.isChecked() else "设置界面->通用设置->关闭->启用AI提示看图功能")
+            if self.main_window and bool(self.main_window.ai_tips_info):            
+                self.main_window.checkBox_4.setChecked(self.ai_checkbox.isChecked())
+                
+        except Exception as e:
+            print(f"[toggle_ai_info]-->设置界面--显示设置-启用AI提示看图功能时发生错误: {e}")
+
+    def on_title_checkbox_changed(self, state):
+        """显示设置-->标题显示开关; 添加互斥逻辑：未勾选显示窗口标题时，单选按钮置灰"""
+        try:
+            # 互斥逻辑功能
+            print("打开--显示看图界面窗口标题" if (enabled := bool(state == Qt.Checked)) else "关闭--显示看图界面窗口标题")
+            self.radio_custom.setEnabled(enabled)
+            self.radio_folder.setEnabled(enabled)
+
+            # 待添加
+
+        except Exception as e:
+            print(f"[on_title_checkbox_changed]-->设置界面--点击显示设置相关按钮时发生错误: {e}")
+
+    def toggle_radio_title(self):
+        """显示设置-->表头设置; 跟随文件夹、名称文本自定义"""
+        try:
+            if self.radio_folder.isChecked():
+                print("显示看图界面窗口标题，选择跟随文件夹")
+            if self.radio_custom.isChecked():
+                print("显示看图界面窗口标题，选择名称文本自定义")
+
+        except Exception as e:
+            print(f"[toggle_radio_title]-->设置界面--点击显示设置相关按钮时发生错误: {e}")
+
+    def toggle_checkbox_exif(self):
+        """EXIF显示-->保存按钮链接函数"""
+        print("保存并更新EXIF显示!!!")
+        try:
+            # 获取设置界面上最新的EXIF显示结果
+            result = self.exif_grid.get_status_dict()
+
+            # 同步更新看图界面上的显示
+            if self.main_window and hasattr(self.main_window, 'dict_exif_info_visibility'):
+                self.main_window.dict_exif_info_visibility = result
+
+            if bool(self.main_window.update_exif_show):
+                self.main_window.update_exif_show()
+
+        except Exception as e:
+            print(f"[toggle_checkbox_exif]-->设置界面--更新EXIF显示时发生错误: {e}")
+
+    def toggle_radio_colorspace(self):
+        """色彩空间-->图像色彩空间管理"""
+        try:
+            if self.auto_radio.isChecked():
+                print("图像色彩空间管理, 选择AUTO(自动读取并加载图片ICC配置文件)")
+                if self.main_window and bool(self.main_window.on_comboBox_2_changed):
+                    self.main_window.on_comboBox_2_changed(index=0)  
+                    self.main_window.comboBox_2.setCurrentIndex(0)  
+
+            if self.rgb_radio.isChecked():
+                print("图像色彩空间管理, 选择sRGB色域")
+                if self.main_window and bool(self.main_window.on_comboBox_2_changed):
+                    self.main_window.on_comboBox_2_changed(index=1)
+                    self.main_window.comboBox_2.setCurrentIndex(1)
+
+            if self.gray_radio.isChecked():
+                print("图像色彩空间管理, 选择gray灰度空间")     
+                if self.main_window and bool(self.main_window.on_comboBox_2_changed):
+                    self.main_window.on_comboBox_2_changed(index=2)
+                    self.main_window.comboBox_2.setCurrentIndex(2)
+
+            if self.p3_radio.isChecked():
+                print("图像色彩空间管理, 选择Display-P3色域")
+                if self.main_window and bool(self.main_window.on_comboBox_2_changed):
+                    self.main_window.on_comboBox_2_changed(index=3)
+                    self.main_window.comboBox_2.setCurrentIndex(3)
+        except Exception as e:
+            print(f"[toggle_radio_colorspace]-->设置界面--选择图像色彩空间时发生错误: {e}")
+
+    """
+    内容区设置槽函数
+    ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    """
 
 
     def add_general_settings_content(self, layout):
@@ -524,10 +681,6 @@ class setting_Window(QMainWindow):
         size_group.layout().addWidget(self.full_radio)
         settings_layout.addWidget(size_group)
 
-        # 设置圆形复选按钮的链接事件
-        self.normal_radio.clicked.connect(self.toggle_screen_display)
-        self.maxed_radio.clicked.connect(self.toggle_screen_display)
-        self.full_radio.clicked.connect(self.toggle_screen_display)
 
         # 主题设置
         theme_group = self.create_setting_group("主题模式", "跟随系统勾选后，应用将跟随设备的系统设置切换主题模式，可选模式置灰处理")
@@ -872,66 +1025,48 @@ class setting_Window(QMainWindow):
         settings_layout = QVBoxLayout(settings_container)
         settings_layout.setSpacing(15)
 
-        # 显示选项复选框
+        """显示设置的复选框相关设置"""
         display_group = self.create_setting_group("显示设置",
                         "支持可选功能有: 直方图信息、EXIF信息、ROI信息以及AI提示看图功能")
-        hisgram_checkbox = QCheckBox("显示直方图信息")
-        exif_checkbox = QCheckBox("显示EXIF信息")
-        roi_checkbox = QCheckBox("显示ROI信息")
-        ai_checkbox = QCheckBox("启用AI提示看图功能")
-        ## 默认选中显示ROI信息
-        roi_checkbox.setChecked(True)
-        display_group.layout().addWidget(hisgram_checkbox)
-        display_group.layout().addWidget(exif_checkbox)
-        display_group.layout().addWidget(roi_checkbox)
-        display_group.layout().addWidget(ai_checkbox)
+        self.hisgram_checkbox = QCheckBox("显示直方图信息")
+        self.exif_checkbox = QCheckBox("显示EXIF信息")
+        self.roi_checkbox = QCheckBox("显示ROI信息")
+        self.ai_checkbox = QCheckBox("启用AI提示看图功能")
+        display_group.layout().addWidget(self.hisgram_checkbox)
+        display_group.layout().addWidget(self.exif_checkbox)
+        display_group.layout().addWidget(self.roi_checkbox)
+        display_group.layout().addWidget(self.ai_checkbox)
 
-        # 标题显示开关
+
+        """标题显示开关的相关设置"""
         title_group = self.create_setting_group("标题显示开关", "看图子界面的列名称设置，支持自定义和跟随文件夹两种可选")
-        title_checkbox = QCheckBox("显示窗口标题")
-        title_checkbox.setChecked(True)
-        title_group.layout().addWidget(title_checkbox)
+        self.title_checkbox = QCheckBox("显示看图界面窗口标题")
+        title_group.layout().addWidget(self.title_checkbox)
         ## 添加两个互斥的圆形单选项
         radio_layout = QHBoxLayout()
-        radio_folder = QRadioButton("跟随文件夹")
-        radio_custom = QRadioButton("名称文本自定义")
-        radio_custom.setChecked(True)
-        ## 互斥分组
+        self.radio_folder = QRadioButton("跟随文件夹")
+        self.radio_custom = QRadioButton("名称文本自定义")
+        # checbox: 显示窗口标题;radiobutton: 跟随文件夹,名称文本自定义
+        self.title_checkbox.setChecked(True)
+        self.radio_folder.setChecked(True)
+        self.radio_custom.setChecked(False)
+
+        ## 设置互斥分组
         radio_group = QButtonGroup(settings_container)
-        radio_group.addButton(radio_custom)
-        radio_group.addButton(radio_folder)
-        radio_layout.addWidget(radio_custom)
-        radio_layout.addWidget(radio_folder)
+        radio_group.addButton(self.radio_folder)
+        radio_group.addButton(self.radio_custom)
+        radio_layout.addWidget(self.radio_folder)
+        radio_layout.addWidget(self.radio_custom)
         title_group.layout().addLayout(radio_layout)
-        # 互斥逻辑：未勾选显示窗口标题时，单选按钮置灰
-        def on_title_checkbox_changed(state):
-            enabled = title_checkbox.isChecked()
-            radio_custom.setEnabled(enabled)
-            radio_folder.setEnabled(enabled)
-        title_checkbox.stateChanged.connect(on_title_checkbox_changed)
-        # 初始化一次
-        on_title_checkbox_changed(title_checkbox.checkState())
+        
 
         # 添加组件信息到主布局中
         settings_layout.addWidget(display_group)
         settings_layout.addWidget(title_group)
         layout.addWidget(settings_container)
 
-    def add_exif_settings_content(self, layout):
-        """添加EXIF显示设置内容，支持两列复选框拖动排序，保存时返回新顺序和勾选状态"""
-        exif_field_status = {
-            "图片名称": True, "品牌": False, "型号": True, "图片张数": True, "图片大小": True,
-            "图片尺寸": True, "曝光时间": True, "光圈值": False, "ISO值": True, "原始时间": False,
-            "测光模式": False, "HDR": True, "Zoom": True, "Lux": True, "CCT": True,
-            "FaceSA": True, "DRCgain": True, "Awb_sa": False, "Triangle_index": False,
-            "R_gain": False, "B_gain": False, "Safe_gain": False, "Short_gain": False, "Long_gain": False
-        }
-
-        settings_container = QWidget()
-        settings_layout = QVBoxLayout(settings_container)
-        settings_layout.setSpacing(15)
-        exif_group = self.create_setting_group("", "")
-
+    def set_exif_setting_ui(self):
+        """exif显示设置界面UI"""
         # 标题和保存按钮
         title_widget = QWidget()
         title_layout = QHBoxLayout(title_widget)
@@ -975,54 +1110,68 @@ class setting_Window(QMainWindow):
             padding: 0px 0px 0px 0px;
             border: 1px solid #b3d8fd;
         """)
+
+        return title_widget, save_button
+
+    def add_exif_settings_content(self, layout):
+        """添加EXIF显示设置内容，支持两列复选框拖动排序，保存时返回新顺序和勾选状态"""
+        settings_container = QWidget()
+        settings_layout = QVBoxLayout(settings_container)
+        settings_layout.setSpacing(15)
+        exif_group = self.create_setting_group("", "")
+
+        # 初始化exif基础信息
+        exif_field_status = {
+            "图片名称": True, "品牌": False, "型号": True, "图片张数": True, "图片大小": True,
+            "图片尺寸": True, "曝光时间": True, "光圈值": False, "ISO值": True, "原始时间": False,
+            "测光模式": False, "HDR": True, "Zoom": True, "Lux": True, "CCT": True,
+            "FaceSA": True, "DRCgain": True, "Awb_sa": False, "Triangle_index": False,
+            "R_gain": False, "B_gain": False, "Safe_gain": False, "Short_gain": False, "Long_gain": False
+        }
+        if self.main_window and hasattr(self.main_window, 'dict_exif_info_visibility'):
+            exif_field_status = self.main_window.dict_exif_info_visibility
+
+        # 设置EXIF显示主要UI
+        title_widget, save_button = self.set_exif_setting_ui()
+        self.save_button = save_button
+
+        # 设置自定义类，支持拖拽调整复选框顺序
+        self.exif_grid = ExifGridWidget(exif_field_status)
+
         exif_group.layout().insertWidget(0, title_widget)
-
-        # 拖拽排序的两列复选框
-        exif_grid = ExifGridWidget(exif_field_status)
-        exif_group.layout().addWidget(exif_grid)
-
-        def on_save():
-            result = exif_grid.get_status_dict()
-            print("EXIF新顺序和勾选状态：", result)
-            # 你可以emit信号或其它处理
-
-        save_button.clicked.connect(on_save)
+        exif_group.layout().addWidget(self.exif_grid)
         settings_layout.addWidget(exif_group)
         layout.addWidget(settings_container)
 
     def add_color_space_settings_content(self, layout):
         """添加色彩空间设置内容"""
+        # 主内容layout
         settings_container = QWidget()
         settings_layout = QVBoxLayout(settings_container)
         settings_layout.setSpacing(15)
-        # 色彩空间选择
         cm_group = self.create_setting_group(
             "图像色彩空间管理",
             "设置色彩空间管理选项,默认自动读取ICC配置文件,支持可选强制转换色域(Gray、RGB和Display_P3)"
         )
 
         # 创建互斥的单选按钮
-        auto_radio = QRadioButton("AUTO(自动读取ICC配置文件)")
-        rgb_radio = QRadioButton("sRGB色域")
-        gray_radio = QRadioButton("gray色域")
-        p3_radio = QRadioButton("Display_P3色域")
-
-        # 默认选中“自动读取ICC配置文件”
-        auto_radio.setChecked(True)
+        self.auto_radio = QRadioButton("AUTO(自动读取ICC配置文件)")
+        self.rgb_radio = QRadioButton("sRGB色域")
+        self.gray_radio = QRadioButton("gray色域")
+        self.p3_radio = QRadioButton("Display_P3色域")
 
         # 创建互斥组
         button_group = QButtonGroup(settings_container)
-        button_group.addButton(auto_radio)
-        button_group.addButton(rgb_radio)
-        button_group.addButton(gray_radio)
-        button_group.addButton(p3_radio)
+        button_group.addButton(self.auto_radio)
+        button_group.addButton(self.rgb_radio)
+        button_group.addButton(self.gray_radio)
+        button_group.addButton(self.p3_radio)
         
-
         # 添加到布局
-        cm_group.layout().addWidget(auto_radio)
-        cm_group.layout().addWidget(rgb_radio)
-        cm_group.layout().addWidget(gray_radio)
-        cm_group.layout().addWidget(p3_radio)
+        cm_group.layout().addWidget(self.auto_radio)
+        cm_group.layout().addWidget(self.rgb_radio)
+        cm_group.layout().addWidget(self.gray_radio)
+        cm_group.layout().addWidget(self.p3_radio)
         settings_layout.addWidget(cm_group)
         layout.addWidget(settings_container)
 
@@ -1178,17 +1327,47 @@ class setting_Window(QMainWindow):
         self.scroll_content.setStyleSheet("background: #F0F0F0;")
         self.bottom_spacer.setStyleSheet("background: #F0F0F0;")
 
-        # 通用设置区域的相关初始化
+        """内容取组件初始化"""
         if self.main_window:
+            # 通用设置区域
             if hasattr(self.main_window, 'is_maxscreen') and self.main_window.is_maxscreen:
                 self.maxed_radio.setChecked(True)
             if hasattr(self.main_window, 'is_norscreen') and self.main_window.is_norscreen:
                 self.normal_radio.setChecked(True)
             if hasattr(self.main_window, 'is_fullscreen') and self.main_window.is_fullscreen:
                 self.full_radio.setChecked(True)
+        
+            # 显示设置区域
+            if hasattr(self.main_window, 'checkBox_1'):
+                self.hisgram_checkbox.setChecked(self.main_window.checkBox_1.isChecked())
+            if hasattr(self.main_window, 'checkBox_2'):
+                self.exif_checkbox.setChecked(self.main_window.checkBox_2.isChecked())
+            if hasattr(self.main_window, 'checkBox_3'):
+                self.roi_checkbox.setChecked(self.main_window.checkBox_3.isChecked())
+            if hasattr(self.main_window, 'checkBox_4'):
+                self.ai_checkbox.setChecked(self.main_window.checkBox_4.isChecked())
+
+            # 色彩空间区域
+            if hasattr(self.main_window, 'auto_color_space'):
+                self.auto_radio.setChecked(self.main_window.auto_color_space)
+            if hasattr(self.main_window, 'srgb_color_space'):
+                self.rgb_radio.setChecked(self.main_window.srgb_color_space)
+            if hasattr(self.main_window, 'p3_color_space'):
+                self.p3_radio.setChecked(self.main_window.p3_color_space)
+            if hasattr(self.main_window, 'gray_color_space'):
+                self.gray_radio.setChecked(self.main_window.gray_color_space)
+
+        
         else:
-            # 设置默认设置项
+            """默认设置区域"""
+            # 通用设置区域
             self.maxed_radio.setChecked(True)
+
+            # 显示设置区域
+            self.roi_checkbox.setChecked(True)
+
+            # 色彩空间区域
+            self.auto_radio.setChecked(True)
 
 
 
@@ -1202,10 +1381,46 @@ class setting_Window(QMainWindow):
         self.splitter.doubleClicked.connect(self.on_splitter_double_clicked)
         self.scroll_area.verticalScrollBar().valueChanged.connect(self.on_scroll) 
 
+
+
+        """内容区组件的槽函数"""
+        # 通用设置区域；设置圆形选择按钮的链接事件
+        self.normal_radio.clicked.connect(self.toggle_screen_display)
+        self.maxed_radio.clicked.connect(self.toggle_screen_display)
+        self.full_radio.clicked.connect(self.toggle_screen_display)
+
+        # 显示设置区域；设置方形复选框的链接事件
+        self.hisgram_checkbox.stateChanged.connect(self.toggle_hisgram_info)
+        self.exif_checkbox.stateChanged.connect(self.toggle_exif_info)
+        self.roi_checkbox.stateChanged.connect(self.toggle_roi_info)
+        self.ai_checkbox.stateChanged.connect(self.toggle_ai_info)
+
+        # 显示设置区域；
+        # checbox: 显示窗口标题;radiobutton: 跟随文件夹,名称文本自定义
+        self.title_checkbox.stateChanged.connect(self.on_title_checkbox_changed)
+        self.radio_folder.clicked.connect(self.toggle_radio_title)
+        self.radio_custom.clicked.connect(self.toggle_radio_title)
+
+        # EXIF显示区域
+        self.save_button.clicked.connect(self.toggle_checkbox_exif)
+        
+
+        # 色彩空间区域
+        self.auto_radio.clicked.connect(self.toggle_radio_colorspace)
+        self.rgb_radio.clicked.connect(self.toggle_radio_colorspace)
+        self.p3_radio.clicked.connect(self.toggle_radio_colorspace)
+        self.gray_radio.clicked.connect(self.toggle_radio_colorspace)
+
+
+        
+
+
+        """全局快键键设置"""
         # 添加ESC键退出快捷键
         self.shortcut_esc = QShortcut(QKeySequence(Qt.Key_Escape), self)
         self.shortcut_esc.activated.connect(self.close)
 
+        # 添加i键退出快捷键
         self.shortcut_esc = QShortcut(QKeySequence('i'), self)
         self.shortcut_esc.activated.connect(self.close)
         
