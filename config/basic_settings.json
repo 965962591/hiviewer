@@ -32,19 +32,20 @@
         "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.21-O19-IN-一供-三方/Facebook/N19",
         "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.21-O19-IN-一供-三方/normal/O19-1st",
         "D:/Tuning/O19/0_pic/02_IN_pic/逆光对比度低,发蒙问题澄清/0625/dump_raw/raw",
-        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.22自测回归/N19"
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.22自测回归/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.8-IN-一供三方验证",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.22自测回归/O19_1st",
+        "C:\\Users\\caozhen\\Downloads\\o19 July 29_07 反馈",
+        "D:/Tuning/O19/0_pic/02_IN_pic/印度测试_0730/N19 29th July",
+        "D:/Tuning/O19/0_pic/02_IN_pic/印度测试_0730/O19 29th July"
     ],
-    "current_directory": "D:/Tuning/O19/0_pic/02_IN_pic/2025.7.22自测回归/N19",
+    "current_directory": "D:/Tuning/O19/0_pic/02_IN_pic/印度测试_0730/O19 29th July",
     "file_type_option": "显示图片文件",
-    "combobox1_checked_items": [
-        "O19_1st",
-        "O19_2nd",
-        "VIVO50"
-    ],
+    "combobox1_checked_items": [],
     "combobox1_all_items": [
-        "O19_1st",
-        "O19_2nd",
-        "VIVO50"
+        "N19 29th July",
+        "Vivo V50 29th July",
+        "问题点_o19 July 29_07 反馈"
     ],
     "sort_option": "按文件名称排序",
     "theme_option": "默认主题",

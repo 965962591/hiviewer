@@ -542,6 +542,110 @@ class setting_Window(QMainWindow):
         except Exception as e:
             print(f"[toggle_screen_display]-->设置界面-->通用设置—-尺寸设置发生错误: {e}")
 
+    def reset_colorsetting(self):
+        """颜色设置-->一键重置"""
+        try:
+            print("设置界面->颜色设置-->一键重置")
+            if self.main_window and bool(self.main_window.show_menu_combox1):
+                self.main_window.show_menu_combox1(index=1)
+
+        except Exception as e:
+            print(f"[reset_colorsetting]-->颜色设置-->一键重置时发生错误: {e}")
+
+    def read_colorsetting(self):
+        """颜色设置-->读取配置文件"""
+        try:
+            print("设置界面->颜色设置-->读取配置文件")
+            if self.main_window and bool(self.main_window.show_menu_combox1):
+                if self.checkbox_checkbox.isChecked():
+                    self.main_window.show_menu_combox1(index=0)
+        except Exception as e:
+            print(f"[read_colorsetting]-->颜色设置-->读取配置文件时发生错误: {e}")
+
+
+    def create_color_row(self, label_text, color_list):
+        """颜色设置-->行生成函数"""
+        try:
+            row = QHBoxLayout()
+            row.setSpacing(16)
+            # 标签
+            label = QLabel(label_text)
+            label.setStyleSheet("color: black; font-size: 15px; min-width: 36px;")
+            row.addWidget(label)
+            # 色块
+            btn_group = []
+            for color in color_list:
+                btn = QPushButton()
+                btn.setFixedSize(32, 32)
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background: {color};
+                        border-radius: 16px;
+                        border: 2px solid transparent;
+                    }}
+                    QPushButton[selected='true'] {{
+                        border: 3px solid #409eff;
+                    }}
+                """)
+                btn.setProperty("selected", False)
+                btn.setCursor(Qt.PointingHandCursor)
+                btn_group.append(btn)
+                row.addWidget(btn)
+            row.addStretch(1)
+            return btn_group, row
+        except Exception as e:
+            print(f"[create_color_row]-->颜色设置-->行生成函数时发生错误: {e}")
+
+
+    def select_color(self, btns, idx, color_type):
+        """颜色设置-->槽函数--选中颜色并打印RGB值
+        Args:
+            btns: 按钮组列表
+            idx: 选中的索引
+            color_type: 颜色类型(背景颜色、填充颜色、字体颜色、EXIF颜色)
+        """
+        try:
+            for i, b in enumerate(btns):
+                if i == idx:
+                    # 更新按钮选中状态并强制刷新样式
+                    print(f"🎨 颜色设置 -> {color_type} -> 选中: {self.color_names[idx]} RGB: {self.list_colors[idx]}")
+                    b.setProperty("selected", True)
+                    b.setStyle(b.style())  
+
+                    # 更新看图界面上的显示
+                    if self.main_window and hasattr(self.main_window, 'update_ui_styles'):
+                        if hasattr(self.main_window, 'background_color_default'):
+                            if color_type == "背景颜色":
+                                self.main_window.background_color_default = self.list_colors[idx]
+                            if color_type == "填充颜色":
+                                self.main_window.background_color_table = self.list_colors[idx]
+                            if color_type == "字体颜色":
+                                self.main_window.font_color_default = self.list_colors[idx]
+                            if color_type == "EXIF颜色":
+                                self.main_window.font_color_exif = self.list_colors[idx]
+                        # 更新样式表
+                        self.main_window.update_ui_styles()
+                else:
+                    b.setProperty("selected", False)
+                    b.setStyle(b.style())  
+        except Exception as e:
+            print(f"[select_color]-->颜色设置-->选中颜色并打印RGB值时发生错误: {e}")
+
+    def color_setting_clicked(self):
+        """颜色设置-->点击颜色设置按钮"""
+        try:
+            # 点击事件槽函数
+            for idx, btn in enumerate(self.background_btns):
+                btn.clicked.connect(lambda _, i=idx: self.select_color(self.background_btns, i, "背景颜色"))
+            for idx, btn in enumerate(self.fill_btns):
+                btn.clicked.connect(lambda _, i=idx: self.select_color(self.fill_btns, i, "填充颜色"))
+            for idx, btn in enumerate(self.font_btns):
+                btn.clicked.connect(lambda _, i=idx: self.select_color(self.font_btns, i, "字体颜色"))
+            for idx, btn in enumerate(self.exif_btns):
+                btn.clicked.connect(lambda _, i=idx: self.select_color(self.exif_btns, i, "EXIF颜色"))
+        except Exception as e:
+            print(f"[color_setting_clicked]-->颜色设置-->点击颜色设置按钮时发生错误: {e}")
+
     def toggle_hisgram_info(self):
         """显示设置-->显示直方图信息的槽函数"""
         try:
@@ -590,7 +694,9 @@ class setting_Window(QMainWindow):
             self.radio_custom.setEnabled(enabled)
             self.radio_folder.setEnabled(enabled)
 
-            # 待添加
+            # 看图界面显示隐藏标题逻辑
+            if self.main_window and bool(self.main_window.toggle_title_display): 
+                self.main_window.toggle_title_display(enabled)
 
         except Exception as e:
             print(f"[on_title_checkbox_changed]-->设置界面--点击显示设置相关按钮时发生错误: {e}")
@@ -853,28 +959,34 @@ class setting_Window(QMainWindow):
 
     def add_color_settings_content(self, layout):
         """添加颜色设置内容（配色盘风格）"""
-        
-        list_colors = [
-            "rgb(127,127,127)",  # 18度灰
-            "rgb(22, 24, 35)",  # 乌漆嘛黑
-            "rgb(136,173,166)", # 水色
+        # 颜色列表
+        self.list_colors = [
+            "rgb(127,127,127)", # 18度灰
+            "rgb(0,0,0)",       # 乌漆嘛黑
+            "rgb(173,216,230)", # 好蓝
             "rgb(123,207,166)", # 石青
             "rgb(242,12,0)",    # 茶色
             "rgb(242,12,0)",    # 石榴红
-            "rgb(240,240,244)", # 铅白
+            "rgb(255,255,255)", # 纯白
             "rgb(236,237,236)", # 天际
             "rgb(234,243,244)", # 晴空
             "rgb(220,230,247)", # 苍穹
             "rgb(74,116,171)",  # 湖光
-            "rgb(84, 99,125)",  # 曜石
+            "rgb(84,99,125)",  # 曜石
             "rgb(8,8,6)",       # 天际黑
             "rgb(45,53,60)",    # 晴空黑
             "rgb(47,51,68)",    # 苍穹黑
             "rgb(49,69,96)",    # 湖光黑
             "rgb(57,63,78)",    # 曜石黑
         ]
+        # 颜色名称映射
+        self.color_names = [
+            "18度灰", "乌漆嘛黑", "好蓝", "石青", "茶色", "石榴红", "纯白", "天际", 
+            "晴空", "苍穹", "湖光", "曜石", "天际黑", "晴空黑", "苍穹黑", "湖光黑", "曜石黑"
+        ]
 
-        # 配色主容器
+        
+        # 配色主容器初始化
         color_frame = QFrame()
         color_frame.setStyleSheet("""
             QFrame {
@@ -887,77 +999,23 @@ class setting_Window(QMainWindow):
         color_layout.setSpacing(10)
         color_layout.setContentsMargins(16, 8, 16, 8)
 
-        # 行生成函数
-        def create_color_row(label_text, color_list):
-            row = QHBoxLayout()
-            row.setSpacing(16)
-            # 标签
-            label = QLabel(label_text)
-            label.setStyleSheet("color: black; font-size: 15px; min-width: 36px;")
-            row.addWidget(label)
-            # 色块
-            btn_group = []
-            for color in color_list:
-                btn = QPushButton()
-                btn.setFixedSize(32, 32)
-                btn.setStyleSheet(f"""
-                    QPushButton {{
-                        background: {color};
-                        border-radius: 16px;
-                        border: 2px solid transparent;
-                    }}
-                    QPushButton[selected='true'] {{
-                        border: 3px solid #409eff;
-                    }}
-                """)
-                btn.setProperty("selected", False)
-                btn.setCursor(Qt.PointingHandCursor)
-                btn_group.append(btn)
-                row.addWidget(btn)
-            row.addStretch(1)
-            return btn_group, row
-
         # 自定义颜色选项行
-        background_btns, back_row = create_color_row("背景颜色:", list_colors)
-        fill_btns, fill_row = create_color_row("填充颜色:", list_colors)
-        font_btns, font_row = create_color_row("字体颜色:", list_colors)
-        exif_btns, exif_row = create_color_row("EXIF颜色:", list_colors)
+        self.background_btns, back_row_layout = self.create_color_row("背景颜色:", self.list_colors)
+        self.fill_btns, fill_row_layout = self.create_color_row("填充颜色:", self.list_colors)
+        self.font_btns, font_row_layout = self.create_color_row("字体颜色:", self.list_colors)
+        self.exif_btns, exif_row_layout = self.create_color_row("EXIF颜色:", self.list_colors)
 
-        color_layout.addLayout(back_row)
-        color_layout.addLayout(fill_row)
-        color_layout.addLayout(font_row)
-        color_layout.addLayout(exif_row)
+        color_layout.addLayout(back_row_layout)
+        color_layout.addLayout(fill_row_layout)
+        color_layout.addLayout(font_row_layout)
+        color_layout.addLayout(exif_row_layout)
 
-        # 选中逻辑
-        def select_color(btns, idx):
-            for i, b in enumerate(btns):
-                b.setProperty("selected", i == idx)
-                b.setStyle(b.style())  # 强制刷新样式
         # 默认选中第一个
-        select_color(background_btns, 0)
-        select_color(fill_btns, 0)
-        select_color(font_btns, 0)
-        select_color(exif_btns, 0)
+        # self.select_color(self.background_btns, 0, "背景颜色")
+        # self.select_color(self.fill_btns, 0, "填充颜色")
+        # self.select_color(self.font_btns, 0, "字体颜色")
+        # self.select_color(self.exif_btns, 0, "EXIF颜色")
         
-        # 点击事件
-        for idx, btn in enumerate(background_btns):
-            btn.clicked.connect(lambda _, i=idx: select_color(background_btns, i))
-        for idx, btn in enumerate(fill_btns):
-            btn.clicked.connect(lambda _, i=idx: select_color(fill_btns, i))
-        for idx, btn in enumerate(font_btns):
-            btn.clicked.connect(lambda _, i=idx: select_color(font_btns, i))
-        for idx, btn in enumerate(exif_btns):
-            btn.clicked.connect(lambda _, i=idx: select_color(exif_btns, i))
-
-        """添加水平layout存放radio_layout等信息"""
-        radio_layout = QHBoxLayout()
-        radio_auto = QRadioButton("读取配置")
-        radio_custom = QRadioButton("自定义颜色")
-        # 设置默认选中读取配置项
-        radio_auto.setChecked(True)
-        # 添加到layout中
-        radio_layout.addWidget(radio_auto)
-        radio_layout.addWidget(radio_custom)
 
         """设置主题配色大框架""" 
         settings_container = QWidget()
@@ -971,10 +1029,10 @@ class setting_Window(QMainWindow):
         title_label.setStyleSheet("font-size: 20px; font-weight: bold; color: #22262A;")
         title_layout.addWidget(title_label)
         title_layout.addStretch(1)
-        save_button = QPushButton("一键重置")
-        save_button.setMinimumSize(120, 50)
-        save_button.setMaximumHeight(60)
-        save_button.setStyleSheet("""
+        self.save_button_colorsetting = QPushButton("一键重置")
+        self.save_button_colorsetting.setMinimumSize(120, 50)
+        self.save_button_colorsetting.setMaximumHeight(60)
+        self.save_button_colorsetting.setStyleSheet("""
             QPushButton {
                 font-size: 19px; 
                 padding: 10px 36px; 
@@ -999,23 +1057,15 @@ class setting_Window(QMainWindow):
             }                  
         """)
 
-        def on_save():
-            print("一键重置：")
-            # 你可以emit信号或其它处理
+        self.checkbox_checkbox = QCheckBox("读取配置文件")
 
         # 添加组件到主layout中
-        title_layout.addWidget(save_button)
+        title_layout.addWidget(self.save_button_colorsetting)
         color_group.layout().insertLayout(0, title_layout)
-        # radio_layout中设置互斥分组
-        radio_group = QButtonGroup(settings_container)
-        radio_group.addButton(radio_custom)
-        radio_group.addButton(radio_auto)        
-        # 添加radio_layout和color_frame到设置组
-        color_group.layout().addLayout(radio_layout)
+        color_group.layout().addWidget(self.checkbox_checkbox)
         color_group.layout().addWidget(color_frame)
         
-        # 添加槽函数
-        save_button.clicked.connect(on_save)
+
         settings_layout.addWidget(color_group)
         layout.addWidget(settings_container)
 
@@ -1337,6 +1387,34 @@ class setting_Window(QMainWindow):
             if hasattr(self.main_window, 'is_fullscreen') and self.main_window.is_fullscreen:
                 self.full_radio.setChecked(True)
         
+
+            # 颜色设置区域
+            if hasattr(self.main_window, 'background_color_default'):
+                try:
+                    idx = self.list_colors.index(self.main_window.background_color_default)
+                except ValueError:
+                    idx = 0  
+                self.select_color(self.background_btns, idx, "背景颜色")
+            if hasattr(self.main_window, 'background_color_table'):
+                try:
+                    idx = self.list_colors.index(self.main_window.background_color_table)
+                except ValueError:
+                    idx = 0  
+                self.select_color(self.fill_btns, idx, "填充颜色")
+            if hasattr(self.main_window, 'font_color_default'):
+                try:
+                    idx = self.list_colors.index(self.main_window.font_color_default)
+                except ValueError:
+                    idx = 0  
+                self.select_color(self.font_btns, idx, "字体颜色")
+            if hasattr(self.main_window, 'font_color_exif'):
+                try:
+                    idx = self.list_colors.index(self.main_window.font_color_exif)
+                except ValueError:
+                    idx = 0  
+                self.select_color(self.exif_btns, idx, "EXIF颜色")
+
+
             # 显示设置区域
             if hasattr(self.main_window, 'checkBox_1'):
                 self.hisgram_checkbox.setChecked(self.main_window.checkBox_1.isChecked())
@@ -1346,6 +1424,11 @@ class setting_Window(QMainWindow):
                 self.roi_checkbox.setChecked(self.main_window.checkBox_3.isChecked())
             if hasattr(self.main_window, 'checkBox_4'):
                 self.ai_checkbox.setChecked(self.main_window.checkBox_4.isChecked())
+            if hasattr(self.main_window, 'is_title_on'):
+                self.title_checkbox.setChecked(self.main_window.is_title_on)
+                if not self.title_checkbox.isChecked():
+                    self.radio_custom.setEnabled(self.title_checkbox.isChecked())
+                    self.radio_folder.setEnabled(self.title_checkbox.isChecked())
 
             # 色彩空间区域
             if hasattr(self.main_window, 'auto_color_space'):
@@ -1388,6 +1471,12 @@ class setting_Window(QMainWindow):
         self.normal_radio.clicked.connect(self.toggle_screen_display)
         self.maxed_radio.clicked.connect(self.toggle_screen_display)
         self.full_radio.clicked.connect(self.toggle_screen_display)
+
+        # 颜色设置区域；一键重置按钮链接事件
+        self.save_button_colorsetting.clicked.connect(self.reset_colorsetting)
+        self.checkbox_checkbox.clicked.connect(self.read_colorsetting)
+        self.color_setting_clicked()
+
 
         # 显示设置区域；设置方形复选框的链接事件
         self.hisgram_checkbox.stateChanged.connect(self.toggle_hisgram_info)
@@ -1607,6 +1696,8 @@ class setting_Window(QMainWindow):
         """重写设置子界面的关闭事件，发送关闭信号"""
         self.closed.emit()
         event.accept()
+
+    
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

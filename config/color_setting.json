@@ -2,7 +2,7 @@
     "basic_color_settings": {
         "background_color_default": "rgb(173,216,230)",
         "background_color_table": "rgb(127,127,127)",
-        "font_color_default": "rgb(0, 0, 0)",
+        "font_color_default": "rgb(0,0,0)",
         "font_color_exif": "rgb(242,12,0)"
     },
     "rgb_color_settings": {

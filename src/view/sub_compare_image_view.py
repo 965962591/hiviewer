@@ -911,9 +911,9 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
         # 显示窗口
         # self.showMaximized()
-        self.toggle_screen_display()
         # self.show()
-
+        self.toggle_screen_display()
+        
         # 更新颜色样式表，放到最后，确保生效
         self.update_ui_styles()
 
@@ -941,9 +941,10 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         # 设置表格的宽高初始大小
         self.table_width_heigth_default = [2534,1376]
 
-        # 初始化roi亮度等信息统计框标志位；看图界面更新状态标志位
+        # 初始化roi亮度等信息统计框标志位；看图界面更新状态标志位; 看图界面标题显示开关
         self.roi_selection_active = False 
         self.is_updating = False        
+        self.is_title_on = False
 
         # 初始化看图界面尺寸显示变量  
         self.is_fullscreen = False      
@@ -1066,10 +1067,11 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.setWindowIcon(QIcon(icon_path))
         self.setWindowTitle("图片对比界面")
 
-        # 获取鼠标所在屏幕，并根据当前屏幕计算界面大小与居中位置，调整大小并移动到该位置
-        # x, y, w, h = self.__get_screen_geometry()
-        # self.resize(int(w * 0.8), int(h * 0.65))
-        # self.move(x, y)
+        """获取鼠标所在屏幕，并根据当前屏幕计算界面大小与居中位置，调整大小并移动到该位置
+        x, y, w, h = self.__get_screen_geometry()
+        self.resize(int(w * 0.8), int(h * 0.65))
+        self.move(x, y)
+        """
 
         # 设置第一排标签
         self.label_0.setText("提示:鼠标左键拖动所有图像,滚轮控制放大/缩小;按住Ctrl+滚轮或者鼠标右键操作单独图像")
@@ -1411,13 +1413,15 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
 
                 # 2. 设置表头行列结构以及单元格内容（文件夹名或文件名） 
+                self.toggle_title_display(self.is_title_on) # 设置列表头是否显示和隐藏
                 self.tableWidget_medium.setColumnCount(num_images)
                 self.tableWidget_medium.setRowCount(1)
                 folder_names = [os.path.basename(os.path.dirname(path)) for path in image_paths]
                 if len(set(folder_names)) == 1: # 如果图片路径都在同一个文件夹下，则将文件夹名作为表头
                     _tmp = folder_names[0]
                     folder_names = [_tmp + ":" + os.path.basename(path) for path in image_paths]
-                self.tableWidget_medium.setHorizontalHeaderLabels(folder_names) 
+                self.tableWidget_medium.setHorizontalHeaderLabels(folder_names)
+                
 
 
                 # 3. 使用线程池并行处理图片
@@ -1863,15 +1867,17 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         """
         
         # 计算表格中单个单元格的宽度和高度
-        sigle_table_w = (self.table_width_heigth_default[0]-18) / len(self.images_path_list)
-        sigle_table_h = self.table_width_heigth_default[1]-55
+        if self.is_title_on:
+            sigle_table_w = (self.table_width_heigth_default[0]-18) / len(self.images_path_list)
+            sigle_table_h = self.table_width_heigth_default[1]-55
+        else:
+            sigle_table_w = (self.table_width_heigth_default[0]-5) / len(self.images_path_list)
+            sigle_table_h = self.table_width_heigth_default[1]-5
 
         if avg_aspect_ratio > 1: #横向图片
-            # 以当前的最大宽度为基准
             zoom_scale = sigle_table_w/target_width
             while ((zoom_scale*target_height) >= sigle_table_h):
                 zoom_scale *= 0.995
-    
         else: #纵向图片
             zoom_scale = sigle_table_h/target_height
             while ((zoom_scale*target_width) >= sigle_table_w):
@@ -1936,14 +1942,13 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         try:
             if not index:     # index == 0 颜色设置，不做任何操作
                 print("[show_menu_combox1]-->看图子界面--点击了颜色配置选项")
-                # 从json文件加载配置
+                # 从json文件加载配置, 更新样式表
                 self.load_settings()
-                # 更新样式表
                 self.update_ui_styles()
             elif index == 1:  # index == 1 一键重置
                 self.background_color_default = "rgb(173,216,230)" # 背景默认色_好蓝
                 self.background_color_table = "rgb(127,127,127)"   # 表格填充背景色_18度灰
-                self.font_color_default = "rgb(0, 0, 0)"           # 字体默认颜色_纯黑色
+                self.font_color_default = "rgb(0,0,0)"           # 字体默认颜色_纯黑色
                 self.font_color_exif = "rgb(255,255,255)"          # exif字体默认颜色_纯白色
                 self.comboBox_1.setCurrentIndex(0)                 # 设置默认显示索引为0
                 # 更新样式表
@@ -2117,7 +2122,16 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.update()
         QApplication.processEvents() 
                 
-                
+
+    def toggle_title_display(self, state):
+        """切换看图界面表格组件列表头的显示和隐藏"""
+        try:
+            self.is_title_on = state
+            self.tableWidget_medium.horizontalHeader().setVisible(self.is_title_on)  
+        except Exception as e:
+            print(f"❌ [toggle_title_display]-->处理toggle_title_display函数时发生错误: {e}")
+
+
     def toggle_exif_info(self, state):
         print(f"[toggle_exif_info]-->切换 EXIF 信息: {'显示' if state == Qt.Checked else '隐藏'}")
         try:
@@ -2422,8 +2436,11 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             else:
                 # 退出全屏模式，恢复Normal常规尺寸显示
                 self.showNormal()
-                x, y, w, h = self.__get_screen_geometry()
+
+                _, _, w, h = self.__get_screen_geometry()
                 self.resize(int(w * 0.8), int(h * 0.70))
+
+                x, y, _, _ = self.__get_screen_geometry()
                 self.move(x, y)
 
                 self.is_norscreen = True
@@ -2457,7 +2474,10 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             elif self.is_norscreen:
                 # 退出全屏模式
                 self.showNormal()
-                
+
+                # 手动设置看图界面尺寸同主界面；
+                self.resize(int(self.parent_window.width()), int(self.parent_window.height()))
+
                 # 显示相关组件
                 self.label_bottom.setVisible(True)
                 for i in range(self.hl_top.count()):
@@ -2992,10 +3012,10 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             exif_visable = ExifSettings.get("exif_visable_setting",{})      # exif具体项显示的标志位
 
             # 从颜色配置中读取基础颜色
-            self.font_color_default = color_settings.get("font_color_default", "rgb(0, 0, 0)")                  # 默认字体颜色_纯黑色
-            self.font_color_exif = color_settings.get("font_color_exif", "rgb(255, 255, 255)")                  # Exif字体颜色_纯白色
+            self.font_color_default = color_settings.get("font_color_default", "rgb(0,0,0)")                  # 默认字体颜色_纯黑色
+            self.font_color_exif = color_settings.get("font_color_exif", "rgb(255,255,255)")                  # Exif字体颜色_纯白色
             self.background_color_default = color_settings.get("background_color_default", "rgb(173,216,230)")  # 深色背景色_好蓝
-            self.background_color_table = color_settings.get("background_color_table", "rgb(127, 127, 127)")    # 表格背景色_18度灰
+            self.background_color_table = color_settings.get("background_color_table", "rgb(127,127,127)")    # 表格背景色_18度灰
 
             # 读取rgb颜色配置
             self.color_rgb_settings = rgb_settings
@@ -3016,6 +3036,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             # 设置亮度统计信息的标志位；初始化ai提示标注位为False 
             self.stats_visible = self.dict_label_info_visibility.get("roi_info", False)         
             self.ai_tips_flag = self.dict_label_info_visibility.get("ai_tips", False)  
+            # 读取标题显示开关, 默认选择开启
+            self.is_title_on = self.dict_label_info_visibility.get("is_title_on", True)
                  
 
         except Exception as e:
@@ -3067,6 +3089,10 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 "is_fullscreen":self.is_fullscreen,
                 "is_norscreen":self.is_norscreen,
                 "is_maxscreen":self.is_maxscreen,
+
+                # 标题显示开关
+                "is_title_on":self.is_title_on,
+                
 
             }
             setting = {
