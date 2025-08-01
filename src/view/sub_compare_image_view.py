@@ -2433,6 +2433,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     if item.widget():
                         item.widget().setVisible(False)
                 
+                
             else:
                 # 退出全屏模式，恢复Normal常规尺寸显示
                 self.showNormal()
@@ -2453,6 +2454,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     item = self.hl_top.itemAt(i)
                     if item.widget():
                         item.widget().setVisible(True)
+
         except Exception as e:
             print(f"❌ [toggle_fullscreen]-->应用F11切换全屏时发生错误: {e}")
 

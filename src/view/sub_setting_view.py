@@ -321,11 +321,11 @@ class setting_Window(QMainWindow):
         
         # 设置窗口标志，确保设置窗口显示在最顶层
         self.setWindowFlags(
-            Qt.Window |  # 独立窗口
-            Qt.WindowStaysOnTopHint |  # 保持在最顶层
-            Qt.WindowCloseButtonHint |  # 显示关闭按钮
-            Qt.WindowMinimizeButtonHint |  # 显示最小化按钮
-            Qt.WindowMaximizeButtonHint  # 显示最大化按钮
+            Qt.Window |                   # 独立窗口
+            Qt.WindowStaysOnTopHint |     # 保持在最顶层
+            Qt.WindowCloseButtonHint |    # 显示关闭按钮
+            Qt.WindowMinimizeButtonHint | # 显示最小化按钮
+            Qt.WindowMaximizeButtonHint   # 显示最大化按钮
         )
         
         # 初始化基础UI
@@ -345,19 +345,19 @@ class setting_Window(QMainWindow):
 
     def setup_ui(self):
         """设置界面基础UI设计"""
-        # 左侧导航区整体widget
+        # 创建左侧导航区整体widget
         self.nav_widget = QWidget()
         self.nav_layout = QVBoxLayout(self.nav_widget)
         self.nav_layout.setContentsMargins(0, 0, 0, 0)
         self.nav_layout.setSpacing(6) 
-        # 创建导航区列表项,并设置图标尺寸为24x24
+        # 创建左侧导航区列表项,并设置图标尺寸为24x24
         self.nav_list = QListWidget()
         self.nav_list.setIconSize(QSize(24, 24))
         self.nav_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.nav_list.setFocusPolicy(Qt.NoFocus)
         self.nav_layout.addWidget(self.nav_list)
         
-        # 右侧内容区
+        # 创建右侧内容区
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setFrameShape(QFrame.NoFrame)
@@ -376,7 +376,6 @@ class setting_Window(QMainWindow):
         self.splitter.setCollapsible(0, False)
         self.splitter.setCollapsible(1, False)
 
-
         # 创建中央主容器
         main_layout = QHBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -389,7 +388,8 @@ class setting_Window(QMainWindow):
 
     def init_sections(self):
         """初始化导航分区和内容区"""
-        # 定义分区
+        # 设置列表存储每个分区的标题控件，用于滚动时高亮导航项
+        self.section_title_widgets = []
         self.sections = [
             {"name": "通用设置", "icon": "setting.png"},
             {"name": "颜色设置", "icon": "setting_color.png"},
@@ -397,12 +397,9 @@ class setting_Window(QMainWindow):
             {"name": "EXIF显示", "icon": "setting_h.png"},
             {"name": "色彩空间", "icon": "setting_rgb.png"},
             {"name": "关于", "icon": "setting_about.png"},
-            # 可继续添加更多分区
+            # 自定义添加导航分区和内容区，可继续添加更多分区
         ]
 
-        # 存储每个分区的标题控件，用于滚动时高亮导航项
-        self.section_title_widgets = []
-        
         # 根据自定义分区创建导航项和内容区
         for i, sec in enumerate(self.sections):
             # 左侧导航区添加: 名称+图标
@@ -411,30 +408,24 @@ class setting_Window(QMainWindow):
             item.setData(Qt.UserRole, sec["name"])
             self.nav_list.addItem(item)
             
-            # 右侧内容区设置: 分区标题，并设置对象名，便于识别; 右侧内容区添加: 标题组件
+            """右侧内容区添加: 分区标题; 存储到对应列表中便于滚动高亮显示"""
             title_label = self.set_title_label(sec, i)
             self.content_layout.addWidget(title_label)
+            self.section_title_widgets.append(title_label)
             
-            """右侧内容区添加: 具体内容组件,主要实现集中在这一部分""" 
+            """🔺右侧内容区添加: 具体内容组件,主要实现集中在这一部分🔺""" 
             self.add_section_content(sec)
 
-            # 右侧内容区添加: 分隔线（最后一个分区不添加横线）
+            """右侧内容区添加: 分隔线（最后一个分区不添加横线）"""
             if i < len(self.sections) - 1:
-                # 设置并添加分隔线到分区layout中
-                separator = self.set_title_separator()
-                self.content_layout.addWidget(separator)
+                self.content_layout.addWidget(self.set_title_separator())
             
-            # 存储每个分区的标题控件，用于滚动时高亮导航项
-            self.section_title_widgets.append(title_label)
-        
         # 添加底部弹性空间（保存为实例变量，便于动态调整高度）
         self.bottom_spacer = QWidget()
         self.bottom_spacer.setFixedHeight(0)
         self.content_layout.addWidget(self.bottom_spacer)
         
-        # 默认选中第一个分区
-        if self.nav_list.count() > 0:
-            self.nav_list.setCurrentRow(0)
+
 
     def set_title_separator(self):
         """设置分隔横线"""
@@ -470,10 +461,9 @@ class setting_Window(QMainWindow):
 
 
     def add_section_content(self, section):
-        """添加分区内容"""
-        # 创建内容容器
+        """添加内容区各个分区的具体内容"""
+        # 首先，创建内容区容器
         content_container = QWidget()
-
         content_layout = QVBoxLayout(content_container)
         content_layout.setContentsMargins(10, 0, 10, 0)
         content_layout.setSpacing(0)
@@ -489,12 +479,11 @@ class setting_Window(QMainWindow):
             self.add_exif_settings_content(content_layout)
         elif section["name"] == "色彩空间":
             self.add_color_space_settings_content(content_layout)
-        else:# 其他分区的默认内容
+        else:
             self.add_default_settings_content(content_layout, section["name"])
         
+        # 添加
         self.content_layout.addWidget(content_container)
-
-
 
     
     """
@@ -541,6 +530,98 @@ class setting_Window(QMainWindow):
 
         except Exception as e:
             print(f"[toggle_screen_display]-->设置界面-->通用设置—-尺寸设置发生错误: {e}")
+
+
+    # 互斥逻辑
+    def on_follow_system_changed(self):
+        """通用设置-->主题模式--跟随系统复选框的槽函数"""
+        try:
+            enabled = not self.follow_system_checkbox.isChecked()
+            print("通用设置-主题模式-->跟随系统主题" if not enabled else "通用设置-主题模式-->不跟随系统主题")
+
+            self.light_radio.setEnabled(enabled)
+            self.dark_radio.setEnabled(enabled)
+            self.light_card.setStyleSheet(f"""
+                QFrame#light_card {{
+                    border: 2px solid {'#e0e0e0' if not enabled else ('#409eff' if self.light_radio.isChecked() else '#e0e0e0')};
+                    border-radius: 14px;
+                    background: #fafbfc;
+                    min-width: 220px;
+                    max-width: 240px;
+                    min-height: 120px;
+                    margin: 0 0 0 0;
+                }}
+            """)
+            self.dark_card.setStyleSheet(f"""
+                QFrame#dark_card {{
+                    border: 2px solid {'#e0e0e0' if not enabled else ('#409eff' if self.dark_radio.isChecked() else '#e0e0e0')};
+                    border-radius: 14px;
+                    background: #23272e;
+                    min-width: 220px;
+                    max-width: 240px;
+                    min-height: 120px;
+                    margin: 0 0 0 0;
+                }}
+            """)
+        except Exception as e:
+            print(f"[on_follow_system_changed]-->设置界面-->通用设置—-主题模式跟随系统发生错误: {e}")
+
+
+    def update_card_styles(self):
+        """通用设置-->主题模式--深浅色主题选择的槽函数"""
+        try:
+            if self.light_radio.isChecked():
+                print("通用设置-->主题模式--选择浅色主题")
+                
+                self.light_card.setStyleSheet("""
+                    QFrame#light_card {
+                        border: 2px solid #409eff;
+                        border-radius: 14px;
+                        background: #fafbfc;
+                        min-width: 220px;
+                        max-width: 240px;
+                        min-height: 120px;
+                        margin: 0 0 0 0;
+                    }
+                """)
+                self.dark_card.setStyleSheet("""
+                    QFrame#dark_card {
+                        border: 2px solid #e0e0e0;
+                        border-radius: 14px;
+                        background: #23272e;
+                        min-width: 220px;
+                        max-width: 240px;
+                        min-height: 120px;
+                        margin: 0 0 0 0;
+                    }
+                """)
+            else:
+                print("通用设置-->主题模式--选择深色主题")
+                self.light_card.setStyleSheet("""
+                    QFrame#light_card {
+                        border: 2px solid #e0e0e0;
+                        border-radius: 14px;
+                        background: #fafbfc;
+                        min-width: 220px;
+                        max-width: 240px;
+                        min-height: 120px;
+                        margin: 0 0 0 0;
+                    }
+                """)
+                self.dark_card.setStyleSheet("""
+                    QFrame#dark_card {
+                        border: 2px solid #409eff;
+                        border-radius: 14px;
+                        background: #23272e;
+                        min-width: 220px;
+                        max-width: 240px;
+                        min-height: 120px;
+                        margin: 0 0 0 0;
+                    }
+                """)
+        except Exception as e:
+            print(f"[update_card_styles]-->通用设置-->主题模式--深浅色主题选择发生错误: {e}")
+
 
     def reset_colorsetting(self):
         """颜色设置-->一键重置"""
@@ -608,7 +689,7 @@ class setting_Window(QMainWindow):
             for i, b in enumerate(btns):
                 if i == idx:
                     # 更新按钮选中状态并强制刷新样式
-                    print(f"🎨 颜色设置 -> {color_type} -> 选中: {self.color_names[idx]} RGB: {self.list_colors[idx]}")
+                    # print(f"🎨 颜色设置 -> {color_type} -> 选中: {self.color_names[idx]} RGB: {self.list_colors[idx]}")
                     b.setProperty("selected", True)
                     b.setStyle(b.style())  
 
@@ -762,8 +843,6 @@ class setting_Window(QMainWindow):
     内容区设置槽函数
     ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     """
-
-
     def add_general_settings_content(self, layout):
         """添加通用设置内容"""
         settings_container = QWidget()
@@ -787,23 +866,21 @@ class setting_Window(QMainWindow):
         size_group.layout().addWidget(self.full_radio)
         settings_layout.addWidget(size_group)
 
-
         # 主题设置
         theme_group = self.create_setting_group("主题模式", "跟随系统勾选后，应用将跟随设备的系统设置切换主题模式，可选模式置灰处理")
-        ## 跟随系统
-        follow_system_checkbox = QCheckBox("跟随系统")
-        follow_system_checkbox.setChecked(True)
-        follow_system_checkbox.setStyleSheet("QCheckBox { font-size: 15px; margin-bottom: 2px; }")
-        theme_group.layout().addWidget(follow_system_checkbox)
-
-        ## 主题卡片区
+        # 跟随系统复选框设置
+        self.follow_system_checkbox = QCheckBox("跟随系统")
+        self.follow_system_checkbox.setStyleSheet("QCheckBox { font-size: 15px; margin-bottom: 2px; }")
+        theme_group.layout().addWidget(self.follow_system_checkbox)
+        # 主题卡片区
         card_layout = QHBoxLayout()
         card_layout.setSpacing(24)
         card_layout.setAlignment(Qt.AlignLeft)
-        ## 浅色卡片
-        light_card = QFrame()
-        light_card.setObjectName("light_card")
-        light_card.setStyleSheet("""
+
+        # 浅色卡片
+        self.light_card = QFrame()
+        self.light_card.setObjectName("light_card")
+        self.light_card.setStyleSheet("""
             QFrame#light_card {
                 border: 2px solid #409eff;
                 border-radius: 14px;
@@ -814,25 +891,35 @@ class setting_Window(QMainWindow):
                 margin: 0 0 0 0;
             }
         """)
-        light_layout = QVBoxLayout(light_card)
+        light_layout = QVBoxLayout(self.light_card)
         light_layout.setContentsMargins(18, 14, 18, 10)
         light_layout.setSpacing(8)
         # 预览
         light_preview = QLabel()
         light_preview.setFixedHeight(38)
-        light_preview.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #f5f6fa, stop:1 #e6eaf3); border-radius: 7px; margin-bottom: 2px;")
+        light_preview.setStyleSheet("""
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #f5f6fa, stop:1 #e6eaf3); 
+            border-radius: 7px; 
+            margin-bottom: 2px;
+        """)
         light_layout.addWidget(light_preview)
-        # 单选按钮
-        light_radio = QRadioButton("浅色")
-        light_radio.setChecked(True)
-        light_radio.setStyleSheet("QRadioButton { font-size: 15px; margin-top: 2px; color: #000; }")
-        light_layout.addWidget(light_radio)
-        light_layout.setAlignment(light_radio, Qt.AlignLeft)
+        # 浅色-->单选圆形按钮
+        self.light_radio = QRadioButton("浅色")
+        self.light_radio.setChecked(True)
+        self.light_radio.setStyleSheet("""
+            QRadioButton { font-size: 15px;
+                margin-top: 2px; 
+                color: #000; 
+            }
+        """)
+        light_layout.addWidget(self.light_radio)
+        light_layout.setAlignment(self.light_radio, Qt.AlignLeft)
+
 
         # 深色卡片
-        dark_card = QFrame()
-        dark_card.setObjectName("dark_card")
-        dark_card.setStyleSheet("""
+        self.dark_card = QFrame()
+        self.dark_card.setObjectName("dark_card")
+        self.dark_card.setStyleSheet("""
             QFrame#dark_card {
                 border: 2px solid #e0e0e0;
                 border-radius: 14px;
@@ -843,117 +930,39 @@ class setting_Window(QMainWindow):
                 margin: 0 0 0 0;
             }
         """)
-        dark_layout = QVBoxLayout(dark_card)
+        dark_layout = QVBoxLayout(self.dark_card)
         dark_layout.setContentsMargins(18, 14, 18, 10)
         dark_layout.setSpacing(8)
         # 预览
         dark_preview = QLabel()
         dark_preview.setFixedHeight(38)
-        dark_preview.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #23272e, stop:1 #31343b); border-radius: 7px; margin-bottom: 2px;")
+        dark_preview.setStyleSheet("""
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #23272e, stop:1 #31343b); 
+            border-radius: 7px;
+            margin-bottom: 2px;
+        """)
         dark_layout.addWidget(dark_preview)
-        # 单选按钮
-        dark_radio = QRadioButton("深色")
-        dark_radio.setChecked(False)
-        dark_radio.setStyleSheet("QRadioButton { font-size: 15px; margin-top: 2px; color: #000; }")
-        dark_layout.addWidget(dark_radio)
-        dark_layout.setAlignment(dark_radio, Qt.AlignLeft)
+        # 深色-->单选圆形按钮
+        self.dark_radio = QRadioButton("深色")
+        self.dark_radio.setChecked(False)
+        self.dark_radio.setStyleSheet("""
+            QRadioButton { 
+                font-size: 15px;
+                margin-top: 2px;
+                color: #000; 
+            }
+        """)
+        dark_layout.addWidget(self.dark_radio)
+        dark_layout.setAlignment(self.dark_radio, Qt.AlignLeft)
 
         # 单选互斥
         theme_radio_group = QButtonGroup(settings_container)
-        theme_radio_group.addButton(light_radio)
-        theme_radio_group.addButton(dark_radio)
-
-        # 添加到主题组theme_group中
-        card_layout.addWidget(light_card)
-        card_layout.addWidget(dark_card)
-        theme_group.layout().addLayout(card_layout)
-
-        # 互斥逻辑
-        def on_follow_system_changed():
-            enabled = not follow_system_checkbox.isChecked()
-            light_radio.setEnabled(enabled)
-            dark_radio.setEnabled(enabled)
-            light_card.setStyleSheet(f"""
-                QFrame#light_card {{
-                    border: 2px solid {'#e0e0e0' if not enabled else ('#409eff' if light_radio.isChecked() else '#e0e0e0')};
-                    border-radius: 14px;
-                    background: #fafbfc;
-                    min-width: 220px;
-                    max-width: 240px;
-                    min-height: 120px;
-                    margin: 0 0 0 0;
-                }}
-            """)
-            dark_card.setStyleSheet(f"""
-                QFrame#dark_card {{
-                    border: 2px solid {'#e0e0e0' if not enabled else ('#409eff' if dark_radio.isChecked() else '#e0e0e0')};
-                    border-radius: 14px;
-                    background: #23272e;
-                    min-width: 220px;
-                    max-width: 240px;
-                    min-height: 120px;
-                    margin: 0 0 0 0;
-                }}
-            """)
-
-
-        def update_card_styles():
-            if light_radio.isChecked():
-                light_card.setStyleSheet("""
-                    QFrame#light_card {
-                        border: 2px solid #409eff;
-                        border-radius: 14px;
-                        background: #fafbfc;
-                        min-width: 220px;
-                        max-width: 240px;
-                        min-height: 120px;
-                        margin: 0 0 0 0;
-                    }
-                """)
-                dark_card.setStyleSheet("""
-                    QFrame#dark_card {
-                        border: 2px solid #e0e0e0;
-                        border-radius: 14px;
-                        background: #23272e;
-                        min-width: 220px;
-                        max-width: 240px;
-                        min-height: 120px;
-                        margin: 0 0 0 0;
-                    }
-                """)
-            else:
-                light_card.setStyleSheet("""
-                    QFrame#light_card {
-                        border: 2px solid #e0e0e0;
-                        border-radius: 14px;
-                        background: #fafbfc;
-                        min-width: 220px;
-                        max-width: 240px;
-                        min-height: 120px;
-                        margin: 0 0 0 0;
-                    }
-                """)
-                dark_card.setStyleSheet("""
-                    QFrame#dark_card {
-                        border: 2px solid #409eff;
-                        border-radius: 14px;
-                        background: #23272e;
-                        min-width: 220px;
-                        max-width: 240px;
-                        min-height: 120px;
-                        margin: 0 0 0 0;
-                    }
-                """)
-
-        # 设置主题模式的槽函数
-        if follow_system_checkbox.isChecked:
-            on_follow_system_changed()
-        follow_system_checkbox.stateChanged.connect(on_follow_system_changed)
-        light_radio.toggled.connect(update_card_styles)
-        dark_radio.toggled.connect(update_card_styles)
-
-
+        theme_radio_group.addButton(self.light_radio)
+        theme_radio_group.addButton(self.dark_radio)
         # 添加各个组件
+        card_layout.addWidget(self.light_card)
+        card_layout.addWidget(self.dark_card)
+        theme_group.layout().addLayout(card_layout)    
         settings_layout.addWidget(theme_group)
         layout.addWidget(settings_container)
 
@@ -1311,30 +1320,28 @@ class setting_Window(QMainWindow):
 
     def set_stylesheet(self):
         """设置组件风格样式表"""
-        # 设置应用程序图标
+        """
+        设置界面-->应用程序图标
+        -----------------------------------------------------------------------------------------------------------
+        """
         icon_path = base_dir / "resource" / "icons" / "setting_basic.png"
         self.setWindowIcon(QIcon(icon_path.as_posix()))
         
+        """
+        设置界面-->左侧导航区样式设计
+        -----------------------------------------------------------------------------------------------------------
+        """
         # 导航区显示状态：True为展开状态（显示图标和文字），False为折叠状态（只显示图标）
         self.nav_expanded = True
         self.nav_expanded_width = 220  # 展开时的宽度
         self.nav_collapsed_width = 60  # 折叠时的宽度
         
-
-        # 分割器的样式设置
-        self.splitter.setStyleSheet("""
-            QSplitter::handle {
-                background: #b3d8fd;  
-                width: 6px;
-                border-radius: 3px;
-            }
-            QSplitter::handle:hover {
-                background: #6ca0dc;  
-            }
-        """)
-
         # 设置左侧导航区的最小宽度为60,确保折叠只显示图标
         self.nav_widget.setMinimumWidth(60)
+
+        # 导航区默认选中第一个分区
+        if self.nav_list.count() > 0:
+            self.nav_list.setCurrentRow(0)
 
         # 设置导航区列表的风格样式
         self.nav_list.setStyleSheet("""
@@ -1373,12 +1380,32 @@ class setting_Window(QMainWindow):
             }
         """)
 
-        # 内容区的样式设置
+        """
+        设置界面-->分割器的样式设置
+        -----------------------------------------------------------------------------------------------------------
+        """
+        self.splitter.setStyleSheet("""
+            QSplitter::handle {
+                background: #b3d8fd;  
+                width: 6px;
+                border-radius: 3px;
+            }
+            QSplitter::handle:hover {
+                background: #6ca0dc;  
+            }
+        """)
+
+
+        """
+        设置界面-->右侧内容区的样式设置
+        -----------------------------------------------------------------------------------------------------------
+        """
         self.scroll_content.setStyleSheet("background: #F0F0F0;")
         self.bottom_spacer.setStyleSheet("background: #F0F0F0;")
 
         """内容取组件初始化"""
         if self.main_window:
+
             # 通用设置区域
             if hasattr(self.main_window, 'is_maxscreen') and self.main_window.is_maxscreen:
                 self.maxed_radio.setChecked(True)
@@ -1446,12 +1473,17 @@ class setting_Window(QMainWindow):
             # 通用设置区域
             self.maxed_radio.setChecked(True)
 
+            # 颜色设置区域
+
             # 显示设置区域
             self.roi_checkbox.setChecked(True)
+
+            # EXIF显示
 
             # 色彩空间区域
             self.auto_radio.setChecked(True)
 
+            # 关于
 
 
     def set_shortcut(self):
@@ -1464,19 +1496,20 @@ class setting_Window(QMainWindow):
         self.splitter.doubleClicked.connect(self.on_splitter_double_clicked)
         self.scroll_area.verticalScrollBar().valueChanged.connect(self.on_scroll) 
 
-
-
         """内容区组件的槽函数"""
         # 通用设置区域；设置圆形选择按钮的链接事件
         self.normal_radio.clicked.connect(self.toggle_screen_display)
         self.maxed_radio.clicked.connect(self.toggle_screen_display)
         self.full_radio.clicked.connect(self.toggle_screen_display)
+        # 通用设置区域；主题模式的槽函数
+        self.follow_system_checkbox.stateChanged.connect(self.on_follow_system_changed)
+        self.light_radio.clicked.connect(self.update_card_styles)
+        self.dark_radio.clicked.connect(self.update_card_styles)
 
         # 颜色设置区域；一键重置按钮链接事件
         self.save_button_colorsetting.clicked.connect(self.reset_colorsetting)
         self.checkbox_checkbox.clicked.connect(self.read_colorsetting)
         self.color_setting_clicked()
-
 
         # 显示设置区域；设置方形复选框的链接事件
         self.hisgram_checkbox.stateChanged.connect(self.toggle_hisgram_info)
@@ -1493,15 +1526,11 @@ class setting_Window(QMainWindow):
         # EXIF显示区域
         self.save_button.clicked.connect(self.toggle_checkbox_exif)
         
-
         # 色彩空间区域
         self.auto_radio.clicked.connect(self.toggle_radio_colorspace)
         self.rgb_radio.clicked.connect(self.toggle_radio_colorspace)
         self.p3_radio.clicked.connect(self.toggle_radio_colorspace)
         self.gray_radio.clicked.connect(self.toggle_radio_colorspace)
-
-
-        
 
 
         """全局快键键设置"""
