@@ -31,13 +31,9 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt5.QtCore import Qt, QSize, pyqtSignal, QMimeData, QTimer, QRectF, QPropertyAnimation, QObject, QEvent, QPoint
 from PyQt5.QtGui import QKeySequence, QDrag, QPainter, QIcon, QMouseEvent, QCursor
 from pathlib import Path
-import xml.etree.ElementTree as ET
-
-
 
 # 设置项目根路径
 base_dir = Path(__file__).parent.parent.parent
-
 
 class CustomSplitter(QSplitter):
     """自定义分割器，支持双击切换导航区显示状态"""
@@ -334,11 +330,12 @@ class setting_Window(QMainWindow):
         # 初始化导航和内容区
         self.init_sections()
 
-        # 设置导航区和内容区的风格样式  
-        self.set_stylesheet()
-
         # 设置槽函数和快捷键
         self.set_shortcut()
+
+        # 设置导航区和内容区的风格样式  
+        self.set_stylesheet()
+        
 
         # 显示设置界面
         # self.show_setting_ui()
@@ -570,9 +567,47 @@ class setting_Window(QMainWindow):
     def update_card_styles(self):
         """通用设置-->主题模式--深浅色主题选择的槽函数"""
         try:
+
+            qss_dark = f"""
+                /* 主窗口样式 */
+                QMainWindow {{
+                    background-color: black;
+                    color: white;
+                }}
+                QMainWindow QCheckBox{{
+                    color: #FFFFFF;
+                    background-color: #2D353C;
+                    border:none;
+                    border-radius:5px;
+                    margin: 0 0 0 0; /* 外边距 上右下左 */
+                    padding:0 0 0 5; /* 外边距 上右下左 */                  
+                }}
+
+                QMainWindow QComboBox{{
+                    background-color: #2D353C;
+                }}
+            """
+
+            qss_light = f"""
+                /* 主窗口样式 */
+                QMainWindow {{
+                    background-color: white;
+                    color: black;
+                }}
+            """
+
             if self.light_radio.isChecked():
-                print("通用设置-->主题模式--选择浅色主题")
-                
+                print("通用设置-->主题模式--选择浅色主题")   
+
+                if self.main_window:
+                    self.main_window.setStyleSheet(qss_light) 
+                    self.main_window.statusbar.setStyleSheet(f"background-color: {self.main_window.background_color_default};")
+                    self.main_window.label_0.setStyleSheet(f"background-color: {self.main_window.background_color_default};")
+
+                    if hasattr(self.main_window, 'parent_window') and hasattr(self.main_window.parent_window, 'current_theme'):
+                        self.main_window.parent_window.current_theme = "默认主题"
+                        self.main_window.parent_window.apply_theme()
+
                 self.light_card.setStyleSheet("""
                     QFrame#light_card {
                         border: 2px solid #409eff;
@@ -597,6 +632,15 @@ class setting_Window(QMainWindow):
                 """)
             else:
                 print("通用设置-->主题模式--选择深色主题")
+                
+                if self.main_window:
+                    self.main_window.setStyleSheet(qss_dark)
+                    self.main_window.statusbar.setStyleSheet("background-color: #2D353C;")
+                    self.main_window.label_0.setStyleSheet("background-color: #2D353C;")
+                    if hasattr(self.main_window, 'parent_window') and hasattr(self.main_window.parent_window, 'current_theme'):
+                        self.main_window.parent_window.current_theme = "暗黑主题"
+                        self.main_window.parent_window.apply_theme()
+
                 self.light_card.setStyleSheet("""
                     QFrame#light_card {
                         border: 2px solid #e0e0e0;
@@ -905,7 +949,7 @@ class setting_Window(QMainWindow):
         light_layout.addWidget(light_preview)
         # 浅色-->单选圆形按钮
         self.light_radio = QRadioButton("浅色")
-        self.light_radio.setChecked(True)
+        # self.light_radio.setChecked(True)
         self.light_radio.setStyleSheet("""
             QRadioButton { font-size: 15px;
                 margin-top: 2px; 
@@ -944,7 +988,6 @@ class setting_Window(QMainWindow):
         dark_layout.addWidget(dark_preview)
         # 深色-->单选圆形按钮
         self.dark_radio = QRadioButton("深色")
-        self.dark_radio.setChecked(False)
         self.dark_radio.setStyleSheet("""
             QRadioButton { 
                 font-size: 15px;
@@ -1402,7 +1445,7 @@ class setting_Window(QMainWindow):
         """
         self.scroll_content.setStyleSheet("background: #F0F0F0;")
         self.bottom_spacer.setStyleSheet("background: #F0F0F0;")
-
+        
         """内容取组件初始化"""
         if self.main_window:
 
@@ -1413,7 +1456,15 @@ class setting_Window(QMainWindow):
                 self.normal_radio.setChecked(True)
             if hasattr(self.main_window, 'is_fullscreen') and self.main_window.is_fullscreen:
                 self.full_radio.setChecked(True)
-        
+
+            if hasattr(self.main_window, 'parent_window') and hasattr(self.main_window.parent_window, 'current_theme'):
+                if self.main_window.parent_window.current_theme == "默认主题":
+                    self.light_radio.setChecked(True)
+                if self.main_window.parent_window.current_theme == "暗黑主题":
+                    self.dark_radio.setChecked(True)
+            else:
+                self.light_radio.setChecked(True)
+            self.update_card_styles()  # 更新主题设置
 
             # 颜色设置区域
             if hasattr(self.main_window, 'background_color_default'):
@@ -1730,6 +1781,7 @@ class setting_Window(QMainWindow):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
+
     window = setting_Window()
     window.show()
     sys.exit(app.exec_()) 

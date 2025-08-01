@@ -3673,5 +3673,10 @@ if __name__ == '__main__':
 
     # 设置主程序app
     app = QApplication(sys.argv)
+
+    # 使用qt_material统一管理主题配色
+    # from qt_material import apply_stylesheet
+    # apply_stylesheet(app, theme="dark_blue.xml")
+
     window = HiviewerMainwindow()
     sys.exit(app.exec_())

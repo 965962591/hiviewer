@@ -1189,8 +1189,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         combobox_style = f"""
             QComboBox {{
                 /* 下拉框本体样式*/
-                background-color: {"rgb(240,240,240)"};                       /* 背景色 */
-                color: {self.font_color_default};                             /* 字体颜色 */
+                color: {self.font_color_default};                             /* 前景字体颜色 */
                 selection-background-color: {self.background_color_default};  /* 选中时背景色 */
                 selection-color: {self.font_color_default};                   /* 选中时字体颜色 */
                 min-height: 30px;                                             /* 最小高度 */
