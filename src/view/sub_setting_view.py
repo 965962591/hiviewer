@@ -572,7 +572,7 @@ class setting_Window(QMainWindow):
                 /* 主窗口样式 */
                 QMainWindow {{
                     background-color: black;
-                    color: white;
+                    color: #F0F0F0;
                 }}
                 QMainWindow QCheckBox{{
                     color: #FFFFFF;
@@ -591,7 +591,7 @@ class setting_Window(QMainWindow):
             qss_light = f"""
                 /* 主窗口样式 */
                 QMainWindow {{
-                    background-color: white;
+                    background-color: #F0F0F0;
                     color: black;
                 }}
             """

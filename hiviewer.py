@@ -84,6 +84,14 @@ from src.utils.aebox_link import (check_process_running,                    # �
     urlencode_folder_path, get_api_data)
 
 
+
+import warnings
+# 过滤libpng相关的警告
+warnings.filterwarnings("ignore", message=".*libpng warning.*")
+warnings.filterwarnings("ignore", message=".*profile 'Display P3'.*")
+warnings.filterwarnings("ignore", message=".*length does not match profile.*")
+
+
 """
 设置主界面类区域开始线
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -863,7 +871,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """将文件夹路径发送到aebox"""
         try:
 
-            if not check_process_running("aebox.exe"):
+            if not check_process_running("aebox"):
                 show_message_box(f"未检测到aebox进程，请先手动打开aebox软件", "错误", 1000)
 
             # url编码

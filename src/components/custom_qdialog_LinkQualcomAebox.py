@@ -224,7 +224,7 @@ class Qualcom_Dialog(QDialog):
         # 检查aebox工具是否在运行
         list_url = self.get_url()
         from src.utils.aebox_link import check_process_running
-        if list_url and check_process_running("aebox.exe"): # and test_aebox_link(list_url):
+        if list_url and check_process_running("aebox"): # and test_aebox_link(list_url):
             self.status_button2.setText("✅")
             self.status_button2.setToolTip(f"✅当前AEBOX工具路径有效,程序已启动")
             return

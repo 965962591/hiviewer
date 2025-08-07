@@ -536,7 +536,7 @@ class MyGraphicsView(QGraphicsView):
             # f"ROI: {stats['width']}x{stats['height']}\n"
             f"亮度: {stats['avg_brightness']:.1f}\n"
             f"对比度: {stats['contrast']:.1f}\n"
-            # f"LAB均值: {stats['avg_lab']}\n"
+            f"LAB均值: {stats['avg_lab']}\n"
             f"RGB均值: {stats['avg_rgb']}\n"
             f"(R/G:{stats['R_G']} B/G: {stats['B_G']})\n"
             f"(roi:{stats['width']}x{stats['height']})"
@@ -1775,7 +1775,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         """同步当前图片索引到aebox应用"""
         try:
             # 预检查程序aebox是否启动
-            if not check_process_running("aebox.exe"):
+            if not check_process_running("aebox"):
                 print("❌ [sync_image_index_with_aebox]-->同步当前图片索引到aebox应用失败--aebox应用未启动")
                 return False
 

@@ -71,9 +71,8 @@ def check_process_running(process_name: str) -> bool:
         is_path = os.path.isfile(process_name)
         
         # 路径规范化处理
-        target_process_name = os.path.basename(aebox_path).lower() if is_path else process_name.lower()
-
-        if any(p.name().lower() == target_process_name for p in psutil.process_iter()):
+        target_process_name = os.path.basename(is_path).lower() if is_path else process_name.lower()
+        if any(target_process_name in p.name().lower() for p in psutil.process_iter()):
             print(f"✅ [check_process_running]-->{target_process_name} 进程已在运行")
             return True
         else:
