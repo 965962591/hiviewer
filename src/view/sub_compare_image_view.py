@@ -302,25 +302,7 @@ def load_xml_data(xml_path):
         print(f"解析XML失败{xml_path}:\n报错信息: {e}")
         return '', False
     
-def get_aebox_host():
-    """读取aebox连接配置"""
-    config_path = os.path.join(BasePath, "cache", "aebox_link_host.json")
-    default_host = "http://127.0.0.1:8000"
-    
-    try:
-        if os.path.exists(config_path):
-            with open(config_path, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-                return config.get('host', default_host)
-        else:
-            # 创建默认配置
-            os.makedirs(os.path.dirname(config_path), exist_ok=True)
-            with open(config_path, 'w', encoding='utf-8') as f:
-                json.dump({"host": default_host}, f, indent=4)
-            return default_host
-    except Exception as e:
-        print(f"读取aebox配置失败，使用默认值: {str(e)}")
-        return default_host  
+
 
 
 """
@@ -1779,14 +1761,19 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 print("❌ [sync_image_index_with_aebox]-->同步当前图片索引到aebox应用失败--aebox应用未启动")
                 return False
 
+        
             # 新增配置文件读取
-            host = get_aebox_host()
+            host = ( 
+                f"http://{self.parent_window.fast_api_host}:{self.parent_window.fast_api_port}" 
+                if self.parent_window and self.parent_window.fast_api_host and self.parent_window.fast_api_port else
+                "http://127.0.0.1:8000"
+            )
             origin_image_names = [os.path.basename(path) for path in images_path_list]
 
             # 发送初始索引
             select_url = f"{host}/select_image/{index_list[0].split('/')[0]}"
-            if not get_api_data(url=select_url, timeout=3):
-                print("❌ [sync_image_index_with_aebox]-->初始索引发送失败")
+            if not get_api_data(url=select_url, timeout=2):
+                print(f"❌ [sync_image_index_with_aebox]-->初始索引发送失败:{select_url}")
                 return False
 
             # 获取aebox当前图片信息

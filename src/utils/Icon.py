@@ -194,9 +194,6 @@ class IconCache:
             reader.setAutoTransform(True)     # 设置自动转换（处理EXIF方向信息）
             reader.setQuality(100)            # 设置高质量缩放
             
-            # 直接设置目标尺寸，QImageReader会自动处理等比例缩放，会导致图像比例失调，移除
-            # reader.setScaledSize(QtCore.QSize(48, 48))
-
             if True:
                 # 设置高效缩放，获取原始图像尺寸
                 original_size = reader.size()
@@ -217,12 +214,14 @@ class IconCache:
             
             # 尝试读取图像
             if bool(img := reader.read()):
+                # print("方案一：使用QImageReader高效加载")
                 pixmap = QPixmap.fromImage(img)
                 return QIcon(pixmap)
             
             # 方案二：使用PIL 加载，ImageOps.exif_transpose自动处理EXIF方向信息
             with Image.open(file_path) as img:
                 if bool(pixmap := pil_to_pixmap(img)):
+                    # print("方案二：使用PIL 加载")
                     return QIcon(pixmap)
 
         except Exception as e:

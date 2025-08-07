@@ -242,6 +242,8 @@ class UpdaterGUI:
         """统一的消息框显示方法"""
         self.msg_box.setIcon(icon_type)
         self.msg_box.setWindowTitle(title)
+        # 内容居中
+        self.msg_box.setText(f"<div align='center'>{text}</div>")
         self.msg_box.setText(text)
         self.msg_box.setStandardButtons(buttons)
         return self.msg_box.exec_()
@@ -301,12 +303,12 @@ def pre_check_update():
 def check_update(parent_window=None):
     """检查更新的主函数，供主程序调用"""
     try:
-        icon_path = os.path.join(BasePath, "icons", "viewer_3.ico")
+        icon_path = os.path.join(BasePath, "resource", "icons", "viewer_3.ico")
         gui = UpdaterGUI(icon_path, parent_window)
         updater = Updater()
         cursor_pos = QPoint(QCursor.pos())
         
-        print("check_update()--开始检查更新...")
+        print("[check_update]-->开始检查更新...")
         download_url, version = updater.check_for_updates()
         
         if not download_url:

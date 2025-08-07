@@ -65,7 +65,7 @@ from src.components.custom_qdialog_rename import SingleFileRenameDialog     # �
 from src.components.custom_qdialog_progress import (ProgressDialog,         # 导入自定义压缩进度对话框类
     CompressWorker)         
 from src.common.manager_font import MultiFontManager                        # 字体管理器
-from src.common.manager_version import version_init                         # 版本号初始化
+from src.common.manager_version import version_init, fastapi_init           # 版本号&IP地址初始化
 from src.common.manager_color_exif import load_color_settings               # 导入自定义json配置文件
 from src.common.manager_log import setup_logging                            # 导入日志文件初始化
 from src.utils.raw2jpg import Mipi2RawConverterApp                          # 导入MIPI RAW文件转换为JPG文件的类
@@ -85,11 +85,7 @@ from src.utils.aebox_link import (check_process_running,                    # �
 
 
 
-import warnings
-# 过滤libpng相关的警告
-warnings.filterwarnings("ignore", message=".*libpng warning.*")
-warnings.filterwarnings("ignore", message=".*profile 'Display P3'.*")
-warnings.filterwarnings("ignore", message=".*length does not match profile.*")
+
 
 
 """
@@ -104,7 +100,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.start_time = flag_start
         print(f"----------[程序预启动时间]----------: {(time.time()-self.start_time):.2f} 秒")
         self.base_icon_path = Path(__file__).parent / "resource" / "icons"
-        self.version_info, self.new_version_info = version_init(), False     
+        self.version_info, self.new_version_info,  = version_init(), False     
+        self.fast_api_host, self.fast_api_port = fastapi_init()
         
         # 创建启动画面,启动画面以及相关初始化在self.update_splash_message()函数中
         self.create_splash_screen()
@@ -547,8 +544,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """设置主界面图标以及标题"""
         # print("[set_stylesheet]-->设置主界面相关组件")
 
-        icon_path = os.path.join(self.base_icon_path, "viewer_3.ico")
-        self.setWindowIcon(QIcon(icon_path))
+        self.icon_path = os.path.join(self.base_icon_path, "viewer_3.ico")
+        self.setWindowIcon(QIcon(self.icon_path))
         self.setWindowTitle(f"HiViewer")
 
         # 根据鼠标的位置返回当前光标所在屏幕的几何信息
@@ -564,12 +561,16 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 设置按钮无边框
         self.statusbar_button1.setFlat(True)
         self.statusbar_button2.setFlat(True)
+        self.statusbar_button3.setFlat(True)
 
         # 初始化版本更新按钮文本
-        self.statusbar_button2.setText(f"🚀版本({self.version_info})")            
+        self.statusbar_button2.setText(f"🚀({self.version_info})")            
+
+        # 初始化FastAPI按钮文本
+        self.statusbar_button3.setText(f"🐹{self.fast_api_host}:{self.fast_api_port}")     
 
         # 初始化标签文本
-        self.statusbar_label1.setText(f"🔉: 进度提示标签🍃")
+        self.statusbar_label1.setText(f"📢:进度提示标签🍃")
         self.statusbar_label0.setText(f"📢:选中或筛选的文件夹中包含{self.image_index_max}张图")
         self.statusbar_label.setText(f"[0]已选择")
 
@@ -736,7 +737,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 底部状态栏按钮连接函数
         self.statusbar_button1.clicked.connect(self.setting)   # 🔆设置按钮槽函数
         self.statusbar_button2.clicked.connect(self.update)    # 🚀版本按钮槽函数
-        
+        self.statusbar_button3.clicked.connect(self.fast_api)  # 🐹127.0.0.1:8000按钮槽函数
+
 
     """
     左侧信号槽函数
@@ -949,7 +951,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.update_RB_QTableWidget0()
 
     def clear_combox(self):
-        print("clear_combox()--清除按钮被点击")
+        print("[clear_combox]-清除按钮被点击")
         # 清空地址栏
         self.RT_QComboBox.clear()
         # 刷新右侧表格
@@ -961,27 +963,54 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         
     
     def execute_command(self):
-        print("execute_command()--命令按钮被点击")
+        print("[execute_command]-命令按钮被点击")
         try:    
             self.open_bat_tool()
         except Exception as e:
-            print(f"execute_command()-error--打开批量执行命令工具失败: {e}")
+            print(f"[execute_command]-error--打开批量执行命令工具失败: {e}")
             return
 
     def compare(self):
-        print("compare()-对比按钮被点击--调用on_space_pressed()")
+        print("[compare]-对比按钮被点击")
         self.on_space_pressed()
 
 
     def setting(self):
-        print("setting()-设置按钮被点击--setting()")
+        print("[setting]-设置按钮被点击")
         # 暂时调用关于信息，后续添加设置界面
         self.on_ctrl_h_pressed()
     
 
     def update(self):
-        print("setting()-版本按钮被点击")
+        print("[update]-版本按钮被点击")
         check_update()
+
+
+    def fast_api(self):
+        """设置fast_api服务地址"""
+        try:
+            from src.components.custom_qdialog_fastapi import FastApiDialog 
+            dialog = FastApiDialog(self)
+            if dialog.exec_() == QDialog.Accepted:
+                self.fast_api_host, self.fast_api_port = dialog.get_result()
+                
+                # 打印log
+                print(f"[fast_api]-->设置FastAPI服务地址: {self.fast_api_host}:{self.fast_api_port}")
+
+                # 更新底部信息栏按钮信息显示
+                self.statusbar_button3.setText(f"🐹{self.fast_api_host}:{self.fast_api_port}")
+
+                # 保存fast_api地址和端口到ipconfig.ini配置文件
+                FASTAPI=f"[API]\nhost = {self.fast_api_host}\nport = {self.fast_api_port}"
+                default_version_path = Path(__file__).parent / "config" / "ipconfig.ini"
+                default_version_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(default_version_path, 'w', encoding='utf-8') as f:
+                    f.write(FASTAPI)
+            else:
+                print("[fast_api]-->取消设置FastAPI服务地址")
+        except Exception as e:
+            print(f"[fast_api]-error--设置fast_api失败: {e}")
+            return
 
     @CC_TimeDec(tips="预更新版本")
     def pre_update(self):
@@ -1000,12 +1029,12 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 self.statusbar_button2.setToolTip("已是最新版本")
 
         except Exception as e:
-            print(f"pre_update()-error--预更新版本失败: {e}")
+            print(f"[pre_update]-error--预更新版本失败: {e}")
             return
         
     def show_exif(self):
         """打开Exif信息显示，类似快捷键CTRL+P功能  """
-        print("show_exif()--打开Exif信息显示")
+        print("[show_exif]-打开Exif信息显示")
 
         try:
             # 获取当前选中的文件类型
@@ -1024,7 +1053,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             else:
                 show_message_box("打开Exif信息显示", "提示", 500)
         except Exception as e:
-            print(f"show_exif()-error--打开Exif信息显示失败: {e}")
+            print(f"[show_exif]-error--打开Exif信息显示失败: {e}")
         finally:
             # 更新 RB_QTableWidget0 中的内容    
             self.update_RB_QTableWidget0() 
@@ -1053,7 +1082,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             else:
                 show_message_box(f"未知筛选模式: {row_type}", "错误", 1000)
         except Exception as e:
-            print(f"show_filter_rows()-error--显示筛选行失败: {e}")
+            print(f"[show_filter_rows]-error--显示筛选行失败: {e}")
             return
 
     def filter_rows(self, row_type):
@@ -1104,12 +1133,12 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 )
 
         except Exception as e:
-            print(f"filter_rows()-error--批量选中指定模式行失败: {e}")
+            print(f"[filter_rows]-error--批量选中指定模式行失败: {e}")
             return
 
     def jpg_lossless_rotator(self, para=''):
         """无损旋转图片"""
-        print(f"jpg_lossless_rotator()-启动无损旋转图片任务:")
+        print(f"[jpg_lossless_rotator]-启动无损旋转图片任务:")
         try:
             # 取消当前的预加载任务
             self.cancel_preloading()
@@ -1221,7 +1250,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 self.update_RB_QTableWidget0() 
 
         except subprocess.CalledProcessError as e:
-            print(f"jpg_lossless_rotator()-error--无损旋转图片失败: {e}")
+            print(f"[jpg_lossless_rotator]-error--无损旋转图片失败: {e}")
             return
 
 
@@ -1297,7 +1326,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 show_message_box("没有有效的文件路径", "提示", 2000)
 
         except Exception as e:
-            print(f"copy_selected_file_path()-error--复制文件路径失败: {e}")
+            print(f"[copy_selected_file_path]-error--复制文件路径失败: {e}")
             return
 
 
@@ -1338,13 +1367,13 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 show_message_box("没有有效的文件路径", "提示", 2000)
 
         except Exception as e:
-            print(f"copy_selected_files()-error--复制文件失败: {e}")
+            print(f"[copy_selected_files]-error--复制文件失败: {e}")
             return
 
 
     def delete_from_list(self):
         """从列表中删除选中的单元格"""
-        print(f"delete_from_list()-从列表中删除选中的单元格")
+        print(f"[delete_from_list]-从列表中删除选中的单元格")
 
         selected_items = self.RB_QTableWidget0.selectedItems()
         if not selected_items:
@@ -1384,12 +1413,12 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.update_RB_QTableWidget0_from_list(self.files_list, self.paths_list, self.dirnames_list)
     
         except Exception as e:
-            print(f"delete_from_list()-error--删除失败: {e}")
+            print(f"[delete_from_list]-error--删除失败: {e}")
             return
 
     def delete_from_file(self):
         """从源文件删除选中的单元格并删除原文件"""
-        print(f"delete_from_file()-从原文件删除选中的单元格并删除原文件")
+        print(f"[delete_from_file]-从原文件删除选中的单元格并删除原文件")
 
         selected_items = self.RB_QTableWidget0.selectedItems()  # 获取选中的项
         if not selected_items:
@@ -1421,13 +1450,13 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.update_RB_QTableWidget0()
 
         except Exception as e:
-            print(f"delete_from_file()-error--删除失败: {e}")
+            print(f"[delete_from_file]-error--删除失败: {e}")
             return
 
 
     def compress_selected_files(self):
         """压缩选中的文件并复制压缩包文件到剪贴板"""
-        print("compress_selected_files()-启动压缩文件任务")
+        print("[compress_selected_files]-启动压缩文件任务")
         try:
             selected_items = self.RB_QTableWidget0.selectedItems()
             if not selected_items:
@@ -1480,7 +1509,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.threadpool.start(self.compress_worker)
 
         except Exception as e:
-            print(f"compress_selected_files()-error--压缩失败: {e}")
+            print(f"[compress_selected_files]-error--压缩失败: {e}")
             return  
 
     def screen_shot_tool(self):
@@ -1578,14 +1607,14 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         mime_data.setUrls([url])
         QApplication.clipboard().setMimeData(mime_data)
         # 更新状态栏信息显示
-        self.statusbar_label1.setText(f"🔉: 压缩完成🍃")
+        self.statusbar_label1.setText(f"📢:压缩完成🍃")
         show_message_box(f"文件已压缩为: {zip_path} 并复制到剪贴板", "提示", 500)
 
     def on_compress_error(self, error_msg):
         """处理压缩错误"""
         self.progress_dialog.close()  
         # 更新状态栏信息显示
-        self.statusbar_label1.setText(f"🔉: 压缩出错🍃")
+        self.statusbar_label1.setText(f"📢:压缩出错🍃")
         show_message_box(error_msg, "错误", 2000)
 
 
@@ -1968,14 +1997,14 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def update_preload_progress(self, current, total):
         """处理预加载进度"""
         # 更新状态栏信息显示
-        self.statusbar_label1.setText(f"🔉: 图标加载进度...{current}/{total}🍃")
+        self.statusbar_label1.setText(f"📢:图标加载进度...{current}/{total}🍃")
         
     def on_preload_finished(self):
         """处理预加载完成"""
         # 打印提示信息
-        print(f"[on_preload_finished]-->所有图标预加载完成,耗时：{time.time()-self.start_time_image_preloading:.2f}秒")
+        print(f"[on_preload_finished]-->所有图标预加载完成,耗时:{time.time()-self.start_time_image_preloading:.2f}秒")
         # 更新状态栏信息显示
-        self.statusbar_label1.setText(f"🔉: 图标已全部加载-^-耗时：{time.time()-self.start_time_image_preloading:.2f}秒🍃")
+        self.statusbar_label1.setText(f"📢:图标已全部加载-^-耗时:{time.time()-self.start_time_image_preloading:.2f}秒🍃")
         gc.collect()
         
     def on_preload_error(self, error):
@@ -2455,6 +2484,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 设置底部状态栏区域样式 self.statusbar --> self.statusbar_widget --> self.statusbar_QHBoxLayout --> self.statusbar_button1 self.statusbar_button2
         self.statusbar.setStyleSheet(statusbar_style)
         self.statusbar_button1.setStyleSheet(statusbar_button_style)
+        self.statusbar_button3.setStyleSheet(statusbar_button_style)
         # 设置版本按钮更新样式
         if self.new_version_info:
             self.statusbar_button2.setStyleSheet(statusbar_button_style_version)
@@ -2757,6 +2787,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # 设置底部状态栏区域样式 self.statusbar --> self.statusbar_widget --> self.statusbar_QHBoxLayout --> self.statusbar_button1 self.statusbar_button2
             self.statusbar.setStyleSheet(statusbar_style)
             self.statusbar_button1.setStyleSheet(statusbar_button_style)
+            self.statusbar_button3.setStyleSheet(statusbar_button_style)
             # 设置版本按钮更新样式
             if self.new_version_info:
                 self.statusbar_button2.setStyleSheet(statusbar_button_style_version)
@@ -3477,7 +3508,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # self.pause_preloading() # modify by diamond_cz 20250217 不暂停预加载，看图时默认后台加载图标
             
             # 初始化标签文本
-            self.statusbar_label1.setText(f"🔉: 正在打开看图子界面...")
+            self.statusbar_label1.setText(f"📢:正在打开看图子界面...")
             self.statusbar_label1.repaint()  # 刷新标签文本
 
             # 初始化看图子界面
@@ -3491,7 +3522,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
             # 连接看图子窗口的关闭信号
             self.compare_window.closed.connect(self.on_compare_window_closed)
-            self.statusbar_label1.setText(f"🔉: 看图子界面打开成功")
+            self.statusbar_label1.setText(f"📢:看图子界面打开成功")
             self.statusbar_label1.repaint()  # 刷新标签文本
 
             # self.hide()  # modify by diamond_cz 20250217 不隐藏主界面
@@ -3505,7 +3536,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             print("[on_compare_window_closed]-->主界面,接受看图子窗口关闭事件")
             # 隐藏看图子界面，清理资源
             self.compare_window.hide(), self.compare_window.cleanup()
-            self.statusbar_label1.setText(f"🔉: 看图子界面关闭成功")
+            self.statusbar_label1.setText(f"📢:看图子界面关闭成功")
 
         # 检查看图子窗口的主题是否与主窗口一致,若不一致则更新主窗口的主题
         if (self.background_color_default != self.compare_window.background_color_default or 
