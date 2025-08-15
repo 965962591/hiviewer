@@ -1800,7 +1800,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
             if len(matching_indices) == 1:
                 new_index = matching_indices[0] + 1
-                if get_api_data(f"{host}/select_image/{new_index}", timeout=3):
+                if get_api_data(f"{host}/select_image/{new_index}", timeout=2):
                     print(f"✅ [sync_image_index_with_aebox]-->成功同步图片到aebox: {aebox_images[matching_indices[0]]}")
                     return True
 

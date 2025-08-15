@@ -85,9 +85,6 @@ from src.utils.aebox_link import (check_process_running,                    # �
 
 
 
-
-
-
 """
 设置主界面类区域开始线
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -880,7 +877,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             image_path_url = urlencode_folder_path(path)
             if image_path_url:
                 # 拼接文件夹
-                image_path_url = f"http://127.0.0.1:8000/set_image_folder/{image_path_url}"
+                image_path_url = f"http://{self.fast_api_host}:{self.fast_api_port}/set_image_folder/{image_path_url}"
                 # 发送请求通信到aebox
                 response = get_api_data(url=image_path_url, timeout=3)
                 if response:

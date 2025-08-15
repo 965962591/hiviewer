@@ -6,6 +6,7 @@ import urllib.parse
 import subprocess
 import platform
 import psutil  # 使用跨平台进程检查库
+from src.components.custom_qMbox_showinfo import show_message_box       # 导入消息框类
 
 def urlencode_folder_path(folder_path):
     """
@@ -46,6 +47,7 @@ def get_api_data(url='https://api.example.com/data', timeout=5):
             return None
     except requests.exceptions.Timeout:
         print("[get_api_data]-->请求超时！")
+        show_message_box("检测到有 aebox 进程正在运行\n端口不匹配可能会导致看图子界面等待时间过长\n请手动匹配端口 或者 手动杀掉aebox进程", "提示")    
         return None
     except requests.exceptions.RequestException as e:
         print(f"[get_api_data]-->请求失败：{e}")
