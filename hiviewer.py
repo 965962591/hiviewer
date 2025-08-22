@@ -58,7 +58,9 @@ from src.components.ui_main import Ui_MainWindow                            # �
 from src.common.img_preview import ImageViewer                              # 导入自定义图片预览组件
 from src.components.custom_qMbox_showinfo import show_message_box           # 导入消息框类
 from src.components.custom_qdialog_about import AboutDialog                 # 导入关于对话框类,显示帮助信息
-from src.components.custom_qdialog_LinkQualcomAebox import Qualcom_Dialog   # 导入自定义对话框的类
+from src.components.custom_qdialog_LinkQualcomAebox import Qualcom_Dialog   # 导入高通工具自定义对话框的类
+from src.components.custom_qdialog_LinkUnisocAebox import Unisoc_Dialog     # 导入展锐工具自定义对话框的类
+from src.components.custom_qdialog_LinkMTKAebox import MTK_Dialog           # 导入展锐工具自定义对话框的类
 from src.components.custom_qCombox_spinner import (CheckBoxListModel,       # 导入自定义下拉框类中的数据模型和委托代理类
     CheckBoxDelegate)        
 from src.components.custom_qdialog_rename import SingleFileRenameDialog     # 导入自定义重命名对话框类
@@ -397,47 +399,68 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         win_folder_icon = QIcon(icon_path)
         icon_path = (self.base_icon_path / "restart_ico_96x96.ico").as_posix()
         restart_icon = QIcon(icon_path)
-
+        icon_path = (self.base_icon_path / "16gl-0.png").as_posix()
+        icon_0 = QIcon(icon_path)
+        icon_path = (self.base_icon_path / "16gl-1.png").as_posix()
+        icon_1 = QIcon(icon_path)
+        icon_path = (self.base_icon_path / "16gl-2.png").as_posix()
+        icon_2 = QIcon(icon_path)
+        icon_path = (self.base_icon_path / "16gl-3.png").as_posix()
+        icon_3 = QIcon(icon_path)
+        icon_path = (self.base_icon_path / "16gl-4.png").as_posix()
+        icon_4 = QIcon(icon_path)
+        icon_path = (self.base_icon_path / "16gl-5.png").as_posix()
+        icon_5 = QIcon(icon_path)
 
         # 创建二级菜单-删除选项
         sub_menu = QMenu("删除选项", self.context_menu) 
         sub_menu.setIcon(delete_icon)  
-        sub_menu.addAction("从列表中删除(D)", self.delete_from_list)  
-        sub_menu.addAction("从原文件删除(Ctrl+D)", self.delete_from_file)  
+        sub_menu.addAction(icon_0, "从列表中删除(D)", self.delete_from_list)  
+        sub_menu.addAction(icon_1, "从原文件删除(Ctrl+D)", self.delete_from_file)  
 
         # 创建二级菜单-复制选项
         sub_menu2 = QMenu("复制选项", self.context_menu)  
         sub_menu2.setIcon(paste_icon)  
-        sub_menu2.addAction("复制文件路径(C)", self.copy_selected_file_path)  
-        sub_menu2.addAction("复制文件(Ctrl+C)", self.copy_selected_files)  
+        sub_menu2.addAction(icon_0, "复制文件路径(C)", self.copy_selected_file_path)  
+        sub_menu2.addAction(icon_1, "复制文件(Ctrl+C)", self.copy_selected_files)  
 
         # 创建二级菜单-无损旋转
         sub_menu3 = QMenu("无损旋转", self.context_menu)  
         sub_menu3.setIcon(rotator_icon)  
-        sub_menu3.addAction("逆时针旋转", lambda: self.jpg_lossless_rotator('l'))  
-        sub_menu3.addAction("顺时针旋转", lambda: self.jpg_lossless_rotator('r'))  
-        sub_menu3.addAction("旋转180度", lambda: self.jpg_lossless_rotator('u'))  
-        sub_menu3.addAction("水平翻转", lambda: self.jpg_lossless_rotator('h'))  
-        sub_menu3.addAction("垂直翻转", lambda: self.jpg_lossless_rotator('v'))  
-        sub_menu3.addAction("自动校准EXIF旋转信息", lambda: self.jpg_lossless_rotator('auto'))  
+        sub_menu3.addAction(icon_0, "逆时针旋转", lambda: self.jpg_lossless_rotator('l'))  
+        sub_menu3.addAction(icon_1, "顺时针旋转", lambda: self.jpg_lossless_rotator('r'))  
+        sub_menu3.addAction(icon_2, "旋转180度", lambda: self.jpg_lossless_rotator('u'))  
+        sub_menu3.addAction(icon_3, "水平翻转", lambda: self.jpg_lossless_rotator('h'))  
+        sub_menu3.addAction(icon_4, "垂直翻转", lambda: self.jpg_lossless_rotator('v'))  
+        sub_menu3.addAction(icon_5, "自动校准EXIF旋转信息", lambda: self.jpg_lossless_rotator('auto'))  
 
         # 创建二级菜单-按行筛选
         sub_menu4 = QMenu("按行筛选", self.context_menu)  
         sub_menu4.setIcon(filtrate_icon)  
-        sub_menu4.addAction("奇数行", lambda: self.show_filter_rows('odd'))  
-        sub_menu4.addAction("偶数行", lambda: self.show_filter_rows('even'))  
-        sub_menu4.addAction("3选1", lambda: self.show_filter_rows('three_1'))  
-        sub_menu4.addAction("3选2", lambda: self.show_filter_rows('three_2'))  
-        sub_menu4.addAction("5选1", lambda: self.show_filter_rows('five_1'))  
+        sub_menu4.addAction(icon_0, "奇数行", lambda: self.show_filter_rows('odd'))  
+        sub_menu4.addAction(icon_1, "偶数行", lambda: self.show_filter_rows('even'))  
+        sub_menu4.addAction(icon_2, "3选1", lambda: self.show_filter_rows('three_1'))  
+        sub_menu4.addAction(icon_3, "3选2", lambda: self.show_filter_rows('three_2'))  
+        sub_menu4.addAction(icon_4, "5选1", lambda: self.show_filter_rows('five_1'))  
+
+        # 创建二级菜单-平台图片解析工具
+        sub_menu5 = QMenu("平台图片解析工具", self.context_menu)  
+        sub_menu5.setIcon(exif_icon)  
+        sub_menu5.addAction(icon_0, "高通_C7工具解析图片(I)", self.on_i_pressed)  
+        sub_menu5.addAction(icon_1, "联发科_DP工具解析图片(U)", self.on_u_pressed)  
+        sub_menu5.addAction(icon_2, "展锐_IQT工具解析图片(Y)", self.on_y_pressed)  
+
 
         # 将二级菜单添加到主菜单
         self.context_menu.addMenu(sub_menu)   
         self.context_menu.addMenu(sub_menu2)  
         self.context_menu.addMenu(sub_menu4)  
+        self.context_menu.addMenu(sub_menu5) 
         self.context_menu.addMenu(sub_menu3)  
         
+        
         # 设置右键菜单槽函数
-        self.context_menu.addAction(exif_icon, "高通AEC10解析图片(I)", self.on_i_pressed)
+        # self.context_menu.addAction(exif_icon, "高通AEC10解析图片(I)", self.on_i_pressed)
         self.context_menu.addAction(zip_icon, "压缩文件(Z)", self.compress_selected_files)
         self.context_menu.addAction(theme_icon, "切换主题(P)", self.on_p_pressed)
         self.context_menu.addAction(image_size_reduce_icon, "图片瘦身(X)", self.jpgc_tool) 
@@ -677,9 +700,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 添加快捷键 F5,刷新表格
         self.f5_shortcut = QShortcut(QKeySequence(Qt.Key_F5), self)
         self.f5_shortcut.activated.connect(self.on_f5_pressed)
-        # 添加快捷键 i 切换极简模式
+        # 添加快捷键 i 打开高通工具解析窗口
         self.p_shortcut = QShortcut(QKeySequence('i'), self)
         self.p_shortcut.activated.connect(self.on_i_pressed)
+        # 添加快捷键 u 打开MTK工具解析窗口
+        self.p_shortcut = QShortcut(QKeySequence('u'), self)
+        self.p_shortcut.activated.connect(self.on_u_pressed)
+        # 添加快捷键 y 打开高通工具解析窗口
+        self.p_shortcut = QShortcut(QKeySequence('y'), self)
+        self.p_shortcut.activated.connect(self.on_y_pressed)
         # 添加快捷键 Ctrl+i 打开图片处理窗口
         self.i_shortcut = QShortcut(QKeySequence('l'), self)
         self.i_shortcut.activated.connect(self.on_l_pressed)
@@ -3253,6 +3282,122 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             show_message_box(f"高通工具后台解析图片失败: {error_message}", "提示", 2000)
             print(f"[on_qualcom_finished]-->高通工具后台解析图片失败: {e}")
+            return
+
+    def on_u_pressed(self):
+        """处理u键按下事件,调用联发科工具后台解析图片的exif信息"""
+        # 获取当前选中的文件类型
+        selected_option = self.RT_QComboBox.currentText()
+        try:
+
+            # 创建并显示自定义对话框,传入图片列表
+            dialog = MTK_Dialog(selected_option)
+
+            # 显示对话框
+            if dialog.exec_() == QDialog.Accepted:
+                # 收集用户输入的参数
+                dict_info = dialog.get_data()
+                mtk_path = dict_info.get("MTK工具路径","")
+                images_path = dict_info.get("Image文件夹路径","")
+
+                # 拼接参数命令字符串
+                if mtk_path and images_path and os.path.exists(images_path) and os.path.exists(mtk_path):
+                    show_message_box("正在使用高通工具后台解析图片Exif信息...", "提示", 1000)
+                    print(f"[on_i_pressed]-->正在使用高通工具后台解析图片Exif信息...")
+
+                    # 创建线程，必须在主线程中连接信号
+                    self.time_qualcom = time.time()
+                    from src.mtk.mtk import MTKThread
+                    self.mtk_thread = MTKThread(mtk_path, images_path)
+                    self.mtk_thread.start()
+                    self.mtk_thread.finished.connect(self.on_mtk_finished)  
+
+            # 无论对话框是接受还是取消，都手动销毁对话框
+            dialog.deleteLater()
+            dialog = None
+        except Exception as e:
+            print(f"[on_u_pressed]-->处理u键按下事件(MTK工具解析图片)失败: {e}")
+            return
+
+    def on_mtk_finished(self, success, error_message, images_path=None):
+        """处理命令执行完成的信号"""
+        try:
+            if success and images_path:
+                
+                # 解析txt文件将其保存到excel中去
+                use_time = time.time() - self.time_qualcom
+                xml_exists = any(f for f in os.listdir(images_path) if f.endswith('.exif'))
+                if xml_exists:
+                    # save_excel_data(images_path)
+                    pass
+
+                show_message_box(f"MTK_DebugParser工具后台解析图片成功！用时: {use_time:.2f}秒", "提示", 1500)
+                print(f"[on_mtk_finished]-->MTK_DebugParser工具后台解析图片成功！用时: {use_time:.2f}秒")
+            else:
+                show_message_box(f"MTK_DebugParser工具后台解析图片失败: {error_message}", "提示", 2000)
+                print(f"[on_mtk_finished]-->MTK_DebugParser工具后台解析图片失败: {error_message}")
+
+        except Exception as e:
+            show_message_box(f"MTK_DebugParser工具后台解析图片失败: {error_message}", "提示", 2000)
+            print(f"[on_mtk_finished]-->MTK_DebugParser工具后台解析图片失败: {e}")
+            return
+
+    def on_y_pressed(self):
+        """处理y键按下事件,调用展锐工具后台解析图片的exif信息"""
+        # 获取当前选中的文件类型
+        selected_option = self.RT_QComboBox.currentText()
+        try:
+            # 创建并显示自定义对话框,传入图片列表
+            dialog = Unisoc_Dialog(selected_option)
+
+            # 显示对话框
+            if dialog.exec_() == QDialog.Accepted:
+                # 收集用户输入的参数
+                dict_info = dialog.get_data()
+                unisoc_path = dict_info.get("Unisoc工具路径","")
+                images_path = dict_info.get("Image文件夹路径","")
+
+                # 拼接参数命令字符串
+                if unisoc_path and images_path and os.path.exists(images_path) and os.path.exists(unisoc_path):
+                    show_message_box("正在使用展锐IQT工具后台解析图片Exif信息...", "提示", 1000)
+                    print(f"[on_y_pressed]-->正在使用展锐IQT工具后台解析图片Exif信息...")
+
+                    # 创建线程，必须在主线程中连接信号
+                    self.time_qualcom = time.time()
+                    from src.unisoc.unisoc import UnisocThread
+                    self.unisoc_thread = UnisocThread(unisoc_path, images_path)
+                    self.unisoc_thread.start()
+                    self.unisoc_thread.finished.connect(self.on_unisoc_finished)  
+
+            # 无论对话框是接受还是取消，都手动销毁对话框
+            dialog.deleteLater()
+            dialog = None
+
+        except Exception as e:
+            print(f"[on_u_pressed]-->处理u键按下事件(MTK工具解析图片)失败: {e}")
+            return
+
+    def on_unisoc_finished(self, success, error_message, images_path=None):
+        """处理命令执行完成的信号"""
+        try:
+            if success and images_path:
+                
+                # 解析txt文件将其保存到excel中去
+                use_time = time.time() - self.time_qualcom
+                xml_exists = any(f for f in os.listdir(images_path) if f.endswith('.txt'))
+                if xml_exists:
+                    # save_excel_data(images_path)
+                    pass
+
+                show_message_box(f"展锐IQT工具后台解析图片成功！用时: {use_time:.2f}秒", "提示", 1500)
+                print(f"[on_unisoc_finished]-->展锐IQT工具后台解析图片成功！用时: {use_time:.2f}秒")
+            else:
+                show_message_box(f"展锐IQT工具后台解析图片失败: {error_message}", "提示", 2000)
+                print(f"[on_unisoc_finished]-->展锐IQT工具后台解析图片失败: {error_message}")
+
+        except Exception as e:
+            show_message_box(f"展锐IQT工具后台解析图片失败: {error_message}", "提示", 2000)
+            print(f"[on_unisoc_finished]-->展锐IQT工具后台解析图片失败: {e}")
             return
 
 

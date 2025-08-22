@@ -244,7 +244,7 @@ def calculate_image_stats(image_input, resize_factor=1):
  
 
 def load_xml_data(xml_path):
-    """加载XML文件并提取Lux值和DRCgain值等EXIF信息"""
+    """(高通平台)加载XML文件并提取Lux值和DRCgain值等EXIF信息"""
     try:
         # 加载xml文件 
         tree = ETT.parse(xml_path)
@@ -303,6 +303,149 @@ def load_xml_data(xml_path):
         return '', False
     
 
+def load_txt_data(txt_path):
+    """(展锐平台)加载txt文件并提取Bv值和EVD值等EXIF信息
+    返回: (汇总字符串, 是否存在EVFrameSA信息)
+    """
+    try:
+        # 判断文件是否存在
+        if not txt_path or not os.path.isfile(txt_path):
+            return "", False
+
+        # 读取txt文件
+        text_norm = ""
+        with open(txt_path, "r", encoding="utf-8", errors="ignore") as f:
+            text_norm = f.read()
+
+        # 关键字段查找
+        patterns = {
+            "Lux": "AE-cur_bv|AE-hm-hm_evd|AE-face-calc_fd_param-calc_face_luma-face_backlight|AE-ae_stable",
+            "Mulaes":"AE-mulae_target|AE-mulae-mulae_thd|AE-mulae-mulae_y|AE-mulae-cur_lum",
+            "HM":("AE-short_hm_target|AE-safe_hm_target|"
+                  "AE-hm-short_hm-hm_final_target_min|AE-hm-short_hm-hm_final_target_max|"
+                  "AE-hm-safe_hm-hm_final_target_min|AE-hm-safe_hm-hm_final_target_max|"
+                  "AE-hm-short_hm-hm_bt_target|AE-hm-short_hm-hm_aftaoe_target|AE-hm-short_hm-hm_aftcoe_target|AE-hm-short_hm-hm_dt_target|"
+                  "AE-hm-short_hm-hm_dt_target_min|AE-hm-short_hm-hm_dt_target_max|"
+                  "AE-hm-safe_hm-hm_bt_target|AE-hm-safe_hm-hm_aftaoe_target|AE-hm-safe_hm-hm_aftcoe_target|AE-hm-safe_hm-hm_dt_target|"
+                  "AE-hm-safe_hm-hm_dt_target_min|AE-hm-safe_hm-hm_dt_target_max"
+                 ),
+            "Face":("AE-face-face_num|AE-face-calc_fd_param-face_target-short_face_thd|AE-face-calc_fd_param-face_target-safe_face_thd|"
+                    "AE-face-calc_fd_param-face_target-short_final_face_luma|AE-face-calc_fd_param-face_target-safe_final_face_luma|"
+                    "AE-face-cur_lum|AE-short_face_target|AE-safe_face_target|AE-face-calc_fd_param-face_target-min_facelum_protection_target|"
+                    "AE-face-calc_fd_param-face_target-short_down_limit|AE-face-calc_fd_param-face_target-safe_down_limit|"
+                    "AE-face-calc_fd_param-face_target-short_up_limit|AE-face-calc_fd_param-face_target-safe_up_limit|"
+                    "AE-face-calc_fd_param-face_target-short_face_target_before_mflumtype1|AE-face-calc_fd_param-face_target-safe_face_target_before_mflumtype2"
+                 ),
+            "LCG": "AE-safe_final_target_lum|AE-short_final_target_lum|AE-ae_lcg|AE-ae_lcg_down_limit|AE-ae_lcg_up_limit",
+        }
+
+
+        # 定义提取关键字函数
+        def extract_value_pat(pat, text_norm):
+            try:
+                value = 0
+                format = rf'{re.escape(pat)}\s*:\s*([0-9]+\.?[0-9]*)'
+                match = re.search(format, text_norm)
+                if match:
+                    value = float(match.group(1)) if '.' in match.group(1) else int(match.group(1))
+                return value if value else 0
+            except Exception as e:
+                print(f"extract_value_pat解析TXT失败{txt_path}:\n报错信息: {e}")
+                return 0
+  
+        # 查找关键字数值并拼接, 先定义基础变量
+        unisoc_exif_info, extracted_values, value = '', [], 0
+        for key,pat in patterns.items():
+            if key == "Lux":
+                bv = extract_value_pat(pat.split("|")[0], text_norm)
+                evd = extract_value_pat(pat.split("|")[1], text_norm)
+                bl = extract_value_pat(pat.split("|")[2], text_norm)
+                stb = extract_value_pat(pat.split("|")[3], text_norm)
+
+                value_ = f"bv[{int(bv)}] evd[{int(evd)}] bl[{bl}] stb[{stb}]"
+                extracted_values.append(f"\n{key}: {value_}")
+
+            elif key == "Mulaes":
+                target = extract_value_pat(pat.split("|")[0], text_norm)
+                thd = extract_value_pat(pat.split("|")[1], text_norm)
+                _y = extract_value_pat(pat.split("|")[2], text_norm)
+                cur_lum = extract_value_pat(pat.split("|")[3], text_norm)
+
+                value_ = f"tar[{int(target)}] calc[{int(thd)}/{int(_y)}*{int(cur_lum)}]"
+                extracted_values.append(f"\n{key}: {value_}")
+     
+
+            elif key == "HM":
+                short_target = extract_value_pat(pat.split("|")[0], text_norm)
+                safe_target = extract_value_pat(pat.split("|")[1], text_norm)
+                short_min = extract_value_pat(pat.split("|")[2], text_norm)
+                short_max = extract_value_pat(pat.split("|")[3], text_norm)
+                safe_min = extract_value_pat(pat.split("|")[4], text_norm)
+                safe_max = extract_value_pat(pat.split("|")[5], text_norm)
+                short_bt = extract_value_pat(pat.split("|")[6], text_norm)
+                short_aoe = extract_value_pat(pat.split("|")[7], text_norm)
+                short_coe = extract_value_pat(pat.split("|")[8], text_norm)
+                short_dt = extract_value_pat(pat.split("|")[9], text_norm)
+                short_dt_min = extract_value_pat(pat.split("|")[10], text_norm)
+                short_dt_max = extract_value_pat(pat.split("|")[11], text_norm)
+                safe_bt = extract_value_pat(pat.split("|")[12], text_norm)
+                safe_aoe = extract_value_pat(pat.split("|")[13], text_norm)
+                safe_coe = extract_value_pat(pat.split("|")[14], text_norm)
+                safe_dt = extract_value_pat(pat.split("|")[15], text_norm)
+                safe_dt_min = extract_value_pat(pat.split("|")[16], text_norm)
+                safe_dt_max = extract_value_pat(pat.split("|")[17], text_norm)
+
+                value_ = (f"tar[{int(short_min)}<{int(short_target)}>{int(short_max)},{int(safe_min)}<{int(safe_target)}>{int(safe_max)}] " 
+                          f"calc[{int(short_bt)}->{int(short_aoe)}->{int(short_coe)}|{int(short_dt)}, {int(safe_bt)}->{int(safe_aoe)}->{int(safe_coe)}|{int(safe_dt)}] "
+                          f"dt[{int(short_dt_min)}<{int(short_dt)}>{int(short_dt_max)},{int(safe_dt_min)}<{int(safe_dt)}>{int(safe_dt_max)}]" 
+                        )
+
+                extracted_values.append(f"\n{key}: {value_}")
+            
+            elif key == "Face":
+                num = extract_value_pat(pat.split("|")[0], text_norm)
+                short_thd = extract_value_pat(pat.split("|")[1], text_norm)
+                safe_thd = extract_value_pat(pat.split("|")[2], text_norm)
+                short_luma = extract_value_pat(pat.split("|")[3], text_norm)
+                safe_luma = extract_value_pat(pat.split("|")[4], text_norm)
+                cur_luma = extract_value_pat(pat.split("|")[5], text_norm)
+                short_target = extract_value_pat(pat.split("|")[6], text_norm)
+                safe_target = extract_value_pat(pat.split("|")[7], text_norm)
+                mfl_target = extract_value_pat(pat.split("|")[8], text_norm)
+                short_down = extract_value_pat(pat.split("|")[9], text_norm)
+                safe_down = extract_value_pat(pat.split("|")[10], text_norm)
+                short_up = extract_value_pat(pat.split("|")[11], text_norm)
+                safe_up = extract_value_pat(pat.split("|")[12], text_norm)
+                short_before_limit = extract_value_pat(pat.split("|")[13], text_norm)
+                safe_before_limit = extract_value_pat(pat.split("|")[14], text_norm)
+
+                value_ = (f"num[{num}] tar[{int(short_down)}<{int(short_target)}>{int(short_up)},{int(safe_down)}<{int(safe_target)}>{int(safe_up)}] " 
+                          f"mft[{int(mfl_target)}] "
+                          f"calc[{int(cur_luma)}*({int(short_thd)}/{int(short_luma)})[{int(short_before_limit)},{int(safe_before_limit)}]({int(safe_thd)}/{int(safe_luma)})*{int(cur_luma)}]" 
+                        )
+
+                extracted_values.append(f"\n{key}: {value_}")
+
+            elif key == "LCG":
+                safe = extract_value_pat(pat.split("|")[0], text_norm)
+                short = extract_value_pat(pat.split("|")[1], text_norm)
+                lcg = extract_value_pat(pat.split("|")[2], text_norm)
+                down = extract_value_pat(pat.split("|")[3], text_norm)
+                up = extract_value_pat(pat.split("|")[4], text_norm)
+
+                value_ = f"lcg[{down}<{lcg}>{up}] tar[{int(short)},{int(safe)}]"
+                extracted_values.append(f"\n{key}: {value_}")
+
+            else: # 剩余关键字数值提取
+                if (value := extract_value_pat(pat, text_norm)):
+                    extracted_values.append(f"\n{key}: {value}")
+
+        unisoc_exif_info = ''.join(extracted_values)
+        return unisoc_exif_info, False
+
+    except Exception as e:
+        print(f"解析TXT失败{txt_path}:\n报错信息: {e}")
+        return '', False
 
 
 """
@@ -1633,13 +1776,30 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             # piexf解析曝光时间光圈值ISO等复杂的EXIF信息
             exif_info = self.get_exif_info(path, img_format) + basic_info
 
-            # 检测是否存在同图片路径的xml文件  将lux_index、DRCgain写入到exif信息中去
+            # （高通平台）检测是否存在同图片路径的xml文件  将lux_index、DRCgain写入到exif信息中去
             hdr_flag, xml_path = False, os.path.join(os.path.dirname(path), os.path.basename(path).split('.')[0] + "_new.xml")
             if os.path.exists(xml_path):
                 # 提取xml中lux_index、cct、drcgain等关键信息，拼接到exif_info
                 exif_info_qpm, hdr_flag = load_xml_data(xml_path)
                 exif_info += exif_info_qpm
                 
+            # （MTK平台）检测是否存在同图片路径的xml文件  将lux_index、DRCgain写入到exif信息中去
+            exif_path = os.path.join(path + ".exif")
+            if os.path.exists(exif_path):
+                # 提取xml中lux_index、cct、drcgain等关键信息，拼接到exif_info
+                # exif_info_mtk, hdr_flag = load_exif_data(xml_path)
+                # exif_info += exif_info_mtk
+                 pass
+        
+            # （展锐平台）检测是否存在同图片路径的xml文件  将lux_index、DRCgain写入到exif信息中去
+            txt_path = os.path.join(os.path.dirname(path), os.path.basename(path).split('.')[0] + ".txt")
+            if os.path.exists(txt_path):
+                # 提取xml中lux_index、cct、drcgain等关键信息，拼接到exif_info
+                exif_info_unisoc, hdr_flag = load_txt_data(txt_path)
+                exif_info += exif_info_unisoc  
+                
+
+
             # 处理EXIF信息，根据可见性字典更新
             # self.str_exif_info = exif_info
             # exif_info = self.process_exif_info(self.dict_exif_info_visibility, exif_info, hdr_flag)
@@ -2569,6 +2729,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
     def keyReleaseEvent(self, event):
         if event.isAutoRepeat():
+            event.accept()
             return  # 忽略自动重复事件
 
         if event.key() == Qt.Key_Q:

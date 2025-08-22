@@ -46,6 +46,8 @@ def load_exif_settings():
                     "测光模式": bool(1),
                     "HDR": bool(1),
                     "Zoom": bool(1),
+
+                    # 高通平台关键字
                     "Lux": bool(1),
                     "CCT": bool(1),
                     "FaceSA": bool(1),
@@ -56,7 +58,14 @@ def load_exif_settings():
                     "B_gain": bool(1),
                     "Safe_gain": bool(1),
                     "Short_gain": bool(1),
-                    "Long_gain": bool(1)
+                    "Long_gain": bool(1),
+                    
+                    # 展锐平台关键字
+                    "Mulaes": bool(1),
+                    "HM": bool(1),
+                    "Face": bool(1),
+                    "LCG": bool(1),
+
                 }
 
                 settings = {
