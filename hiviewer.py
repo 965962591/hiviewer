@@ -586,8 +586,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 初始化版本更新按钮文本
         self.statusbar_button2.setText(f"🚀({self.version_info})")            
 
-        # 初始化FastAPI按钮文本
-        self.statusbar_button3.setText(f"🐹{self.fast_api_host}:{self.fast_api_port}")     
+        # 初始化FastAPI按钮文本 🐹
+        self.statusbar_button3.setText(f"{self.fast_api_host}:{self.fast_api_port}")     
 
         # 初始化标签文本
         self.statusbar_label1.setText(f"📢:进度提示标签🍃")
@@ -763,6 +763,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 底部状态栏按钮连接函数
         self.statusbar_button1.clicked.connect(self.setting)   # 🔆设置按钮槽函数
         self.statusbar_button2.clicked.connect(self.update)    # 🚀版本按钮槽函数
+        self.statusbar_checkbox.stateChanged.connect(self.fast_api_switch)
         self.statusbar_button3.clicked.connect(self.fast_api)  # 🐹127.0.0.1:8000按钮槽函数
 
 
@@ -900,7 +901,12 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         try:
 
             if not check_process_running("aebox"):
-                show_message_box(f"未检测到aebox进程，请先手动打开aebox软件", "错误", 1000)
+                show_message_box(f"未检测到aebox进程，请先手动打开aebox软件", "错误", 1500)
+                return
+
+            if not self.statusbar_checkbox.isChecked():
+                show_message_box(f"未启用Fast_API功能,请先手动打开界面底部复选框启用", "错误", 1500)
+                return
 
             # url编码
             image_path_url = urlencode_folder_path(path)
@@ -1012,6 +1018,24 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         check_update()
 
 
+    def fast_api_switch(self):
+        """设置fast_api服务的开关使能"""
+        try:
+            font = self.statusbar_button3.font()
+            if self.statusbar_checkbox.isChecked():
+                # False = 关闭横线
+                font.setStrikeOut(False)        
+                self.statusbar_button3.setFont(font)
+        
+            else:
+                # True = 显示横线
+                font.setStrikeOut(True)        
+                self.statusbar_button3.setFont(font)
+                
+        except Exception as e:
+            print(f"[fast_api_switch]-error--设置fast_api开关使能失败: {e}")
+            return
+
     def fast_api(self):
         """设置fast_api服务地址"""
         try:
@@ -1024,7 +1048,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 print(f"[fast_api]-->设置FastAPI服务地址: {self.fast_api_host}:{self.fast_api_port}")
 
                 # 更新底部信息栏按钮信息显示
-                self.statusbar_button3.setText(f"🐹{self.fast_api_host}:{self.fast_api_port}")
+                self.statusbar_button3.setText(f"{self.fast_api_host}:{self.fast_api_port}")
 
                 # 保存fast_api地址和端口到ipconfig.ini配置文件
                 FASTAPI=f"[API]\nhost = {self.fast_api_host}\nport = {self.fast_api_port}"
@@ -2491,6 +2515,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             
         """
 
+
         # 设置左上侧文件浏览区域样式
         self.Left_QTreeView.setStyleSheet(left_area_style)
         # 设置左下角侧框架样式
@@ -2961,6 +2986,13 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
                     # 恢复拖拽模式状态,默认开启
                     self.drag_flag = settings.get("drag_flag", True)
+
+                    # 恢复fast_api使能开关,默认关闭,并初始化一下
+                    self.api_flag = settings.get("api_flag", False)
+                    self.statusbar_checkbox.setChecked(self.api_flag)
+                    self.fast_api_switch()
+
+
             else:
                 # 若没有cache/设置，则在此初始化主题设置--默认主题
                 self.apply_theme()
@@ -3003,7 +3035,10 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 "simple_mode": self.simple_mode,
 
                 # 拖拽模式状态
-                "drag_flag": self.drag_flag
+                "drag_flag": self.drag_flag,
+
+                # fast_api开关使能
+                "api_flag":self.statusbar_checkbox.isChecked()
 
             }
 

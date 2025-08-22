@@ -59,8 +59,19 @@ class Ui_MainWindow(object):
         self.statusbar_button1 = QtWidgets.QPushButton("🔆")
         self.statusbar_button1.setToolTip("设置")
         self.statusbar_button2 = QtWidgets.QPushButton("🚀版本(2.3.5)")
-        self.statusbar_button3 = QtWidgets.QPushButton("🐹127.0.0.1:8000")
+        self.statusbar_checkbox = QtWidgets.QCheckBox()
+        self.statusbar_button3 = QtWidgets.QPushButton("127.0.0.1:8000")
         self.statusbar_button3.setToolTip("fast_api地址端口")
+
+        # 创建组合layout (self.statusbar_checkbox，self.statusbar_button3)用status_widget的方式添加到statusbar中
+        self.statusbar_QHBoxLayout = QtWidgets.QHBoxLayout()
+        self.statusbar_QHBoxLayout.setContentsMargins(0, 0, 0, 0)
+        self.statusbar_checkbox.setStyleSheet("""QCheckBox {spacing: 0px; padding-left: 0px;}""")
+        self.statusbar_QHBoxLayout.addWidget(self.statusbar_checkbox)
+        self.statusbar_QHBoxLayout.addWidget(self.statusbar_button3)
+        self.status_widget = QtWidgets.QWidget()
+        self.status_widget.setLayout(self.statusbar_QHBoxLayout)
+
 
         # 创建标签
         self.statusbar_label1 = QtWidgets.QLabel()
@@ -76,7 +87,7 @@ class Ui_MainWindow(object):
         # 正确添加组件的方式：注意，addWidget & addPermanentWidget 的区别
         self.statusbar.addWidget(self.statusbar_button1)           # 普通部件（左对齐）
         self.statusbar.addWidget(self.statusbar_button2)
-        self.statusbar.addWidget(self.statusbar_button3)
+        self.statusbar.addWidget(self.status_widget)
         self.statusbar.addWidget(self.statusbar_label0)
         self.statusbar.addWidget(self.statusbar_label)
         self.statusbar.addPermanentWidget(self.statusbar_label1)  # 永久部件（右对齐）

@@ -16,5 +16,6 @@
     "theme_option": "默认主题",
     "current_theme": "默认主题",
     "simple_mode": true,
-    "drag_flag": true
+    "drag_flag": true,
+    "api_flag": true
 }

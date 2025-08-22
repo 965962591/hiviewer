@@ -1512,8 +1512,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             self.progress_updated.emit(0)
 
 
-            # 调用封装后的函数,将看图界面图片索引发送到aebox中
-            self.sync_image_index_with_aebox(self.images_path_list, self.index_list)
+            # 调用封装后的函数,将看图界面图片索引发送到aebox中,(注意：会拿主界面中的复选框使能来判断是否发送图片索引)
+            self.sync_image_index_with_aebox(self.images_path_list, self.index_list) if self.parent_window.statusbar_checkbox.isChecked() else 0
 
             try:
                 # 先禁用表格自动刷新，确保表格可见，然后释放之前的表格显示等资源
