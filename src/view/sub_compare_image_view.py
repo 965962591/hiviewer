@@ -301,7 +301,65 @@ def load_xml_data(xml_path):
     except Exception as e:
         print(f"解析XML失败{xml_path}:\n报错信息: {e}")
         return '', False
-    
+
+def load_exif_data(exif_path):
+    """(展锐平台)加载txt文件并提取Bv值和EVD值等EXIF信息
+    返回: (汇总字符串, 是否存在EVFrameSA信息)
+    """
+    try:
+        # 判断文件是否存在
+        if not exif_path or not os.path.isfile(exif_path):
+            return "", False
+
+        # 读取txt文件
+        text_norm = ""
+        with open(exif_path, "r", encoding="utf-8", errors="ignore") as f:
+            text_norm = f.read()
+
+        # 关键字段查找
+        patterns = {
+            "Lux": "AE_TAG_REALBVX1000|AE_TAG_HSV4P0_STS_EVD|AE_TAG_HS_EVD",
+            "CWV": "AE_TAG_CWV_FINAL_TARGET",
+        }
+
+
+        # 定义提取关键字函数
+        def extract_value_pat(pat, text_norm):
+            try:
+                value = 0
+                format = rf'{re.escape(pat)}\s*:\s*([-+]?\d+(?:\.\d+)?)'
+                match = re.search(format, text_norm)
+                if match:
+                    value = float(match.group(1)) if '.' in match.group(1) else int(match.group(1))
+                return value if value else 0
+            except Exception as e:
+                print(f"extract_value_pat解析exif失败{exif_path}:\n报错信息: {e}")
+                return 0
+  
+        # 查找关键字数值并拼接, 先定义基础变量
+        unisoc_exif_info, extracted_values, value = '', [], 0
+        for key,pat in patterns.items():
+            if key == "Lux":
+                bv = extract_value_pat(pat.split("|")[0], text_norm)
+                evd1 = extract_value_pat(pat.split("|")[1], text_norm)
+                evd2 = extract_value_pat(pat.split("|")[2], text_norm)
+                evd = evd1 if evd1 else evd2  
+
+                value = f"bv[{bv}] evd[{evd}]"
+                extracted_values.append(f"\n{key}: {value}")
+                
+            else: # 剩余关键字数值提取
+                if (value := extract_value_pat(pat, text_norm)):
+                    extracted_values.append(f"\n{key}: {value}")
+        
+
+        unisoc_exif_info = ''.join(extracted_values)
+        return unisoc_exif_info, False
+
+    except Exception as e:
+        print(f"解析TXT失败{exif_path}:\n报错信息: {e}")
+        return '', False
+
 
 def load_txt_data(txt_path):
     """(展锐平台)加载txt文件并提取Bv值和EVD值等EXIF信息
@@ -344,7 +402,7 @@ def load_txt_data(txt_path):
         def extract_value_pat(pat, text_norm):
             try:
                 value = 0
-                format = rf'{re.escape(pat)}\s*:\s*([0-9]+\.?[0-9]*)'
+                format = rf'{re.escape(pat)}\s*:\s*([-+]?\d+(?:\.\d+)?)'
                 match = re.search(format, text_norm)
                 if match:
                     value = float(match.group(1)) if '.' in match.group(1) else int(match.group(1))
@@ -1787,10 +1845,9 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             exif_path = os.path.join(path + ".exif")
             if os.path.exists(exif_path):
                 # 提取xml中lux_index、cct、drcgain等关键信息，拼接到exif_info
-                # exif_info_mtk, hdr_flag = load_exif_data(xml_path)
-                # exif_info += exif_info_mtk
-                 pass
-        
+                exif_info_mtk, hdr_flag = load_exif_data(exif_path)
+                exif_info += exif_info_mtk
+                
             # （展锐平台）检测是否存在同图片路径的xml文件  将lux_index、DRCgain写入到exif信息中去
             txt_path = os.path.join(os.path.dirname(path), os.path.basename(path).split('.')[0] + ".txt")
             if os.path.exists(txt_path):

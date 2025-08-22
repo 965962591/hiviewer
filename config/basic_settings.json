@@ -3,19 +3,23 @@
         "D:/Tuning/C3Z/03_pic/20250819_20.18.11",
         "C:\\Users\\caozhen\\Downloads\\2",
         "C:/Users/caozhen/Downloads/2",
-        "D:/Tuning/Somalia-A(M953)/03_pic/20250819_20.18.11"
+        "D:/Tuning/Somalia-A(M953)/03_pic/20250819_20.18.11",
+        "D:/Tuning/M5151/0_picture/0_tuning_para/空景",
+        "D:/Tuning/Somalia-A(M953)/03_pic",
+        "D:/Tuning/Somalia-A(M953)/03_pic/20250806_15.06.51",
+        "D:/Tuning/Somalia-A(M953)/03_pic/20250806_15.20.13"
     ],
-    "current_directory": "D:/Tuning/Somalia-A(M953)/03_pic/20250819_20.18.11",
+    "current_directory": "D:/Tuning/Somalia-A(M953)/03_pic/20250806_15.20.13",
     "file_type_option": "显示图片文件",
     "combobox1_checked_items": [],
     "combobox1_all_items": [
         "20250806_15.06.51",
-        "20250806_15.20.13"
+        "20250819_20.18.11"
     ],
     "sort_option": "按文件名称排序",
     "theme_option": "默认主题",
     "current_theme": "默认主题",
     "simple_mode": true,
     "drag_flag": true,
-    "api_flag": true
+    "api_flag": false
 }
