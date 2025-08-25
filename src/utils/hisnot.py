@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from pathlib import Path
 import sys
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
@@ -614,10 +615,16 @@ class WScreenshot(QWidget):
         self.output = self.output.copy(toRect(self.maskRect))
         self.clipboard.setPixmap(self.output)  # 写入剪贴板
         
-        # 确保保存路径存在
-        save_path = "ocr.png"  # 可以考虑使用文件对话框让用户选择路径
+        # 设置截图保存路径
+        save_path = "0_ocr.png"
+        # 判断base_path是否存在
+        base_path = Path(__file__).parent.parent.parent / "cache"
+        if base_path.exists():
+            save_path = base_path / "0_ocr.png"
+
+        # 保存图片
         try:
-            self.output.save(save_path, self.saveFormat, self.picQuality)
+            self.output.save(save_path.as_posix(), self.saveFormat, self.picQuality)
         except Exception as e:
             print(f"保存文件时出错: {e}")  # 添加异常处理
 
