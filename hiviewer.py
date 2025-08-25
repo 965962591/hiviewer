@@ -584,7 +584,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.statusbar_button3.setFlat(True)
 
         # 初始化版本更新按钮文本
-        self.statusbar_button2.setText(f"🚀({self.version_info})")            
+        self.statusbar_button2.setText(f"🌼{self.version_info}")            
 
         # 初始化FastAPI按钮文本 🐹
         self.statusbar_button3.setText(f"{self.fast_api_host}:{self.fast_api_port}")     
@@ -592,7 +592,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 初始化标签文本
         self.statusbar_label1.setText(f"📢:进度提示标签🍃")
         self.statusbar_label0.setText(f"📢:选中或筛选的文件夹中包含{self.image_index_max}张图")
-        self.statusbar_label.setText(f"[0]已选择")
+        self.statusbar_label.setText(f"💦已选文件数[0]个")
 
         
         """ 左侧组件
@@ -764,7 +764,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.statusbar_button1.clicked.connect(self.setting)   # 🔆设置按钮槽函数
         self.statusbar_button2.clicked.connect(self.update)    # 🚀版本按钮槽函数
         self.statusbar_checkbox.stateChanged.connect(self.fast_api_switch)
-        self.statusbar_button3.clicked.connect(self.fast_api)  # 🐹127.0.0.1:8000按钮槽函数
+        self.statusbar_button3.clicked.connect(self.fast_api)  # 127.0.0.1:8000按钮槽函数
 
 
     """
@@ -1703,7 +1703,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         print("update_combobox函数: ")
 
         # 清空历史的已选择
-        self.statusbar_label.setText(f"[0]已选择")
+        self.statusbar_label.setText(f"💦已选文件数[0]个")
 
         # 更新左侧文件浏览器中的预览区域显示
         if True:
@@ -1874,7 +1874,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     self.RB_QTableWidget0.setRowHeight(row, 52)
 
             # # 更新标签显示  
-            self.statusbar_label0.setText(f"📢:当前选中的文件夹中包含 {pic_num_list} 张图")  
+            self.statusbar_label0.setText(f"🎃已选文件夹内文件数{pic_num_list}个 ")  
 
             return pic_num_list
         except Exception as e:
@@ -2176,7 +2176,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 self.show_preview_error("不支持预览的文件类型")
                 
             # 更新状态栏显示选中数量
-            self.statusbar_label.setText(f"[{len(file_paths)}]已选择")
+            self.statusbar_label.setText(f"💦已选文件数[{len(file_paths)}]个")
 
         except Exception as e:
             print(f"[handle_table_selection]-->处理表格选中事件失败: {e}")
