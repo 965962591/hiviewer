@@ -318,7 +318,7 @@ def load_exif_data(exif_path):
 
         # 关键字段查找
         patterns = {
-            "Lux": "AE_TAG_REALBVX1000|AE_TAG_HSV4P0_STS_EVD|AE_TAG_HS_EVD",
+            "Lux": "AE_TAG_REALBVX1000|AE_TAG_HSV4P0_STS_EVD|AE_TAG_HS_EVD|AE_TAG_FLT_DR",
             "CWV": "AE_TAG_CWV_FINAL_TARGET",
         }
 
@@ -343,9 +343,13 @@ def load_exif_data(exif_path):
                 bv = extract_value_pat(pat.split("|")[0], text_norm)
                 evd1 = extract_value_pat(pat.split("|")[1], text_norm)
                 evd2 = extract_value_pat(pat.split("|")[2], text_norm)
-                evd = evd1 if evd1 else evd2  
+                evd = evd1 if evd1 else evd2
+                dr = extract_value_pat(pat.split("|")[3], text_norm)
 
-                value = f"bv[{bv}] evd[{evd}]"
+                # 打印相关信息
+                value = f"NULL" if not bv and not evd and not dr else f"bv[{bv}] evd[{evd}] dr[{dr}]"
+                
+                
                 extracted_values.append(f"\n{key}: {value}")
                 
             else: # 剩余关键字数值提取
