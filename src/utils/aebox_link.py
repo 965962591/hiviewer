@@ -79,7 +79,7 @@ def check_process_running(process_name: str) -> bool:
             print(f"✅ [check_process_running]-->{target_process_name} 进程已在运行")
             return True
         else:
-            print(f"❌ [check_process_running]-->未找到运行中的进程 [{process_name}]")
+            print(f"❌ [check_process_running]-->未找到运行中的进程[{process_name}]")
             return False
 
     except (psutil.NoSuchProcess, PermissionError):

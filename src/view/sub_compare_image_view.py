@@ -1975,58 +1975,48 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         return histogram, cv_img, stats, rgb_pixmap, gray_pixmap, p3_pixmap
 
     def sync_image_index_with_aebox(self, images_path_list, index_list):
-        """同步当前图片索引到aebox应用"""
+        """同步当前图片索引到aebox应用,与aebox的基础通信协议如下:
+        主要使用函数get_api_data进行fast api通信
+        1. 直接发送指定索引0,get_api_data(url=http://127.0.0.1:8000/select_image/0, timeout=2)
+        2. 获取aebox当前选中的图片信息,get_api_data(url=http://127.0.0.1:8000/current_image, timeout=2)
+        3. 获取aebox当前图片数据列表,get_api_data(url=http://127.0.0.1:8000/image_list, timeout=2)
+        """
         try:
-            # 预检查程序aebox是否启动
+            # 1. 预检查程序aebox是否启动
             if not check_process_running("aebox"):
-                print("❌ [sync_image_index_with_aebox]-->同步当前图片索引到aebox应用失败--aebox应用未启动")
+                print("❌ [sync_image_index_with_aebox]-->无法同步索引到[aebox]")
                 return False
 
         
-            # 新增配置文件读取
+            # 2. 读取配置文件,获取当前fast api的地址和端口；一般默认设置为 http://127.0.0.1:8000
             host = ( 
                 f"http://{self.parent_window.fast_api_host}:{self.parent_window.fast_api_port}" 
                 if self.parent_window and self.parent_window.fast_api_host and self.parent_window.fast_api_port else
                 "http://127.0.0.1:8000"
             )
-            origin_image_names = [os.path.basename(path) for path in images_path_list]
 
-            # 发送初始索引
-            select_url = f"{host}/select_image/{index_list[0].split('/')[0]}"
-            if not get_api_data(url=select_url, timeout=2):
-                print(f"❌ [sync_image_index_with_aebox]-->初始索引发送失败:{select_url}")
-                return False
+            # 3. 获取当前看图子界面打开的图片名称列表
+            set_hiviewer_images = set([os.path.basename(path) for path in images_path_list])
 
-            # 获取aebox当前图片信息
-            current_data = json.loads(get_api_data(
-                url=f"{host}/current_image", 
-                timeout=3) or '{}'
-            )
-            current_name = current_data.get('filename', '')
 
-            if current_name and current_name in origin_image_names:
-                print(f"✅ [sync_image_index_with_aebox]-->初始索引发送成功匹配: {current_name}")
-                return True
-
-            # 执行图片列表匹配
-            list_data = json.loads(get_api_data(
+            # 4. 使用fast api 获取到当前aebox图片列表信息；返回列表数据 list_aebox_images
+            list_aebox_images = json.loads(get_api_data(
                 url=f"{host}/image_list",
                 timeout=3) or '{}'
-            )
-            aebox_images = list_data.get('filenames', [])
+            ).get('filenames', [])
 
-            # 使用集合提高查找效率
-            origin_set = set(origin_image_names)
-            matching_indices = [i for i, name in enumerate(aebox_images) if name in origin_set]
+            # 5. 使用集合提高查找效率,得到匹配index并发送到aebox
+            if list_aebox_images:
+                matching_indices = [i for i, name in enumerate(list_aebox_images) if name in set_hiviewer_images]
 
             if len(matching_indices) == 1:
                 new_index = matching_indices[0] + 1
                 if get_api_data(f"{host}/select_image/{new_index}", timeout=2):
-                    print(f"✅ [sync_image_index_with_aebox]-->成功同步图片到aebox: {aebox_images[matching_indices[0]]}")
+                    print(f"✅ [sync_image_index_with_aebox]-->成功同步图片到aebox: {list_aebox_images[matching_indices[0]]}")
                     return True
-
-                print("⭕ [sync_image_index_with_aebox]-->warning: 未找到唯一匹配的图片")
-            return False
+            else:
+                print("⭕ [sync_image_index_with_aebox]-->aebox中未找到唯一匹配的图片")
+                return False
 
         except Exception as e:
             print(f"❌ [sync_image_index_with_aebox]-->error: 同步索引异常: {str(e)}")
