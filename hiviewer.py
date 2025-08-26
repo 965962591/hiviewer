@@ -1874,7 +1874,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     self.RB_QTableWidget0.setRowHeight(row, 52)
 
             # # 更新标签显示  
-            self.statusbar_label0.setText(f"🎃已选文件夹内文件数{pic_num_list}个 ")  
+            self.statusbar_label0.setText(f"🎃已选文件夹数{pic_num_list}个 ")  
 
             return pic_num_list
         except Exception as e:

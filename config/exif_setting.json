@@ -1,11 +1,11 @@
 {
     "label_visable_settings": {
-        "histogram_info": true,
+        "histogram_info": false,
         "exif_info": true,
         "roi_info": true,
         "ai_tips": false,
-        "auto_color_space": true,
-        "srgb_color_space": false,
+        "auto_color_space": false,
+        "srgb_color_space": true,
         "p3_color_space": false,
         "gray_color_space": false,
         "is_fullscreen": false,
