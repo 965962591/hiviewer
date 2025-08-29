@@ -3046,13 +3046,10 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def save_settings(self):
         """保存当前设置到JSON文件"""
         try:
-            settings_path = os.path.join(os.path.dirname(__file__), "config", "basic_settings.json")
-            
-            # 确保cache目录存在
-            cache_dir = os.path.dirname(settings_path)
-            if not os.path.exists(cache_dir):
-                os.makedirs(cache_dir)
-
+            # 使用 pathlib.Path 统一路径处理，更现代和跨平台
+            settings_path = Path(__file__).parent / "config" / "basic_settings.json"
+            # 确保config目录存在
+            settings_path.parent.mkdir(parents=True, exist_ok=True)
             # 收集所有需要保存的设置
             settings = {
                 # 地址栏历史记录和当前目录
@@ -3081,14 +3078,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
                 # fast_api开关使能
                 "api_flag":self.statusbar_checkbox.isChecked()
-
             }
-
-            # 保存设置到JSON文件
-            with open(settings_path, "w", encoding='utf-8', errors='ignore') as f:
-                json.dump(settings, f, ensure_ascii=False, indent=4)
-
+            # 保存设置到JSON文件，使用 pathlib 的 write_text 方法
+            settings_path.write_text(
+                json.dumps(settings, ensure_ascii=False, indent=4), 
+                encoding='utf-8'
+            )
+            self.logger.info(f"save_settings()-->成功保存设置信息到JSON文件 | 路径: {settings_path.as_posix()}")
         except Exception as e:
+            self.logger.error(f"【save_settings】-->保存设置到JSON文件失败: {e}")
             print(f"[save_settings]-->保存设置时出错: {e}")
 
 
