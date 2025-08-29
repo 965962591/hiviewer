@@ -113,7 +113,7 @@ class Ui_MainWindow(object):
         # 创建标签
         self.label_bottom = QtWidgets.QLabel()
         self.label_bottom.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)  # 设置为可扩展
-        self.label_bottom.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)  # 设置右居中对齐
+        self.label_bottom.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)  # 设置左居中对齐
         self.label_bottom.setMinimumWidth(1)
 
         # 正确添加组件的方式：注意，addWidget & addPermanentWidget 的区别

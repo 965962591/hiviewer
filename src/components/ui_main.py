@@ -12,12 +12,13 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from .custom_qCombox_spinner import CustomComboBox
 from .custom_qTableWidget_drag import DragTableWidget
 # 导入自定义装饰器
-from src.common.decorator import CC_TimeDec
+from src.common.decorator import CC_TimeDec, log_performance_decorator
 
 
 class Ui_MainWindow(object):
     """主窗口UI类"""
     @CC_TimeDec(tips="设置主窗口界面UI")
+    @log_performance_decorator(tips="设置主窗口界面UI", log_args=False, log_result=False)
     def setupUi(self, MainWindow):
         """设置主窗口"""
         MainWindow.setObjectName("MainWindow")
@@ -311,14 +312,14 @@ class Ui_MainWindow(object):
         self.verticalLayout_3.setSpacing(1)
         self.verticalLayout_3.setObjectName("verticalLayout_3")
 
-        # 右侧第三行的表格组件,设置自定义或者默认模式
-        # self.RB_QTableWidget0 = QtWidgets.QTableWidget(self.Right_Bottom_QGroupBox)
+        # 右侧第三行的表格组件,支持设置自定义表格或者默认模式
         # 使用自定义的表格，支持拖拽事件
         if self.drag_flag:
+            # 设置自定义表格以及主窗口引用（支持表格图片拖拽功能）
             self.RB_QTableWidget0 = DragTableWidget(self)
-            # 设置表格的主窗口引用
             self.RB_QTableWidget0.set_main_window(self)
         else:
+            # 设置默认模式（无拖拽）
             self.RB_QTableWidget0 = QtWidgets.QTableWidget(self.Right_Bottom_QGroupBox)
 
         self.RB_QTableWidget0.setObjectName("RB_QTableWidget0")

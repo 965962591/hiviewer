@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 import time
 from pathlib import Path
-from src.common.decorator import CC_TimeDec # 导入自定义装饰器
+from src.common.decorator import CC_TimeDec, log_performance_decorator      # 导入自定义装饰器函数 
 
 @CC_TimeDec(tips="读取版本号")
+@log_performance_decorator(tips="读取版本号", log_args=False, log_result=False)
 def version_init(VERSION="release-v2.3.2"):
     """从配置文件中读取当前软件版本号"""
     _start_time = time.time()
@@ -26,9 +27,10 @@ def version_init(VERSION="release-v2.3.2"):
         print(f"[version_init]-->读取版本号失败: {str(e)}\n使用默认版本号{VERSION}")
         return VERSION
 
-
+@CC_TimeDec(tips="读取fast api地址端口")
+@log_performance_decorator(tips="读取fast api地址端口", log_args=False, log_result=False)
 def fastapi_init(FASTAPI="[API]\nhost = 127.0.0.1\nport = 8000"):
-    """从配置文件中读取当前软件版本号"""
+    """从配置文件中读取Fast API的地址端口"""
     BASE_PATH = Path(__file__).parent.parent.parent
     default_version_path = BASE_PATH / "config" / "ipconfig.ini"
     try:

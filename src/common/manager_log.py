@@ -4,6 +4,7 @@ import sys
 import logging
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
+import json
 
 """设置根目录"""
 # 通过当前py文件来定位项目主入口路径，向上找两层父文件夹
@@ -75,36 +76,148 @@ logging.getLogger().setLevel(logging.DEBUG if DEBUG else logging.INFO)
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 """
 
-def setup_logging():
-    # 创建日志目录
-    log_dir = BASE_PATH / "cache" / "logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
+def load_log_config():
+    """加载日志配置文件"""
+    config_path = BASE_PATH / "config" / "log_config.json"
+    default_config = {
+        "console_level": "DEBUG",
+        "file_level": "INFO", 
+        "max_file_size": 10485760,  # 10MB
+        "backup_count": 5,
+        "log_format": "%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s",
+        "date_format": "%Y-%m-%d %H:%M:%S",
+        "enable_console": True,
+        "enable_file": True
+    }
     
-    # 基础配置
-    log_format = "%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
-    date_format = "%Y-%m-%d %H:%M:%S"
-    formatter = logging.Formatter(fmt=log_format, datefmt=date_format)
+    try:
+        if config_path.exists():
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                # 合并默认配置
+                for key, value in default_config.items():
+                    if key not in config:
+                        config[key] = value
+                return config
+        else:
+            # 创建默认配置文件
+            config_dir = config_path.parent
+            config_dir.mkdir(parents=True, exist_ok=True)
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(default_config, f, indent=4, ensure_ascii=False)
+            return default_config
+    except Exception as e:
+        print(f"加载日志配置失败: {e}, 使用默认配置")
+        return default_config
 
-    # 控制台处理器（开发环境使用）
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    console_handler.setLevel(logging.DEBUG)  # 开发时设为DEBUG，生产环境可改为INFO
+def setup_logging():
+    """设置日志系统"""
+    try:
+        # 加载配置
+        config = load_log_config()
+        
+        # 创建日志目录
+        log_dir = BASE_PATH / "cache" / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 获取日志级别
+        level_map = {
+            'DEBUG': logging.DEBUG,
+            'INFO': logging.INFO,
+            'WARNING': logging.WARNING,
+            'ERROR': logging.ERROR,
+            'CRITICAL': logging.CRITICAL
+        }
+        
+        console_level = level_map.get(config['console_level'], logging.DEBUG)
+        file_level = level_map.get(config['file_level'], logging.INFO)
+        
+        # 创建格式化器
+        formatter = logging.Formatter(
+            fmt=config['log_format'], 
+            datefmt=config['date_format']
+        )
 
-    # 文件处理器（带轮转功能）
-    file_handler = RotatingFileHandler(
-        filename=log_dir / "hiviewer.log",
-        maxBytes=10*1024*1024,  # 10MB
-        backupCount=5,
-        encoding="utf-8"
-    )
-    file_handler.setFormatter(formatter)
-    file_handler.setLevel(logging.INFO)
+        # 获取主日志器
+        main_logger = logging.getLogger()
+        main_logger.setLevel(logging.DEBUG)
+        
+        # 清除现有的处理器
+        for handler in main_logger.handlers[:]:
+            main_logger.removeHandler(handler)
 
-    # 主日志器配置
-    main_logger = logging.getLogger()
-    main_logger.setLevel(logging.DEBUG)
-    main_logger.addHandler(console_handler)
-    main_logger.addHandler(file_handler)
+        # 控制台处理器
+        if config['enable_console']:
+            console_handler = logging.StreamHandler()
+            console_handler.setFormatter(formatter)
+            console_handler.setLevel(console_level)
+            main_logger.addHandler(console_handler)
+
+        # 文件处理器（带轮转功能）
+        if config['enable_file']:
+            file_handler = RotatingFileHandler(
+                filename=log_dir / "hiviewer.log",
+                maxBytes=config['max_file_size'],
+                backupCount=config['backup_count'],
+                encoding="utf-8"
+            )
+            file_handler.setFormatter(formatter)
+            file_handler.setLevel(file_level)
+            main_logger.addHandler(file_handler)
+
+        # 记录日志系统启动信息
+        logging.info("=" * 65)
+        logging.info("HiViewer 日志系统初始化成功")
+        logging.info(f"日志文件路径: {log_dir / 'hiviewer.log'}")
+        logging.info(f"控制台日志级别: {config['console_level']}")
+        logging.info(f"文件日志级别: {config['file_level']}")
+        logging.info(f"最大文件大小: {config['max_file_size'] / 1024 / 1024:.1f}MB")
+        logging.info(f"备份文件数量: {config['backup_count']}")
+        logging.info("=" * 65)
+        
+    except Exception as e:
+        print(f"[setup_logging]--日志系统初始化失败: {e}")
+        # 使用最基本的日志配置作为后备
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.StreamHandler(),
+                logging.FileHandler(BASE_PATH / "cache" / "logs" / "hiviewer_fallback.log", encoding='utf-8')
+            ]
+        )
+        logging.error(f"日志系统初始化失败，使用后备配置: {e}")
+
+def get_logger(name=None):
+    """获取指定名称的日志器"""
+    return logging.getLogger(name)
+
+def log_function_call(func_name, *args, **kwargs):
+    """记录函数调用"""
+    logging.debug(f"函数调用: {func_name}(args={args}, kwargs={kwargs})")
+
+def log_function_result(func_name, result, execution_time=None):
+    """记录函数执行结果"""
+    if execution_time is not None:
+        logging.debug(f"函数完成: {func_name}() -> {result} (耗时: {execution_time:.3f}s)")
+    else:
+        logging.debug(f"函数完成: {func_name}() -> {result}")
+
+def log_error(error_msg, exc_info=True, extra_data=None):
+    """记录错误信息"""
+    if extra_data:
+        logging.error(f"{error_msg} | 额外数据: {extra_data}", exc_info=exc_info)
+    else:
+        logging.error(error_msg, exc_info=exc_info)
+
+def log_performance(operation, start_time, end_time, **kwargs):
+    """记录性能信息"""
+    duration = end_time - start_time
+    extra_info = " | ".join([f"{k}={v}" for k, v in kwargs.items()])
+    if extra_info:
+        logging.info(f"性能记录: {operation} | 耗时: {duration:.3f}s | {extra_info}")
+    else:
+        logging.info(f"性能记录: {operation} | 耗时: {duration:.3f}s")
 
 
 

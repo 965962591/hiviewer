@@ -3140,9 +3140,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         """获取下一组图片"""
         try:
             if self.parent_window:
-                next_images, next_indexs = self.parent_window.press_space_and_b_get_selected_file_paths('space')
+                next_images, next_indexs = self.parent_window.press_space_or_b_get_selected_file_list('space')
                 if next_images and isinstance(next_images, list) and len(next_images) > 0:
-                    # print(f"获取到下一组图片: {next_images}")
                     return next_images, next_indexs
                 else:
                     print("[get_next_images]-->获取到的下一组图片无效")
@@ -3156,9 +3155,8 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         """获取上一组图片"""
         try:
             if self.parent_window:
-                prev_images, prev_indexs = self.parent_window.press_space_and_b_get_selected_file_paths('b')
+                prev_images, prev_indexs = self.parent_window.press_space_or_b_get_selected_file_list('b')
                 if prev_images and isinstance(prev_images, list) and len(prev_images) > 0:
-                    # print(f"获取到上一组图片: {prev_images}")
                     return prev_images, prev_indexs
                 else:
                     print("[get_prev_images]-->获取到的上一组图片无效")

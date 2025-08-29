@@ -207,10 +207,70 @@ def log_decorator(func):
     return wrapper
 
 
-@timing_decorator
-@log_decorator
-def compute_sum(n):
-    return sum(range(n))
+# 自定义的装饰器，用于记录error日志
+def log_error_decorator(tips="程序异常! "):
+    """
+    报错信息监控装饰器
+    :param tips: 报错信息内容
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            try: # 执行函数
+                logging.info(f"{func.__name__}()-->执行函数任务")
+                result = func(*args, **kwargs)
+                return result
+            except Exception as e:
+                from src.components.custom_qMbox_showinfo import show_message_box
+                show_message_box(f"🚩{tips}发生错误!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
+                logging.error(f"【{func.__name__}】-->{tips} | 报错: {str(e)}", exc_info=True)
+                raise e
+        return wrapper
+    return decorator
+
+
+# 增强版日志装饰器，支持性能监控
+def log_performance_decorator(tips=None, log_args=True, log_result=True):
+    """
+    性能监控装饰器
+    :param tips: 操作名称，如果为None则使用函数名
+    :param log_args: 是否记录参数
+    :param log_result: 是否记录结果
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            op_name = tips or func.__name__
+            start_time = time.time() 
+            try:
+                # 记录函数调用
+                if log_args:
+                    logging.debug(f"开始执行: {op_name} | 参数: args={args}, kwargs={kwargs}")
+                else:
+                    logging.info(f"{func.__name__}()-->开始执行--函数说明：{tips}")
+                
+                # 执行函数
+                result = func(*args, **kwargs)
+                end_time = time.time()
+                duration = end_time - start_time
+                
+                # 记录执行结果
+                if log_result:
+                    logging.info(f"执行完成: {op_name} | 耗时: {duration:.3f}s | 结果: {result}")
+                else:
+                    logging.info(f"{func.__name__}()-->执行完成 | 耗时: {duration:.3f}s | 结果: {result}")
+                
+                return result
+                
+            except Exception as e:
+                end_time = time.time()
+                duration = end_time - start_time
+                logging.error(f"{func.__name__}()--执行失败!!! | 耗时: {duration:.3f}s | 错误: {str(e)}", exc_info=True)
+                raise e
+                
+        return wrapper
+    return decorator
+
 
 
 

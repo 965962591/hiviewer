@@ -62,26 +62,23 @@ class DragTableWidget(QTableWidget):
             
             # 主函数中定义的拖拽模式切换标志位
             if self.main_window.drag_flag: 
-                
-                # 收集文件URL
-                urls = self.main_window.get_selected_file_path()
-                if not urls:
+                # 收集表格选择的文件路径列表并判断是否存在
+                if not (file_path_list := self.main_window.get_selected_file_path()):
                     print("mouseMoveEvent()--拖拽操作失败: 无法获取文件路径")
                     return 
 
                 # 处理表格拖拽功能
-                self.handle_table_drag_function(urls)
+                self.handle_table_drag_function(file_path_list)
 
             # 关闭拖拽模式后，处理多选功能        
             else:
-                # 处理表格多选功能
                 self.handle_table_multi_selection(event)
 
         except Exception as e:
             print(f"UiMain.DragTableWidget.mouseMoveEvent()--处理鼠标移动事件失败: {e}")
 
 
-    def handle_table_drag_function(self, urls):
+    def handle_table_drag_function(self, file_path_list):
         """处理表格拖拽功能"""  
         try:
             # 创建拖拽对象和MIME数据
@@ -89,7 +86,7 @@ class DragTableWidget(QTableWidget):
             mime_data = QMimeData()
             
             # 将文件路径转换为URL
-            urls = [QUrl.fromLocalFile(file_path) for file_path in urls]
+            urls = [QUrl.fromLocalFile(file_path) for file_path in file_path_list]
 
             # 设置MIME数据 & 拖拽对象
             mime_data.setUrls(urls)
@@ -100,13 +97,13 @@ class DragTableWidget(QTableWidget):
 
             # 选择项数量为1时直接获取预览区域的pixmap
             if len(urls) == 1:
-                # self.main_window.image_viewer.pixmap_item.pixmap()
-                # self.main_window.image_viewer.scene.items()[0].pixmap()
-
                 # 直接获取主界面预览区域的pixmap
-                if self.main_window.image_viewer and self.main_window.image_viewer.pixmap_item:
+                if hasattr(self.main_window, 'image_viewer') and hasattr(self.main_window.image_viewer, 'pixmap_item'):
                     _pixmap = self.main_window.image_viewer.pixmap_item.pixmap()
                     preview = _pixmap.scaled(128, 128, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                else:
+                    file_type = file_path_list[0].split(".")[-1]
+                    preview = self.create_preview_image(f"{file_type}")
 
             # 设置预览图
             drag.setPixmap(preview)
