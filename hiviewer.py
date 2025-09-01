@@ -2181,11 +2181,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
             # 获取选中单元格完整文件路径列表, 若存在则进行预览区域内容更新
             if (file_paths := self.get_selected_file_path()):
-                # 清空旧预览内容
+                # 清空旧预览内容,根据预览文件完整路径动态选则预览区显示图像,更新状态栏显示选中数量
                 self.clear_preview_layout() 
-                # 根据预览文件完整路径动态选则预览区显示图像
                 self.display_preview_image_dynamically(file_paths[0])
-                # 更新状态栏显示选中数量
                 self.statusbar_label.setText(f"💦已选文件数[{len(file_paths)}]个")
         except Exception as e:
             print(f"[handle_table_selection]-->处理表格选中事件失败: {e}")
@@ -2197,6 +2195,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         try:
             # 统一转换传入文件路径的为小写字母
             file_path = preview_file_path.lower()
+
             # 根据文件类型创建预览, 图片文件处理
             if file_path.endswith(tuple(self.IMAGE_FORMATS)):
                 # 处理HEIC格式图片，成功提取则创建并显示图片预览，反之则显示提取失败
@@ -2207,6 +2206,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                         self.show_preview_error("提取HEIC图片失败")
                 else: # 非".heic"格式图片直接创建并显示预览图像
                     self.create_image_preview(preview_file_path)
+
             # 视频文件处理
             elif file_path.endswith(tuple(self.VIDEO_FORMATS)):
                 # 提取视频文件首帧图，创建并显示预览图
@@ -2214,6 +2214,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     self.create_image_preview(video_path)     
                 else:
                     self.show_preview_error("视频文件预览失败")
+                    
             # 非图片/视频格式文件处理
             else:
                 self.show_preview_error("不支持预览的文件类型")
@@ -2227,26 +2228,20 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         try:
             # 清理 image_viewer 引用
             if hasattr(self, 'image_viewer') and self.image_viewer:
-                try:
-                    # 先调用自定义清理方法
+                try: # 先调用自定义清理方法，然后删除对象
                     if hasattr(self.image_viewer, 'cleanup'):
                         self.image_viewer.cleanup()
-                    # 然后删除对象
                     self.image_viewer.deleteLater()
                 except Exception as e:
-                    self.logger.error(f"clear_preview_layout()-->清理image_viewer失败: {e}")
+                    self.logger.error(f"【clear_preview_layout】-->清理image_viewer失败: {e}")
                 finally:
                     self.image_viewer = None
             
             # 清理布局中的所有组件
             while self.verticalLayout_left_2.count():
                 item = self.verticalLayout_left_2.takeAt(0)
-                widget = item.widget()
-                if widget:
-                    try:
-                        widget.deleteLater()
-                    except Exception as e:
-                        self.logger.error(f"clear_preview_layout()-->清理widget失败: {e}")
+                if (widget := item.widget()):
+                    widget.deleteLater()
         except Exception as e:
             show_message_box("清空预览区域报错!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
             self.logger.error(f"【clear_preview_layout】-->清空预览区域 | 报错: {e}")
@@ -3703,6 +3698,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         函数功能说明: 用于查看上一组图片/视频，在看图子界面功能保持一致
         """
         try:
+            self.logger.info(f"on_b_pressed()-->执行函数任务, 主界面处理【B】键按下事件")
             # 按键防抖机制，防止快速多次按下导致错误，设置0.5秒内不重复触发
             if self.should_block_space_or_b_press():
                 return
@@ -3723,6 +3719,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         函数功能说明: 用于查看下一组图片/视频，在看图子界面功能保持一致
         """
         try:
+            self.logger.info(f"on_space_pressed()-->执行函数任务, 主界面处理【Space】键按下事件")
             # 按键防抖机制，防止快速多次按下导致错误，设置0.5秒内不重复触发
             if self.should_block_space_or_b_press():
                 return
