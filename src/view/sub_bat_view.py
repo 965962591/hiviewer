@@ -15,19 +15,18 @@ from PyQt5.QtWidgets import (
     QSplitter,
     QDialog,
     QLineEdit,
-    QTextEdit,
     QDialogButtonBox,
     QComboBox,
-    QHBoxLayout,
 )
 import subprocess
 from PyQt5.QtGui import QIcon
 import threading
-from PyQt5.QtCore import QMetaObject, Qt, pyqtSlot, Q_ARG, QTimer, pyqtSignal
+from PyQt5.QtCore import QMetaObject, Qt, pyqtSlot, Q_ARG, QTimer, pyqtSignal, QThread
 import json
 import os
 import wmi
 import pythoncom
+import configparser
 
 
 # 全局变量定义缓存目录
@@ -60,18 +59,18 @@ class USBDeviceMonitor:
             )
 
             self.thread_running = True
-            print("[监控系统] USB设备监控服务启动")
+            # print("[监控系统] USB设备监控服务启动")
             while self.thread_running:
                 try:
                     new_device = arr_filter(0.5)
-                    print(f"[监控系统] 检测到新设备: {new_device.Description}")
+                    # print(f"[监控系统] 检测到新设备: {new_device.Description}")
                     self.device_changed_callback()
                 except wmi.x_wmi_timed_out:
                     pass
 
                 try:
                     removed_device = rem_filter(0.5)
-                    print(f"[监控系统] 检测到设备移除: {removed_device.Description}")
+                    # print(f"[监控系统] 检测到设备移除: {removed_device.Description}")
                     self.device_changed_callback()
                 except wmi.x_wmi_timed_out:
                     pass
@@ -80,7 +79,7 @@ class USBDeviceMonitor:
             print(f"[监控系统] 监控出错: {e}")
         finally:
             pythoncom.CoUninitialize()
-            print("[监控系统] 监控服务已关闭")
+            # print("[监控系统] 监控服务已关闭")
 
     def start(self):
         if not self.monitor_thread.is_alive():
@@ -105,8 +104,13 @@ class LogVerboseMaskApp(QWidget):
         # 确保缓存目录存在
         os.makedirs(APP_CACHE_DIR, exist_ok=True)
         self.specific_commands = self.load_commands()
+        self.device_name_mapping = {}  # 设备ID到自定义名称的映射
         self.initUI()
         self.setup_logging()
+        
+        # 加载设备名称映射
+        self.load_device_names()
+        
         self.refresh_devices()  # 初始化时刷新设备列表
         
         # 初始化USB设备监控
@@ -130,7 +134,7 @@ class LogVerboseMaskApp(QWidget):
                 with open(self.COMMANDS_FILE, "r", encoding="utf-8") as file:
                     return json.load(file)
             except json.JSONDecodeError:
-                print(f"警告：无法解析 {self.COMMANDS_FILE}，将使用默认命令。")
+                # print(f"警告：无法解析 {self.COMMANDS_FILE}，将使用默认命令。")
                 return self.get_default_commands() # 返回默认命令
         else:
             # 如果文件不存在，使用默认命令
@@ -188,8 +192,138 @@ class LogVerboseMaskApp(QWidget):
             with open(self.COMMANDS_FILE, "w", encoding="utf-8") as file:
                 json.dump(self.specific_commands, file, ensure_ascii=False, indent=4)
         except IOError as e:
-            print(f"错误：无法写入配置文件 {self.COMMANDS_FILE}: {e}")
+            # print(f"错误：无法写入配置文件 {self.COMMANDS_FILE}: {e}")
             QMessageBox.warning(self, "保存错误", f"""无法保存命令配置到:{self.COMMANDS_FILE}错误: {e}""")
+
+    def load_device_names(self):
+        """从INI文件加载设备名称映射"""
+        ini_path = os.path.join(APP_CACHE_DIR, "bat_filepath.ini")
+        try:
+            if os.path.exists(ini_path):
+                # 直接读取文件内容，专门查找[devices]节
+                with open(ini_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                # 查找[devices]节
+                import re
+                devices_pattern = r'\[devices\](.*?)(?=\[|$)'
+                match = re.search(devices_pattern, content, re.DOTALL)
+                
+                if match:
+                    devices_content = match.group(1).strip()
+                    for line in devices_content.split('\n'):
+                        line = line.strip()
+                        if '=' in line:
+                            device_id, custom_name = line.split('=', 1)
+                            device_id = device_id.strip()
+                            custom_name = custom_name.strip()
+                            if device_id and custom_name:
+                                self.device_name_mapping[device_id] = custom_name
+        except Exception as e:
+            print(f"加载设备名称映射时出错: {e}")
+
+    def save_device_names(self):
+        """保存设备名称映射到INI文件"""
+        ini_path = os.path.join(APP_CACHE_DIR, "bat_filepath.ini")
+        try:
+            os.makedirs(APP_CACHE_DIR, exist_ok=True)
+            
+            # 读取现有文件内容
+            content = ""
+            if os.path.exists(ini_path):
+                with open(ini_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            
+            # 使用正则表达式查找[devices]节
+            import re
+            devices_pattern = r'\[devices\](.*?)(?=\[|$)'
+            match = re.search(devices_pattern, content, re.DOTALL)
+            
+            # 构建新的[devices]节内容
+            devices_content = "\n"
+            for device_id, custom_name in self.device_name_mapping.items():
+                devices_content += f"{device_id}={custom_name}\n"
+            
+            if match:
+                # 如果[devices]节存在，替换它
+                new_content = content[:match.start()] + f"[devices]{devices_content}" + content[match.end():]
+            else:
+                # 如果[devices]节不存在，在文件末尾添加
+                if not content.endswith('\n'):
+                    content += '\n'
+                new_content = content + f"[devices]{devices_content}"
+            
+            # 写入文件
+            with open(ini_path, 'w', encoding='utf-8') as f:
+                f.write(new_content)
+            
+            # 同步到下载界面（如果存在）
+            if hasattr(self, 'download_dialog') and hasattr(self.download_dialog, 'device_name_mapping'):
+                self.download_dialog.device_name_mapping.update(self.device_name_mapping)
+                # 刷新下载界面的设备列表
+                if hasattr(self.download_dialog, 'refresh_devices'):
+                    self.download_dialog.refresh_devices()
+                
+        except Exception as e:
+            print(f"保存设备名称映射时出错: {e}")
+
+    def get_device_display_name(self, device_id):
+        """获取设备的显示名称（自定义名称或原始ID）"""
+        return self.device_name_mapping.get(device_id, device_id)
+
+    def get_device_original_id(self, display_name):
+        """根据显示名称获取原始设备ID"""
+        # 如果显示名称就是原始ID，直接返回
+        if hasattr(self, 'devices') and display_name in self.devices:
+            return display_name
+        
+        # 否则查找自定义名称对应的原始ID
+        for device_id, custom_name in self.device_name_mapping.items():
+            if custom_name == display_name:
+                return device_id
+        
+        return display_name
+
+    def edit_device_name(self, device_id):
+        """编辑设备名称"""
+        current_name = self.device_name_mapping.get(device_id, device_id)
+        new_name, ok = QInputDialog.getText(
+            self, 
+            "重命名设备", 
+            f"为设备 {device_id} 输入自定义名称：", 
+            text=current_name
+        )
+        
+        if ok and new_name.strip():
+            new_name = new_name.strip()
+            
+            # 检查名称是否已被其他设备使用
+            if new_name in self.device_name_mapping.values() and new_name != current_name:
+                QMessageBox.warning(self, "错误", "该名称已被其他设备使用，请选择其他名称。")
+                return
+            
+            # 更新映射
+            if new_name == device_id:
+                # 如果名称与原始ID相同，删除映射
+                self.device_name_mapping.pop(device_id, None)
+            else:
+                # 否则保存新名称
+                self.device_name_mapping[device_id] = new_name
+            
+            # 保存到INI文件
+            self.save_device_names()
+            
+            # 刷新设备显示
+            self.refresh_devices()
+
+    def edit_current_device_name(self):
+        """编辑当前选中设备的名称"""
+        selected_device = self.get_selected_device()
+        if not selected_device:
+            QMessageBox.warning(self, "设备错误", "请先选择有效的ADB设备！")
+            return
+        
+        self.edit_device_name(selected_device)
 
     def refresh_devices(self):
         """刷新ADB设备列表"""
@@ -217,48 +351,68 @@ class LogVerboseMaskApp(QWidget):
                         device_id, status = line.strip().split('\t')
                         if status == 'device':  # 只添加已连接的设备
                             devices.append(device_id)
-                            print(f"[设备刷新] 获取到设备: {device_id}")
+                            # print(f"[设备刷新] 获取到设备: {device_id}")
                 
                 # 更新设备下拉列表
                 current_device = self.device_combo.currentText() if self.device_combo.count() > 0 else ""
                 self.device_combo.clear()
+                
                 if devices:
                     for device in devices:
-                        self.device_combo.addItem(device)
+                        # 显示自定义名称或原始ID
+                        display_name = self.get_device_display_name(device)
+                        self.device_combo.addItem(display_name, device)  # 存储原始ID作为数据
+                    
                     # 尝试保持之前选中的设备
-                    if current_device and current_device in devices:
-                        index = self.device_combo.findText(current_device)
-                        if index >= 0:
-                            self.device_combo.setCurrentIndex(index)
+                    if current_device:
+                        # 查找当前显示名称对应的设备
+                        for i in range(self.device_combo.count()):
+                            if self.device_combo.itemText(i) == current_device:
+                                self.device_combo.setCurrentIndex(i)
+                                break
+                        else:
+                            # 如果没找到，选择第一个
+                            self.device_combo.setCurrentIndex(0)
                     else:
                         self.device_combo.setCurrentIndex(0)
+                    
                     self.device_combo.setEnabled(True)  # 确保有设备时启用下拉列表
-                    print(f"[设备刷新] -->检测到 {len(devices)} 台设备")
+                    # print(f"[设备刷新] 检测到 {len(devices)} 台设备")
                 else:
                     self.device_combo.addItem("未检测到设备")
                     self.device_combo.setEnabled(False)
+                    # print("[设备刷新] 未检测到设备")
             else:
                 self.device_combo.clear()
                 self.device_combo.addItem("ADB命令执行失败")
                 self.device_combo.setEnabled(False)
-                print("[设备刷新] ADB命令执行失败")
+                # print("[设备刷新] ADB命令执行失败")
         except Exception as e:
             self.device_combo.clear()
             self.device_combo.addItem(f"错误: {str(e)}")
             self.device_combo.setEnabled(False)
-            print(f"[设备刷新] 发生错误: {str(e)}")
+            # print(f"[设备刷新] 发生错误: {str(e)}")
 
     def get_selected_device(self):
         """获取当前选中的设备ID"""
-        current_text = self.device_combo.currentText()
-        is_enabled = self.device_combo.isEnabled()
-        print(f"当前选中的设备: '{current_text}', 下拉列表是否启用: {is_enabled}")
-        
-        if current_text in ["未检测到设备", "ADB命令执行失败"] or not is_enabled:
-            print(f"设备选择无效，返回None")
+        if not self.device_combo.isEnabled():
             return None
-        print(f"返回选中的设备: {current_text}")
-        return current_text
+        
+        current_index = self.device_combo.currentIndex()
+        if current_index < 0:
+            return None
+        
+        # 获取当前选中项的数据（原始设备ID）
+        device_id = self.device_combo.itemData(current_index)
+        if device_id is None:
+            # 如果没有数据，使用显示文本
+            current_text = self.device_combo.currentText()
+            if current_text in ["未检测到设备", "ADB命令执行失败"]:
+                return None
+            # 根据显示名称查找原始设备ID
+            device_id = self.get_device_original_id(current_text)
+        
+        return device_id
 
     def switch_usb_mode(self, mode_name, usb_function):
         """切换USB模式"""
@@ -275,7 +429,7 @@ class LogVerboseMaskApp(QWidget):
                 # 仅充电模式（无参数）
                 command = f"adb -s {selected_device} shell svc usb setFunctions"
             
-            print(f"执行USB模式切换命令: {command}")
+            # print(f"执行USB模式切换命令: {command}")
             
             # 执行命令
             # 使用 startupinfo 来隐藏命令行窗口
@@ -297,16 +451,16 @@ class LogVerboseMaskApp(QWidget):
             
             if result.returncode == 0:
                 QMessageBox.information(self, "成功", f"USB模式已切换到: {mode_name}")
-                print(f"USB模式切换成功: {mode_name}")
+                # print(f"USB模式切换成功: {mode_name}")
             else:
                 error_msg = result.stderr.strip() if result.stderr else "未知错误"
                 QMessageBox.warning(self, "执行失败", f"切换USB模式失败: {error_msg}")
-                print(f"USB模式切换失败: {error_msg}")
+                # print(f"USB模式切换失败: {error_msg}")
                 
         except Exception as e:
             error_msg = f"执行USB模式切换时出错: {str(e)}"
             QMessageBox.critical(self, "错误", error_msg)
-            print(error_msg)
+            # print(error_msg)
 
     def initUI(self):
         self.setWindowTitle("Bat脚本执行")
@@ -325,6 +479,10 @@ class LogVerboseMaskApp(QWidget):
         refresh_button = QPushButton("刷新")
         refresh_button.clicked.connect(self.refresh_devices)
         
+        # 添加编辑设备名称按钮
+        edit_device_button = QPushButton("编辑设备名称")
+        edit_device_button.clicked.connect(self.edit_current_device_name)
+        
         # 添加USB功能切换按钮
         usb_label = QLabel("USB模式:")
         only_charge_button = QPushButton("仅充电")
@@ -339,6 +497,7 @@ class LogVerboseMaskApp(QWidget):
         device_layout.addWidget(device_label)
         device_layout.addWidget(self.device_combo)
         device_layout.addWidget(refresh_button)
+        device_layout.addWidget(edit_device_button)
         device_layout.addWidget(usb_label)
         device_layout.addWidget(only_charge_button)
         device_layout.addWidget(file_transfer_button)
@@ -369,6 +528,11 @@ class LogVerboseMaskApp(QWidget):
         batch_run_button = QPushButton("批量执行")
         batch_run_button.clicked.connect(self.batch_execute_adb_commands)
         button_layout.addWidget(batch_run_button)
+
+        # 创建下载按钮
+        download_button = QPushButton("下载")
+        download_button.clicked.connect(self.open_download_window)
+        button_layout.addWidget(download_button)
 
         # 创建新增按钮
         add_button = QPushButton("新增")
@@ -509,8 +673,6 @@ class LogVerboseMaskApp(QWidget):
         
         for checkbox in self.command_checkboxes:
             command_list = self.specific_commands.get(checkbox.text(), [])
-            # print(f"update_command_mask - 复选框 '{checkbox.text()}' 状态: {checkbox.isChecked()}")
-            # print(f"update_command_mask - 复选框 '{checkbox.text()}' 命令列表: {command_list}")
             
             if checkbox.isChecked():
                 for command in command_list:
@@ -621,15 +783,15 @@ class LogVerboseMaskApp(QWidget):
                     if cmd.startswith("adb shell"):
                         # 将 "adb shell" 替换为 "adb -s {selected_device} shell"
                         new_cmd = cmd.replace("adb shell", f"adb -s {selected_device} shell")
-                        print(f"run_commands_in_thread - 替换命令: {cmd} -> {new_cmd}")
+                        # print(f"run_commands_in_thread - 替换命令: {cmd} -> {new_cmd}")
                         all_commands.append(new_cmd)
                     elif cmd.startswith("adb "):
                         # 对所有其他 adb 命令添加设备号
                         new_cmd = cmd.replace("adb ", f"adb -s {selected_device} ", 1)
-                        print(f"run_commands_in_thread - 替换adb命令: {cmd} -> {new_cmd}")
+                        # print(f"run_commands_in_thread - 替换adb命令: {cmd} -> {new_cmd}")
                         all_commands.append(new_cmd)
                     else:
-                        print(f"run_commands_in_thread - 直接添加命令: {cmd}")
+                        # print(f"run_commands_in_thread - 直接添加命令: {cmd}")
                         all_commands.append(cmd)
 
             # 添加特定命令（指定设备）
@@ -789,7 +951,7 @@ class LogVerboseMaskApp(QWidget):
                         if checkbox.isChecked() and checkbox.text() in self.specific_commands:
                             # print(f"批量执行 - 处理复选框 '{checkbox.text()}' 的命令")
                             for cmd in self.specific_commands[checkbox.text()]:
-                                print(f"批量执行 - 原始命令: {cmd}")
+                                # print(f"批量执行 - 原始命令: {cmd}")
                                 if cmd.startswith("adb shell"):
                                     # 将 "adb shell" 替换为 "adb -s {device} shell"
                                     new_cmd = cmd.replace("adb shell", f"adb -s {device} shell")
@@ -1022,6 +1184,11 @@ class LogVerboseMaskApp(QWidget):
         # 在主线程中发送信号
         self.device_changed.emit()
 
+    def open_download_window(self):
+        """打开文件下载窗口"""
+        self.download_dialog = FileDownloadDialog(self)
+        self.download_dialog.show()
+
     def closeEvent(self, event):
         """窗口关闭事件处理"""
         # 停止USB监控
@@ -1040,13 +1207,7 @@ class LogVerboseMaskApp(QWidget):
         """按下 Esc 键关闭窗口"""
         if event.key() == Qt.Key_Escape:
             self.close()
-    
-    def closeEvent(self, event):
-        """重写关闭事件"""
-        # self.close()
-        self.closed.emit()
-        event.accept()
-			
+
 
 class ScriptInputDialog(QDialog):
     def __init__(self, parent=None):
@@ -1133,8 +1294,997 @@ class ScriptEditDialog(QDialog):
         return self.script_content_input.toPlainText()
 
 
+class FileDownloadDialog(QDialog):
+    """文件下载对话框"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.parent = parent
+        self.setWindowTitle("从相机/储存卡下载照片")
+        self.resize(800, 600)
+        self.setMinimumSize(600, 500)
+        
+        # 设置图标
+        icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icon", "file_down.ico")
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+        
+        # 初始化变量
+        self.selected_source_paths = []
+        self.selected_destination_path = ""
+        self.devices = []
+        self.top_folder_checkboxes = []
+        self.device_name_mapping = {}  # 设备ID到自定义名称的映射
+        self.device_checkboxes = {}  # 设备ID到复选框的映射
+        
+        # 创建界面
+        self.initUI()
+        
+        # 加载设备名称映射
+        self.load_device_names()
+        
+        # 刷新设备列表
+        self.refresh_devices()
+        
+        # 设置定时器定期刷新设备列表
+        self.refresh_timer = QTimer()
+        self.refresh_timer.timeout.connect(self.refresh_devices)
+        self.refresh_timer.start(5000)  # 每5秒刷新一次
+
+    def load_device_names(self):
+        """从INI文件加载设备名称映射"""
+        ini_path = self.get_ini_path()
+        try:
+            if os.path.exists(ini_path):
+                # 直接读取文件内容，专门查找[devices]节
+                with open(ini_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                # 查找[devices]节
+                import re
+                devices_pattern = r'\[devices\](.*?)(?=\[|$)'
+                match = re.search(devices_pattern, content, re.DOTALL)
+                
+                if match:
+                    devices_content = match.group(1).strip()
+                    for line in devices_content.split('\n'):
+                        line = line.strip()
+                        if '=' in line:
+                            device_id, custom_name = line.split('=', 1)
+                            device_id = device_id.strip()
+                            custom_name = custom_name.strip()
+                            if device_id and custom_name:
+                                self.device_name_mapping[device_id] = custom_name
+                        
+                # 同步主界面的设备名称映射
+                if hasattr(self.parent, 'device_name_mapping'):
+                    for device_id, custom_name in self.parent.device_name_mapping.items():
+                        if device_id not in self.device_name_mapping:
+                            self.device_name_mapping[device_id] = custom_name
+        except Exception as e:
+            print(f"加载设备名称映射时出错: {e}")
+
+    def save_device_names(self):
+        """保存设备名称映射到INI文件"""
+        ini_path = self.get_ini_path()
+        try:
+            os.makedirs(APP_CACHE_DIR, exist_ok=True)
+            
+            # 读取现有文件内容
+            content = ""
+            if os.path.exists(ini_path):
+                with open(ini_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            
+            # 使用正则表达式查找[devices]节
+            import re
+            devices_pattern = r'\[devices\](.*?)(?=\[|$)'
+            match = re.search(devices_pattern, content, re.DOTALL)
+            
+            # 构建新的[devices]节内容
+            devices_content = "\n"
+            for device_id, custom_name in self.device_name_mapping.items():
+                devices_content += f"{device_id}={custom_name}\n"
+            
+            if match:
+                # 如果[devices]节存在，替换它
+                new_content = content[:match.start()] + f"[devices]{devices_content}" + content[match.end():]
+            else:
+                # 如果[devices]节不存在，在文件末尾添加
+                if not content.endswith('\n'):
+                    content += '\n'
+                new_content = content + f"[devices]{devices_content}"
+            
+            # 写入文件
+            with open(ini_path, 'w', encoding='utf-8') as f:
+                f.write(new_content)
+            
+            # 同步到主界面的设备名称映射
+            if hasattr(self.parent, 'device_name_mapping'):
+                self.parent.device_name_mapping.update(self.device_name_mapping)
+                # 刷新主界面的设备列表
+                if hasattr(self.parent, 'refresh_devices'):
+                    self.parent.refresh_devices()
+                
+        except Exception as e:
+            print(f"保存设备名称映射时出错: {e}")
+
+    def get_device_display_name(self, device_id):
+        """获取设备的显示名称（自定义名称或原始ID）"""
+        return self.device_name_mapping.get(device_id, device_id)
+
+    def get_device_original_id(self, display_name):
+        """根据显示名称获取原始设备ID"""
+        # 如果显示名称就是原始ID，直接返回
+        if hasattr(self, 'devices') and display_name in self.devices:
+            return display_name
+        
+        # 否则查找自定义名称对应的原始ID
+        for device_id, custom_name in self.device_name_mapping.items():
+            if custom_name == display_name:
+                return device_id
+        
+        return display_name
+
+    def edit_device_name(self, device_id):
+        """编辑设备名称"""
+        current_name = self.device_name_mapping.get(device_id, device_id)
+        new_name, ok = QInputDialog.getText(
+            self, 
+            "重命名设备", 
+            f"为设备 {device_id} 输入自定义名称：", 
+            text=current_name
+        )
+        
+        if ok and new_name.strip():
+            new_name = new_name.strip()
+            
+            # 检查名称是否已被其他设备使用
+            if new_name in self.device_name_mapping.values() and new_name != current_name:
+                QMessageBox.warning(self, "错误", "该名称已被其他设备使用，请选择其他名称。")
+                return
+            
+            # 更新映射
+            if new_name == device_id:
+                # 如果名称与原始ID相同，删除映射
+                self.device_name_mapping.pop(device_id, None)
+            else:
+                # 否则保存新名称
+                self.device_name_mapping[device_id] = new_name
+            
+            # 保存到INI文件
+            self.save_device_names()
+            
+            # 刷新设备显示
+            self.refresh_devices()
+
+    def load_fixed_source_paths(self):
+        """读取固定路径与配置文件。优先从 [source] 节读取。
+        支持三种格式：
+        1) INI: [source] 下 paths= 多行；或 path1=, path2= ...
+        2) 旧格式: [source] 下直接逐行列出路径
+        3) 若文件不存在或解析失败，返回默认列表
+        返回: List[str]
+        """
+        ini_path = os.path.join(APP_CACHE_DIR, "bat_filepath.ini")
+        default_paths = ["sdcard/dcim/camera/", "data/vendor/camera/"]
+        default_target = os.path.expanduser("~/Pictures")
+
+        try:
+            os.makedirs(APP_CACHE_DIR, exist_ok=True)
+            config = configparser.ConfigParser()
+
+            if not os.path.exists(ini_path):
+                # 初始化新格式 INI
+                config["source"] = {"paths": "\n".join(default_paths)}
+                config["target"] = {"path": default_target}
+                with open(ini_path, "w", encoding="utf-8") as f:
+                    config.write(f)
+                return default_paths
+
+            # 读取现有文件内容
+            with open(ini_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            paths: list = []
+            try:
+                # 优先尝试标准 INI 解析
+                config.read_string(content)
+                if config.has_section("source"):
+                    if config.has_option("source", "paths"):
+                        raw = config.get("source", "paths")
+                        for line in raw.splitlines():
+                            p = line.strip()
+                            if p:
+                                paths.append(p.lstrip("/"))
+                    else:
+                        for key, val in config.items("source"):
+                            if key.lower().startswith("path"):
+                                p = val.strip()
+                                if p:
+                                    paths.append(p.lstrip("/"))
+            except configparser.Error:
+                # 标准解析失败则走旧格式解析
+                pass
+
+            if not paths:
+                # 旧格式: 读取 [source] 节中的逐行内容
+                paths = self._read_legacy_section_lines("source")
+
+            return paths or default_paths
+        except Exception:
+            return default_paths
+
+    def get_ini_path(self):
+        return os.path.join(APP_CACHE_DIR, "bat_filepath.ini")
+
+    def _read_legacy_section_lines(self, section_name):
+        """从旧格式 INI 中读取某个节下的逐行内容（无 key=value）。"""
+        ini_path = self.get_ini_path()
+        lines = []
+        try:
+            in_section = False
+            with open(ini_path, "r", encoding="utf-8") as f:
+                for raw in f:
+                    line = raw.strip()
+                    if not line:
+                        continue
+                    if line.startswith("[") and line.endswith("]"):
+                        in_section = (line[1:-1].strip().lower() == section_name.lower())
+                        continue
+                    if in_section and not line.startswith("#"):
+                        lines.append(line)
+        except Exception:
+            return []
+        return lines
+
+    def load_target_path(self):
+        """读取 [target] 的本地保存路径，若无则返回默认图片目录。"""
+        ini_path = self.get_ini_path()
+        default_target = os.path.expanduser("~/Pictures")
+        try:
+            if not os.path.exists(ini_path):
+                return default_target
+
+            # 直接读取 [target] 下第一行非空内容作为路径
+            legacy_lines = self._read_legacy_section_lines("target")
+            if legacy_lines:
+                return legacy_lines[0].strip()
+            return default_target
+        except Exception:
+            return default_target
+
+    def save_target_path(self, path):
+        """仅更新 INI 中的 [target] 段，直接存储路径，不改动 [source] 段的任何内容。"""
+        ini_path = self.get_ini_path()
+        try:
+            os.makedirs(APP_CACHE_DIR, exist_ok=True)
+            if not os.path.exists(ini_path):
+                # 若文件不存在，仅写入 target 段
+                with open(ini_path, "w", encoding="utf-8") as f:
+                    f.write(f"[target]\n{path}\n")
+                return
+
+            with open(ini_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            import re
+            # 捕获 [target] 段（到下一个段或文件结尾）
+            pattern = r"(?ms)^\[target\][\s\S]*?(?=^\[|\Z)"
+            match = re.search(pattern, content)
+            if match:
+                # 替换整个 [target] 段内容为新路径
+                new_block = f"[target]\n{path}\n"
+                new_content = content[:match.start()] + new_block + content[match.end():]
+            else:
+                # 不存在 [target] 段，则追加一个
+                if not content.endswith("\n"):
+                    content += "\n"
+                new_content = content + f"[target]\n{path}\n"
+
+            with open(ini_path, "w", encoding="utf-8") as f:
+                f.write(new_content)
+        except Exception:
+            # 静默失败
+            pass
+
+    def initUI(self):
+        """初始化用户界面"""
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+        layout.setContentsMargins(16, 8, 16, 16)
+
+        # 来源区域
+        source_group = QWidget()
+        source_layout = QVBoxLayout(source_group)
+        source_layout.setContentsMargins(0, 0, 0, 0)
+ 
+        # 置顶文件夹选择区域
+        top_folders_group = QWidget()
+        top_folders_layout = QVBoxLayout(top_folders_group)
+        top_folders_layout.setContentsMargins(0, 0, 0, 0)
+        top_folders_layout.setSpacing(6)
+        
+        top_folders_title = QLabel("置顶文件夹选择:")
+        top_folders_title.setStyleSheet("font-weight: bold; color: #34495e;")
+        top_folders_layout.addWidget(top_folders_title)
+        
+        # 创建置顶文件夹复选框（从INI加载）
+        self.top_folders_container = QWidget()
+        self.top_folders_layout = QGridLayout(self.top_folders_container)
+        
+        fixed_paths = self.load_fixed_source_paths()
+        self.top_folder_checkboxes = []
+        columns = 3  # 每行显示3个复选框
+        for idx, p in enumerate(fixed_paths):
+            cb = QCheckBox(p)
+            cb.setToolTip("选择此文件夹进行下载")
+            cb.stateChanged.connect(self.on_top_folder_changed)
+            row = idx // columns
+            col = idx % columns
+            self.top_folders_layout.addWidget(cb, row, col)
+            self.top_folder_checkboxes.append(cb)
+        # self.top_folders_layout.addStretch()  # 网格布局不需要addStretch()
+        
+        top_folders_layout.addWidget(self.top_folders_container)
+        source_layout.addWidget(top_folders_group)
+        
+        # 文件夹选择区域（隐藏）
+        self.folder_selection_widget = QWidget()
+        folder_layout = QVBoxLayout(self.folder_selection_widget)
+        folder_title = QLabel("选择要下载的文件夹:")
+        folder_title.setStyleSheet("font-weight: bold; color: #34495e;")
+        folder_layout.addWidget(folder_title)
+        self.folder_checkboxes_container = QWidget()
+        self.folder_checkboxes_layout = QVBoxLayout(self.folder_checkboxes_container)
+        folder_layout.addWidget(self.folder_checkboxes_container)
+        self.folder_selection_widget.setVisible(False)
+        source_layout.addWidget(self.folder_selection_widget)
+        
+        layout.addWidget(source_group)
+        
+        # 目标区域
+        dest_group = QWidget()
+        dest_layout = QVBoxLayout(dest_group)
+        
+        dest_title = QLabel("目标")
+        dest_title.setStyleSheet("font-weight: bold; font-size: 14px; color: #2c3e50;")
+        dest_layout.addWidget(dest_title)
+        
+        # 目标位置选择
+        dest_location_layout = QHBoxLayout()
+        dest_location_label = QLabel("位置:")
+        self.dest_location_input = QLineEdit()
+        self.dest_location_input.setText(self.load_target_path())
+        
+        self.browse_dest_btn = QPushButton("浏览")
+        self.browse_dest_btn.setToolTip("浏览目标文件夹")
+        self.open_dest_btn = QPushButton("打开")
+        self.open_dest_btn.setToolTip("打开目标文件夹")
+        self.open_dest_btn.clicked.connect(self.open_target_folder)
+        self.browse_dest_btn.clicked.connect(self.browse_destination)
+        
+        dest_location_layout.addWidget(dest_location_label)
+        dest_location_layout.addWidget(self.dest_location_input)
+        dest_location_layout.addWidget(self.browse_dest_btn)
+        dest_location_layout.addWidget(self.open_dest_btn)
+        dest_layout.addLayout(dest_location_layout)
+        
+        # 子文件夹创建选项
+        subfolder_layout = QHBoxLayout()
+        subfolder_label = QLabel("子文件夹命名:")
+        self.subfolder_combo = QComboBox()
+        self.subfolder_combo.addItems(["年\\日", "年\\月\\日", "年\\月\\日\\时", "年\\月\\日\\时分", "年\\月\\日\\时分秒"])
+        self.subfolder_combo.setCurrentText("年\\日")
+        
+        # 根据选择的子文件夹格式动态显示示例
+        self.subfolder_example = QLabel()
+        self.subfolder_example.setStyleSheet("color: #7f8c8d; font-size: 12px;")
+        def update_subfolder_example():
+            from datetime import datetime
+            now = datetime.now()
+            fmt = self.subfolder_combo.currentText()
+            if "年\\月\\日\\时分秒" in fmt:
+                example = now.strftime("YYYY-MM-DD-HH-MM-SS")
+            elif "年\\月\\日\\时分" in fmt:
+                example = now.strftime("YYYY-MM-DD-HH-MM")
+            elif "年\\月\\日\\时" in fmt:
+                example = now.strftime("YYYY-MM-DD-HH")
+            elif "年\\月\\日" in fmt:
+                example = now.strftime("YYYY-MM-DD")
+            elif "年\\日" in fmt:
+                example = now.strftime("YYYY-MM")
+            else:
+                example = now.strftime("YYYY-MM-DD")
+            self.subfolder_example.setText(f"示例: {example}")
+        self.subfolder_combo.currentTextChanged.connect(update_subfolder_example)
+        update_subfolder_example()
+        subfolder_example = self.subfolder_example
+        subfolder_example.setStyleSheet("color: #7f8c8d; font-size: 12px;")
+        
+        subfolder_layout.addWidget(subfolder_label)
+        subfolder_layout.addWidget(self.subfolder_combo)
+        subfolder_layout.addWidget(subfolder_example)
+        subfolder_layout.addStretch()
+        dest_layout.addLayout(subfolder_layout)
+        
+        layout.addWidget(dest_group)
+        
+        # 设备选择区域
+        device_group = QWidget()
+        device_layout = QVBoxLayout(device_group)
+        
+        device_title = QLabel("选择目标设备:")
+        device_title.setStyleSheet("font-weight: bold; font-size: 14px; color: #2c3e50;")
+        device_layout.addWidget(device_title)
+        
+        # 设备列表
+        device_list_layout = QVBoxLayout()
+        self.device_list_widget = QWidget()
+        self.device_list_layout = QVBoxLayout(self.device_list_widget)
+        
+        device_list_layout.addWidget(self.device_list_widget)
+        device_layout.addLayout(device_list_layout)
+        
+        layout.addWidget(device_group)
+        
+        # 操作按钮
+        button_layout = QHBoxLayout()
+        
+        self.download_btn = QPushButton("开始下载")
+        self.download_btn.clicked.connect(self.start_download)
+        self.download_btn.setEnabled(False)
+        
+        refresh_devices_btn = QPushButton("刷新设备")
+        refresh_devices_btn.clicked.connect(self.refresh_devices)
+        
+        close_btn = QPushButton("关闭")
+        close_btn.clicked.connect(self.close)
+        
+        button_layout.addStretch()
+        button_layout.addWidget(refresh_devices_btn)
+        button_layout.addWidget(self.download_btn)
+        button_layout.addWidget(close_btn)
+        
+        layout.addLayout(button_layout)
+        
+        # 进度显示
+        self.progress_label = QLabel("准备就绪")
+        self.progress_label.setStyleSheet("color: #27ae60; font-weight: bold;")
+        layout.addWidget(self.progress_label)
+
+    def refresh_devices(self):
+        """刷新ADB设备列表"""
+        try:
+            # 在刷新前记录当前已选中的设备，刷新后用于恢复选中状态
+            selected_before = set()
+            for device_id, checkbox in self.device_checkboxes.items():
+                if checkbox.isChecked():
+                    selected_before.add(device_id)
+
+            startupinfo = None
+            if hasattr(subprocess, 'STARTUPINFO'):
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = subprocess.SW_HIDE
+            
+            result = subprocess.run(
+                ['adb', 'devices'], 
+                capture_output=True, 
+                text=True, 
+                encoding='utf-8',
+                startupinfo=startupinfo,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            
+            if result.returncode == 0:
+                lines = result.stdout.strip().split('\n')[1:]
+                self.devices = []
+                for line in lines:
+                    if line.strip() and '\t' in line:
+                        device_id, status = line.strip().split('\t')
+                        if status == 'device':
+                            self.devices.append(device_id)
+                # 保留仍然存在的、之前已被选中的设备
+                self.previously_selected_devices = {d for d in selected_before if d in self.devices}
+
+                self.update_device_checkboxes()
+                self.update_download_button_state()
+            else:
+                self.devices = []
+                self.previously_selected_devices = set()
+                self.update_device_checkboxes()
+                
+        except Exception as e:
+            self.devices = []
+            self.previously_selected_devices = set()
+            self.update_device_checkboxes()
+
+    def update_device_checkboxes(self):
+        """更新设备复选框"""
+        # 清除现有的设备复选框和映射
+        for i in reversed(range(self.device_list_layout.count())):
+            widget = self.device_list_layout.itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
+        
+        self.device_checkboxes.clear()
+        
+        if not self.devices:
+            no_device_label = QLabel("未检测到设备")
+            no_device_label.setStyleSheet("color: #e74c3c; font-style: italic;")
+            self.device_list_layout.addWidget(no_device_label)
+        else:
+            previously_selected = getattr(self, 'previously_selected_devices', set())
+            for device in self.devices:
+                # 创建水平布局容器
+                device_container = QWidget()
+                device_layout = QHBoxLayout(device_container)
+                device_layout.setContentsMargins(0, 0, 0, 0)
+                device_layout.setSpacing(5)
+                
+                # 创建复选框，显示自定义名称或原始ID
+                display_name = self.get_device_display_name(device)
+                checkbox = QCheckBox(display_name)
+                checkbox.stateChanged.connect(self.update_download_button_state)
+                
+                # 保存复选框引用
+                self.device_checkboxes[device] = checkbox
+                
+                # 如果之前被选中，恢复选中状态
+                if device in previously_selected:
+                    checkbox.setChecked(True)
+                
+                # 创建编辑按钮
+                edit_btn = QPushButton("编辑")
+                edit_btn.setMaximumWidth(50)
+                edit_btn.clicked.connect(lambda checked, d=device: self.edit_device_name(d))
+                
+                # 添加到容器布局
+                device_layout.addWidget(checkbox)
+                device_layout.addWidget(edit_btn)
+                device_layout.addStretch()
+                
+                # 将容器添加到主布局
+                self.device_list_layout.addWidget(device_container)
+
+
+    def load_folder_contents(self, folder_path):
+        """加载文件夹内容"""
+        try:
+            # 清除现有的文件夹复选框
+            for i in reversed(range(self.folder_checkboxes_layout.count())):
+                widget = self.folder_checkboxes_layout.itemAt(i).widget()
+                if widget:
+                    widget.deleteLater()
+            
+            # 获取文件夹列表
+            folders = []
+            for item in os.listdir(folder_path):
+                item_path = os.path.join(folder_path, item)
+                if os.path.isdir(item_path):
+                    folders.append(item)
+            
+            if folders:
+                for folder in sorted(folders):
+                    checkbox = QCheckBox(folder)
+                    checkbox.stateChanged.connect(self.update_download_button_state)
+                    self.folder_checkboxes_layout.addWidget(checkbox)
+                
+                self.folder_selection_widget.setVisible(True)
+            else:
+                self.folder_selection_widget.setVisible(False)
+                
+        except Exception as e:
+            print(f"加载文件夹内容时出错: {e}")
+
+    def browse_destination(self):
+        """浏览目标位置"""
+        from PyQt5.QtWidgets import QFileDialog
+        folder = QFileDialog.getExistingDirectory(self, "选择目标文件夹")
+        if folder:
+            self.dest_location_input.setText(folder)
+            # 保存到 INI [target]
+            try:
+                self.save_target_path(folder)
+            except Exception:
+                pass
+
+
+    def on_manual_select_changed(self, state):
+        """手动选择复选框状态改变 (此功能已禁用，仅用于内部状态更新)"""
+        # Manual selection is no longer a user-facing feature.
+        # This method is kept for completeness but should not affect UI visibility of folder_selection_widget.
+        self.update_download_button_state()
+
+    def on_top_folder_changed(self, state):
+        """置顶文件夹复选框状态改变"""
+        # 不再重置目标文件夹地址，只更新下载按钮状态
+        self.update_download_button_state()
+
+    def update_download_button_state(self):
+        """更新下载按钮状态"""
+        # 检查是否有选中的设备
+        has_selected_device = False
+        for device_id, checkbox in self.device_checkboxes.items():
+            if checkbox.isChecked():
+                has_selected_device = True
+                break
+        
+        # 检查是否有选中的置顶文件夹
+        has_selected_folder = any(cb.isChecked() for cb in self.top_folder_checkboxes)
+        
+        # 检查是否有目标路径
+        has_destination = bool(self.dest_location_input.text().strip())
+        
+        self.download_btn.setEnabled(has_selected_device and has_selected_folder and has_destination)
+
+    def start_download(self):
+        """开始下载"""
+        # 获取选中的设备（使用原始设备ID）
+        selected_devices = []
+        for device_id, checkbox in self.device_checkboxes.items():
+            if checkbox.isChecked():
+                selected_devices.append(device_id)
+        
+        if not selected_devices:
+            QMessageBox.warning(self, "警告", "请选择至少一个设备！")
+            return
+        
+        # 获取选中的置顶文件夹
+        selected_folders = []
+        for cb in self.top_folder_checkboxes:
+            if cb.isChecked():
+                selected_folders.append(cb.text())
+        
+        if not selected_folders:
+            QMessageBox.warning(self, "警告", "请选择至少一个文件夹！")
+            return
+        
+        # 获取目标路径
+        dest_path = self.dest_location_input.text().strip()
+        if not dest_path:
+            QMessageBox.warning(self, "警告", "请选择目标路径！")
+            return
+        
+        # 检查目标路径是否存在且可写
+        if not os.path.exists(dest_path):
+            QMessageBox.warning(self, "文件夹不存在", 
+                              f"目标文件夹不存在：\n{dest_path}\n\n请选择一个新的本地文件夹。")
+            # 自动打开文件夹选择对话框
+            from PyQt5.QtWidgets import QFileDialog
+            new_folder = QFileDialog.getExistingDirectory(
+                self, 
+                "选择下载目标文件夹", 
+                os.path.expanduser("~/Pictures")  # 默认打开图片文件夹
+            )
+            
+            if new_folder:
+                # 更新目标路径输入框
+                self.dest_location_input.setText(new_folder)
+                
+                # 保存新的目标路径到INI文件
+                try:
+                    self.save_target_path(new_folder)
+                except Exception:
+                    pass
+                
+                # 更新下载按钮状态
+                self.update_download_button_state()
+                
+                # 提示用户重新开始下载
+                QMessageBox.information(self, "路径已更新", 
+                                      f"目标路径已更新为：\n{new_folder}\n\n请重新点击'开始下载'按钮。")
+            else:
+                # 用户取消了选择
+                QMessageBox.information(self, "下载取消", "下载已取消。")
+            return
+        
+        # 检查目标路径是否可写
+        try:
+            test_file = os.path.join(dest_path, "test_write_permission.tmp")
+            with open(test_file, 'w') as f:
+                f.write("test")
+            os.remove(test_file)
+        except Exception as e:
+            QMessageBox.warning(self, "文件夹权限错误", 
+                              f"目标文件夹无写入权限：\n{dest_path}\n\n错误：{str(e)}\n\n请选择一个有写入权限的文件夹。")
+            # 自动打开文件夹选择对话框
+            from PyQt5.QtWidgets import QFileDialog
+            new_folder = QFileDialog.getExistingDirectory(
+                self, 
+                "选择下载目标文件夹", 
+                os.path.expanduser("~/Pictures")  # 默认打开图片文件夹
+            )
+            
+            if new_folder:
+                # 更新目标路径输入框
+                self.dest_location_input.setText(new_folder)
+                
+                # 保存新的目标路径到INI文件
+                try:
+                    self.save_target_path(new_folder)
+                except Exception:
+                    pass
+                
+                # 更新下载按钮状态
+                self.update_download_button_state()
+                
+                # 提示用户重新开始下载
+                QMessageBox.information(self, "路径已更新", 
+                                      f"目标路径已更新为：\n{new_folder}\n\n请重新点击'开始下载'按钮。")
+            else:
+                # 用户取消了选择
+                QMessageBox.information(self, "下载取消", "下载已取消。")
+            return
+        
+        # 将当前目标路径写入 INI
+        try:
+            self.save_target_path(dest_path)
+        except Exception:
+            pass
+        
+        # 创建下载线程
+        self.download_thread = DownloadThread(
+            selected_devices, 
+            selected_folders, 
+            dest_path, 
+            self.subfolder_combo.currentText(),
+            True,  # 总是使用手动模式，因为我们现在有明确的文件夹列表
+            self.device_name_mapping  # 传递设备名称映射
+        )
+        self.download_thread.progress_updated.connect(self.update_progress)
+        self.download_thread.download_finished.connect(self.download_finished)
+        self.download_thread.folder_not_found.connect(self.handle_folder_not_found)  # 连接新信号
+        self.download_thread.start()
+        
+        # 禁用下载按钮
+        self.download_btn.setEnabled(False)
+        self.progress_label.setText("正在下载...")
+        self.progress_label.setStyleSheet("color: #f39c12; font-weight: bold;")
+
+    def update_progress(self, message):
+        """更新进度信息"""
+        self.progress_label.setText(message)
+
+    def download_finished(self, success_count, total_count, failed_devices):
+        """下载完成处理"""
+        self.download_btn.setEnabled(True)
+        
+        if failed_devices:
+            failed_list = "\n".join([f"• {device}" for device in failed_devices])
+            message = f"下载完成！\n\n成功: {success_count}/{total_count}\n\n失败的设备:\n{failed_list}"
+            QMessageBox.information(self, "下载结果", message)
+        else:
+            message = f"下载完成！\n\n所有 {total_count} 台设备都下载成功！"
+            QMessageBox.information(self, "下载结果", message)
+        
+        self.progress_label.setText("下载完成")
+        self.progress_label.setStyleSheet("color: #27ae60; font-weight: bold;")
+
+    def open_target_folder(self):
+        """打开目标文件夹"""
+        dest_path = self.dest_location_input.text().strip()
+        if not dest_path:
+            QMessageBox.warning(self, "警告", "请先设置目标路径！")
+            return
+        
+        if not os.path.exists(dest_path):
+            QMessageBox.warning(self, "文件夹不存在", 
+                              f"目标文件夹不存在：\n{dest_path}\n\n请先选择有效的目标文件夹。")
+            return
+        
+        try:
+            # 使用系统默认的文件管理器打开文件夹
+            if sys.platform == "win32":
+                os.startfile(dest_path)
+            elif sys.platform == "darwin":  # macOS
+                subprocess.run(["open", dest_path])
+            else:  # Linux
+                subprocess.run(["xdg-open", dest_path])
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"无法打开文件夹：\n{str(e)}")
+
+    def handle_folder_not_found(self, dest_path):
+        """处理目标文件夹不存在的情况"""
+        from PyQt5.QtWidgets import QFileDialog
+        
+        # 停止下载线程
+        if hasattr(self, 'download_thread') and self.download_thread.isRunning():
+            self.download_thread.terminate()
+            self.download_thread.wait()
+        
+        # 显示错误消息并提示用户选择文件夹
+        QMessageBox.warning(self, "文件夹不存在", 
+                          f"目标文件夹不存在：\n{dest_path}\n\n请选择一个新的本地文件夹。")
+        
+        # 打开文件夹选择对话框
+        new_folder = QFileDialog.getExistingDirectory(
+            self, 
+            "选择下载目标文件夹", 
+            os.path.expanduser("~/Pictures")  # 默认打开图片文件夹
+        )
+        
+        if new_folder:
+            # 更新目标路径输入框
+            self.dest_location_input.setText(new_folder)
+            
+            # 保存新的目标路径到INI文件
+            try:
+                self.save_target_path(new_folder)
+            except Exception:
+                pass
+            
+            # 重新启用下载按钮并更新状态
+            self.download_btn.setEnabled(True)
+            self.progress_label.setText("已选择新文件夹，请重新开始下载")
+            self.progress_label.setStyleSheet("color: #3498db; font-weight: bold;")
+            
+            # 更新下载按钮状态（确保按钮状态正确）
+            self.update_download_button_state()
+        else:
+            # 用户取消了选择
+            self.download_btn.setEnabled(True)
+            self.progress_label.setText("下载已取消")
+            self.progress_label.setStyleSheet("color: #e74c3c; font-weight: bold;")
+            
+            # 更新下载按钮状态
+            self.update_download_button_state()
+
+    def closeEvent(self, event):
+        """窗口关闭事件"""
+        if hasattr(self, 'refresh_timer'):
+            self.refresh_timer.stop()
+        if hasattr(self, 'download_thread') and self.download_thread.isRunning():
+            self.download_thread.terminate()
+            self.download_thread.wait()
+        event.accept()
+
+
+class DownloadThread(QThread):
+    """下载线程"""
+    
+    progress_updated = pyqtSignal(str)
+    download_finished = pyqtSignal(int, int, list)
+    folder_not_found = pyqtSignal(str)  # 新增信号：当目标文件夹不存在时发送
+    
+    def __init__(self, devices, folders, dest_path, subfolder_format, is_manual_mode, device_name_mapping=None):
+        super().__init__()
+        self.devices = devices
+        self.folders = folders
+        self.dest_path = dest_path
+        self.subfolder_format = subfolder_format
+        self.is_manual_mode = is_manual_mode
+        self.device_name_mapping = device_name_mapping or {}
+        
+    def run(self):
+        """执行下载"""
+        import datetime
+        import tempfile
+        
+        # 检查目标路径是否存在
+        if not os.path.exists(self.dest_path):
+            # 发送信号通知主线程显示文件夹选择对话框
+            self.progress_updated.emit("目标文件夹不存在，请选择本地文件夹")
+            # 这里我们需要通过信号来通知主线程显示对话框
+            # 由于QThread不能直接显示对话框，我们需要通过信号传递
+            self.folder_not_found.emit(self.dest_path)
+            return  # 直接返回，不发送download_finished信号
+        
+        # 创建时间戳文件夹
+        timestamp = datetime.datetime.now()
+        timestamp_str = self.format_timestamp(timestamp)
+        timestamp_folder = os.path.join(self.dest_path, timestamp_str)
+        
+        # 检查时间戳文件夹是否可以创建
+        try:
+            os.makedirs(timestamp_folder, exist_ok=True)
+        except Exception as e:
+            self.progress_updated.emit(f"无法创建目标文件夹: {str(e)}")
+            self.folder_not_found.emit(self.dest_path)
+            return  # 直接返回，不发送download_finished信号
+        
+        success_count = 0
+        failed_devices = []
+        
+        for device in self.devices:
+            try:
+                # 获取设备显示名称
+                device_display_name = self.device_name_mapping.get(device, device)
+                self.progress_updated.emit(f"正在处理设备: {device_display_name}")
+                
+                # 创建设备子文件夹，使用自定义名称或原始ID
+                device_folder = os.path.join(timestamp_folder, device_display_name)
+                try:
+                    os.makedirs(device_folder, exist_ok=True)
+                except Exception as e:
+                    self.progress_updated.emit(f"无法创建设备文件夹: {str(e)}")
+                    failed_devices.append(device)
+                    continue
+                
+                if self.is_manual_mode:
+                    # 手动模式：下载选中的文件夹
+                    for folder in self.folders:
+                        self.progress_updated.emit(f"正在下载文件夹: {folder}")
+                        
+                        # 执行adb pull命令
+                        # 对于置顶文件夹，直接使用完整路径；对于手动选择的文件夹，添加/sdcard前缀
+                        if folder.startswith("sdcard/") or folder.startswith("data/"):
+                            source_path = f"/{folder}"
+                        else:
+                            source_path = f"/sdcard/{folder}"
+                        
+                        result = self.execute_adb_pull(device, source_path, device_folder)
+                        
+                        if result:
+                            self.progress_updated.emit(f"文件夹 {folder} 下载成功")
+                        else:
+                            self.progress_updated.emit(f"文件夹 {folder} 下载失败")
+                else:
+                    # 非手动模式：下载整个存储卡
+                    self.progress_updated.emit("正在下载整个存储卡")
+                    
+                    # 这里可以实现下载整个存储卡的逻辑
+                    # 暂时跳过
+                    pass
+                
+                success_count += 1
+                self.progress_updated.emit(f"设备 {device_display_name} 处理完成")
+                
+            except Exception as e:
+                device_display_name = self.device_name_mapping.get(device, device)
+                self.progress_updated.emit(f"设备 {device_display_name} 处理失败: {str(e)}")
+                failed_devices.append(device)
+        
+        # 只有在正常完成下载时才发送完成信号
+        self.download_finished.emit(success_count, len(self.devices), failed_devices)
+    
+    def format_timestamp(self, timestamp):
+        """格式化时间戳"""
+        # 按照优先级判断，从最具体的开始
+        if "年\\月\\日\\时分秒" in self.subfolder_format:
+            return timestamp.strftime("%Y-%m-%d-%H-%M-%S")
+        elif "年\\月\\日\\时分" in self.subfolder_format:
+            return timestamp.strftime("%Y-%m-%d-%H-%M")
+        elif "年\\月\\日\\时" in self.subfolder_format:
+            return timestamp.strftime("%Y-%m-%d-%H")
+        elif "年\\月\\日" in self.subfolder_format:
+            return timestamp.strftime("%Y-%m-%d")
+        elif "年\\日" in self.subfolder_format:
+            return timestamp.strftime("%Y-%m-%d")
+        else:
+            return timestamp.strftime("%Y-%m-%d")
+    
+    def execute_adb_pull(self, device, source_path, dest_path):
+        """执行adb pull命令"""
+        try:
+            startupinfo = None
+            if hasattr(subprocess, 'STARTUPINFO'):
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = subprocess.SW_HIDE
+            
+            command = f'adb -s {device} pull "{source_path}" "{dest_path}"'
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                startupinfo=startupinfo,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            
+            return result.returncode == 0
+            
+        except Exception as e:
+            print(f"执行adb pull命令时出错: {e}")
+            return False
+
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     ex = LogVerboseMaskApp()
     ex.show()
     sys.exit(app.exec_())
+

@@ -980,7 +980,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def input_enter_action(self):
         # 输出相关log信息
         print("[input_enter_action]-->在地址栏按下回车/拖拽了文件进来,开始在左侧文浏览器中定位") 
-        
         # 定位到左侧文件浏览器中
         self.locate_in_tree_view()
         # 初始化同级文件夹下拉框选项
@@ -1716,33 +1715,34 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     # 点击左侧文件浏览器时的功能函数
     def update_combobox(self, index):
         """左侧文件浏览器点击定位更新右侧combobox函数"""
-        print("update_combobox函数: ")
+        try:
+            print("[update_combobox]-->处理左侧文件浏览器点击定位更新右侧combobox事件")
+            
+            # 清空历史的已选择
+            self.statusbar_label.setText(f"💦已选文件数[0]个")
 
-        # 清空历史的已选择
-        self.statusbar_label.setText(f"💦已选文件数[0]个")
-
-        # 更新左侧文件浏览器中的预览区域显示
-        if True:
-            # 清空旧预览内容
-            self.clear_preview_layout()
-            # 显示预览信息
+            # 更新左侧文件浏览器中的预览区域显示-->先清空旧预览内容-->然后显示预览信息
+            self.clear_preview_layout() 
             self.show_preview_error("预览区域")
 
-        # 获取左侧文件浏览器中当前点击的文件夹路径，并显示在地址栏
-        current_path = self.file_system_model.filePath(index)
-        if os.path.isdir(current_path):
-            if self.RT_QComboBox.findText(current_path) == -1:
-                self.RT_QComboBox.addItem(current_path)
-            self.RT_QComboBox.setCurrentText(current_path)
-            print(f"点击了左侧文件，该文件夹已更新到地址栏中: {current_path}")
+            # 获取左侧文件浏览器中当前点击的文件夹路径，并显示在地址栏
+            if os.path.isdir(current_path := self.file_system_model.filePath(index)):
+                if self.RT_QComboBox.findText(current_path) == -1:
+                    self.RT_QComboBox.addItem(current_path)
+                self.RT_QComboBox.setCurrentText(current_path)
+                print(f"[update_combobox]-->左侧点击的文件夹已更新到地址栏中: {current_path}")
 
-        # 禁用左侧文件浏览器中的滚动条自动滚动
-        self.Left_QTreeView.setAutoScroll(False)
+            # 禁用左侧文件浏览器中的滚动条自动滚动
+            self.Left_QTreeView.setAutoScroll(False)
 
-        # 将同级文件夹添加到 RT_QComboBox1 中
-        self.RT_QComboBox1_init()      
-        # 更新右侧RB_QTableWidget0表格
-        self.update_RB_QTableWidget0() 
+            # 将同级文件夹添加到 RT_QComboBox1 中
+            self.RT_QComboBox1_init()      
+
+            # 更新右侧RB_QTableWidget0表格
+            self.update_RB_QTableWidget0()
+
+        except Exception as e:
+            self.logger.error(f"【update_combobox】-->左侧文件浏览器点击定位更新右侧combobox任务 | 报错：{e}")
         
     # 在左侧文件浏览器中定位地址栏(RT_QComboBox)中当前显示的目录
     def locate_in_tree_view(self):
@@ -1810,7 +1810,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """更新右侧表格功能函数"""
         try:
             # 输出日志文件
-            self.logger.info(f"update_RB_QTableWidget0()-->执行--更新右侧表格功能函数任务")
+            self.logger.info(f"update_RB_QTableWidget0()-->执行函数任务,更新右侧表格功能函数任务")
 
             # 取消当前的预加载任务
             self.cancel_preloading()
@@ -2076,86 +2076,105 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
     def update_preload_progress(self, current, total):
         """处理预加载进度"""
-        # 更新状态栏信息显示
-        self.statusbar_label1.setText(f"📢:图标加载进度...{current}/{total}🍃")
-        
+        try:
+            # 更新状态栏信息显示
+            self.statusbar_label1.setText(f"📢:图标加载进度...{current}/{total}🍃")
+        except Exception as e:
+            self.logger.error(f"【update_preload_progress】-->处理预加载进度时 | 报错: {e}")    
+
+    
     def on_preload_finished(self):
         """处理预加载完成"""
-        # 打印并输出日志信息
-        print(f"[on_preload_finished]-->所有图标预加载完成,耗时:{time.time()-self.start_time_image_preloading:.2f}秒")
-        self.logger.info(f"on_preload_finished()-->所有图标预加载完成 | 耗时:{time.time()-self.start_time_image_preloading:.2f}秒")
-        # 更新状态栏信息显示
-        self.statusbar_label1.setText(f"📢:图标已全部加载-^-耗时:{time.time()-self.start_time_image_preloading:.2f}秒🍃")
-        gc.collect()
-        
+        try:
+            print(f"[on_preload_finished]-->所有图标预加载完成,耗时:{time.time()-self.start_time_image_preloading:.2f}秒")
+            self.logger.info(f"on_preload_finished()-->所有图标预加载完成 | 耗时:{time.time()-self.start_time_image_preloading:.2f}秒")
+            self.statusbar_label1.setText(f"📢:图标已全部加载-^-耗时:{time.time()-self.start_time_image_preloading:.2f}秒🍃")
+            gc.collect()
+        except Exception as e:
+            self.logger.error(f"【on_preload_finished】-->处理预加载完成事件时 | 报错: {e}")
+
+
     def on_preload_error(self, error):
         """处理预加载错误"""
-        print(f"[on_preload_error]-->图标预加载错误: {error}")
-        self.logger.error(f"on_preload_error-->图标预加载错误: {error}")
+        try:
+            print(f"[on_preload_error]-->图标预加载错误: {error}")
+            self.logger.error(f"【on_preload_error】-->图标预加载错误: {error}")
+        except Exception as e:
+            self.logger.error(f"【on_preload_error】-->处理预加载错误时 | 报错: {e}")
 
     def RT_QComboBox1_init(self):
         """自定义RT_QComboBox1, 添加复选框选项"""
-        print("[RT_QComboBox1_init]-->开始添加地址栏文件夹的同级文件夹到下拉复选框中")
         try:
-            # 获取地址栏当前路径    
-            current_directory = self.RT_QComboBox.currentText()
-            # 检查路径是否有效
-            if not os.path.exists(current_directory): 
+            # 写入日志信息
+            print("[RT_QComboBox1_init]-->开始添加地址栏文件夹的同级文件夹到下拉复选框中")
+            self.logger.info(f"RT_QComboBox1_init()-->开始添加地址栏文件夹的同级文件夹到下拉复选框中")
+            # 检查地址栏当前路径是否有效
+            if not os.path.exists(current_directory := self.RT_QComboBox.currentText()): 
                 print("[RT_QComboBox1_init]-->地址栏路径不存在")
                 return  
-            # 获取父目录中的文件夹列表
-            sibling_folders = self.getSiblingFolders(current_directory)  
-            # 使用文件夹列表和父目录初始化模型
+            # 获取父目录中的文件夹列表,始化模型，绑定模型到 QComboBox,设置自定义委托，禁用右键菜单
+            sibling_folders = self.getSiblingFolders(current_directory)    
             self.model = CheckBoxListModel(sibling_folders)  
-            # 绑定模型到 QComboBox
             self.RT_QComboBox1.setModel(self.model)  
-            # 设置自定义委托
             self.RT_QComboBox1.setItemDelegate(CheckBoxDelegate())  
-            # 禁用右键菜单
-            self.RT_QComboBox1.setContextMenuPolicy(Qt.NoContextMenu)  
+            self.RT_QComboBox1.setContextMenuPolicy(Qt.NoContextMenu)
         except Exception as e:
             print(f"[RT_QComboBox1_init]-->初始化失败: {e}")
+            self.logger.error(f"【RT_QComboBox1_init】-->添加地址栏文件夹的同级文件夹到下拉复选框时 | 报错: {e}")
 
     def handleComboBoxPressed(self, index):
-        """处理复选框选项被按下时的事件。"""
+        """处理同级文件夹复选框选项被按下时的事件。"""
         print("[handleComboBoxPressed]-->更新复选框状态")
         try:
             if not index.isValid():
-                print("[handleComboBoxPressed]-->下拉复选框点击无效")
+                show_message_box(f"🚩下拉复选框点击无效,当前index:{index}", "提示", 1500)
                 return
             self.model.setChecked(index)  # 更新复选框的状态
         except Exception as e:
             print(f"[handleComboBoxPressed]-->更新复选框状态失败: {e}")
-
-    def handleComboBox0Pressed(self):
-        """处理（显示图片视频所有文件）下拉框选项被按下时的事件。"""
-        print("[handleComboBox0Pressed]-->更新（显示图片视频所有文件）下拉框状态")
-        self.update_RB_QTableWidget0() # 更新右侧RB_QTableWidget0表格
+            show_message_box(f"🚩处理显示同级文件夹下拉框选项按下事件发生错误!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
+            self.logger.error(f"【handleComboBoxPressed】-->处理显示同级文件夹下拉框选项按下事件时 | 报错: {e}")
+    
+    def handleComboBox0Pressed(self, index):
+        """处理显示(图片/视频/所有文件)下拉框选项被按下事件"""
+        try:
+            # 链式三目表达式选择显示文件类型，记录log信息
+            display_txt = "图片" if index == 0 else ("视频" if index == 1 else "所有")
+            self.logger.info(f"handleComboBox0Pressed()-->处理显示{display_txt}文件下拉框选项按下事件")
+            self.update_RB_QTableWidget0()
+        except Exception as e:
+            show_message_box(f"🚩处理显示{display_txt}文件下拉框选项按下事件发生错误!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
+            self.logger.error(f"【handleComboBox0Pressed】-->处理显示{display_txt}文件下拉框选项按下事件时 | 报错: {e}")
 
     def updateComboBox1Text(self):
         """更新 RT_QComboBox1 的显示文本。"""    
-        print("[updateComboBox1Text]-->更新显示文本")
         try:
-            selected_folders = self.model.getCheckedItems()  # 获取选中的文件夹
-            current_text = '; '.join(selected_folders) if selected_folders else "(请选择)"
-            self.RT_QComboBox1.setCurrentText(current_text)  # 更新 ComboBox 中的内容
-            # 更新表格内容
-            self.update_RB_QTableWidget0()  
+            # 获取选中的文件夹,并更新RT_QComboBox1显示
+            print("[updateComboBox1Text]-->更新显示文本")
+            self.logger.info(f"updateComboBox1Text()-->更新<RT_QComboBox1>同级文件夹下拉框的显示文本")
+            current_text = '; '.join(selected_folders) if (selected_folders := self.model.getCheckedItems()) else "(请选择)"
+            self.RT_QComboBox1.setCurrentText(current_text)
+            # 更新右侧表格
+            self.update_RB_QTableWidget0()
         except Exception as e:
             print(f"[updateComboBox1Text]-->更新显示文本失败: {e}")
-            self.logger.error(f"updateComboBox1Text()-->更新显示文本下拉框失败: {e}")
+            self.logger.error(f"【updateComboBox1Text】-->更新显示文本下拉框失败: {e}")
 
     def getSiblingFolders(self, folder_path):
         """获取指定文件夹的同级文件夹列表。"""
         print(f"[getSiblingFolders]-->获取{folder_path}的同级文件夹列表")
         try:
-            parent_folder = os.path.dirname(folder_path)  # 获取父文件夹路径
-            return [
-                name for name in os.listdir(parent_folder)
-                    if os.path.isdir(os.path.join(parent_folder, name)) and name != os.path.basename(folder_path)  # 过滤出同级文件夹，不包括当前选择的文件夹
+            parent_folder = os.path.dirname(folder_path)   # 获取父文件夹路径
+            # 过滤出同级文件夹，不包括当前选择的文件夹
+            sibling_folders = [
+                name for name in os.listdir(parent_folder) 
+                    if os.path.isdir(os.path.join(parent_folder, name)) and name != os.path.basename(folder_path)  
                 ]
+            print(f"[getSiblingFolders]-->获取{folder_path}的同级文件夹列表: {sibling_folders}")
+            return sibling_folders
         except Exception as e:
             print(f"[getSiblingFolders]-->获取同级文件夹列表失败: {e}")
+            self.logger.error(f"【getSiblingFolders】-->获取指定文件夹的同级文件夹列表 | 报错: {e}")
             return []
 
     
@@ -2193,31 +2212,25 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def display_preview_image_dynamically(self, preview_file_path):
         """动态显示预览图像"""
         try:
-            # 统一转换传入文件路径的为小写字母
-            file_path = preview_file_path.lower()
-
-            # 根据文件类型创建预览, 图片文件处理
-            if file_path.endswith(tuple(self.IMAGE_FORMATS)):
+            # 图片文件处理,更具文件类型创建图片预览
+            if (file_extension := os.path.splitext(preview_file_path)[1].lower()).endswith(self.IMAGE_FORMATS):
                 # 处理HEIC格式图片，成功提取则创建并显示图片预览，反之则显示提取失败
-                if file_path.endswith(tuple(".heic")):
-                    if (new_path := extract_jpg_from_heic(preview_file_path)):
+                if file_extension.endswith(".heic"):
+                    if new_path := extract_jpg_from_heic(preview_file_path):
                         self.create_image_preview(new_path)
-                    else: 
-                        self.show_preview_error("提取HEIC图片失败")
-                else: # 非".heic"格式图片直接创建并显示预览图像
-                    self.create_image_preview(preview_file_path)
+                        return
+                    self.show_preview_error("提取HEIC图片失败")
+                # 非".heic"文件直接使用图片文件生成预览
+                self.create_image_preview(preview_file_path)
+                return
 
-            # 视频文件处理
-            elif file_path.endswith(tuple(self.VIDEO_FORMATS)):
-                # 提取视频文件首帧图，创建并显示预览图
-                if video_path := extract_video_first_frame(preview_file_path):
-                    self.create_image_preview(video_path)     
-                else:
-                    self.show_preview_error("视频文件预览失败")
-                    
+            # 视频文件处理,提取视频文件首帧图，创建并显示预览图
+            elif file_extension.endswith(self.VIDEO_FORMATS):
+                self.create_image_preview(video_path) if (video_path := extract_video_first_frame(preview_file_path)) else self.show_preview_error("视频文件预览失败")
+                return
+
             # 非图片/视频格式文件处理
-            else:
-                self.show_preview_error("不支持预览的文件类型")
+            self.show_preview_error("不支持预览的文件类型")
         except Exception as e:
             print(f"[display_preview_image_dynamically]-->动态显示预览图像: {e}")
             self.logger.error(f"【display_preview_image_dynamically】-->动态显示预览图像 | 报错: {e}")
@@ -3017,13 +3030,13 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         if hasattr(self, 'zip_path'):
             self.zip_path = None
 
-    @log_performance_decorator(tips="从JSON文件加载之前的设置", log_args=False, log_result=False)
+    
     def load_settings(self):
         """从JSON文件加载设置"""
-        self.logger.info("load_settings()-->执行函数任务, 从JSON文件加载之前的设置")
         try:
-            settings_path = os.path.join(os.path.dirname(__file__), "config", "basic_settings.json")
-            if os.path.exists(settings_path):
+            self.logger.info("load_settings()-->执行函数任务, 从JSON文件加载之前的设置")
+            if os.path.exists(
+                settings_path := os.path.join(os.path.dirname(__file__), "config", "basic_settings.json")):
                 with open(settings_path, "r", encoding='utf-8', errors='ignore') as f:
                     settings = json.load(f)
 
@@ -3092,6 +3105,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 self.apply_theme()
         except Exception as e:
             print(f"[load_settings]-->加载设置时出错: {e}")
+            show_message_box("🚩主程序从JSON文件加载之前的设置时发生错误!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
+            self.logger.error(f"【load_settings】-->从JSON文件加载设置 | 报错: {e}")
             return
 
     def save_settings(self):
@@ -3137,8 +3152,10 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             )
             self.logger.info(f"save_settings()-->成功保存设置信息到JSON文件 | 路径: {settings_path.as_posix()}")
         except Exception as e:
-            self.logger.error(f"【save_settings】-->保存设置到JSON文件失败: {e}")
             print(f"[save_settings]-->保存设置时出错: {e}")
+            show_message_box("🚩主程序保存当前设置到JSON文件时发生错误!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
+            self.logger.error(f"【save_settings】-->保存设置到JSON文件失败: {e}")
+            
 
 
     def press_space_or_b_get_selected_file_list(self, key_type):
@@ -3622,7 +3639,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             show_message_box("🚩图片模糊搜索失败.🐬报错信息请打开日志文件查看...", "提示", 2000)
             self.logger.error(f"【on_item_selected_from_search】-->无法使用主界面搜索窗口 | 报错：{e}")
 
-    def check_file_type(self, lsit_file_path):
+    def check_file_type(self, list_file_path):
         """检查文件类型
         函数功能说明: 根据传入的文件路径列表，统计图片、视频、其它文件是否出现
         返回: 置为1表示出现 置为0表示未出现
@@ -3632,7 +3649,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """
         try:
             # 解析传入的文件路径列表中的扩展名
-            if not (file_extensions := {os.path.splitext(path)[1].lower() for path in lsit_file_path}):
+            if not (file_extensions := {os.path.splitext(path)[1].lower() for path in list_file_path}):
                 raise Exception(f"无法解析传入的文件路径列表扩展名")
             # 检查文件类型的合法性, 使用集合操作和in操作符，比endswith()更高效
             flag_video = 1 if any(ext in self.VIDEO_FORMATS for ext in file_extensions) else 0
