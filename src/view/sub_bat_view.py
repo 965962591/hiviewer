@@ -23,18 +23,81 @@ from PyQt5.QtWidgets import (
 import subprocess
 from PyQt5.QtGui import QIcon
 import threading
-from PyQt5.QtCore import QMetaObject, Qt, pyqtSignal, pyqtSlot, Q_ARG
+from PyQt5.QtCore import QMetaObject, Qt, pyqtSlot, Q_ARG, QTimer, pyqtSignal
 import json
 import os
+import wmi
+import pythoncom
 
-icon_abs = False  # 全局标志位，控制路径类型
 
 # 全局变量定义缓存目录
 APP_CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "cache")
 
+class USBDeviceMonitor:
+    """USB设备实时监控类（Windows平台专用）"""
+    
+    def __init__(self, on_device_changed=None):
+        self.on_device_changed = on_device_changed
+        self.monitor_thread = threading.Thread(target=self.start_monitoring)
+        self.monitor_thread.daemon = True
+        self.thread_running = False
+
+    def device_changed_callback(self):
+        if callable(self.on_device_changed):
+            self.on_device_changed()
+
+    def start_monitoring(self):
+        pythoncom.CoInitialize()
+        try:
+            c = wmi.WMI(moniker="root/cimv2")
+            arr_filter = c.Win32_PnPEntity.watch_for(
+                notification_type="creation",
+                delay_secs=1
+            )
+            rem_filter = c.Win32_PnPEntity.watch_for(
+                notification_type="deletion",
+                delay_secs=1
+            )
+
+            self.thread_running = True
+            print("[监控系统] USB设备监控服务启动")
+            while self.thread_running:
+                try:
+                    new_device = arr_filter(0.5)
+                    print(f"[监控系统] 检测到新设备: {new_device.Description}")
+                    self.device_changed_callback()
+                except wmi.x_wmi_timed_out:
+                    pass
+
+                try:
+                    removed_device = rem_filter(0.5)
+                    print(f"[监控系统] 检测到设备移除: {removed_device.Description}")
+                    self.device_changed_callback()
+                except wmi.x_wmi_timed_out:
+                    pass
+
+        except Exception as e:
+            print(f"[监控系统] 监控出错: {e}")
+        finally:
+            pythoncom.CoUninitialize()
+            print("[监控系统] 监控服务已关闭")
+
+    def start(self):
+        if not self.monitor_thread.is_alive():
+            self.monitor_thread.start()
+
+    def stop(self):
+        self.thread_running = False
+        if self.monitor_thread.is_alive():
+            self.monitor_thread.join(timeout=2)
+
+
 class LogVerboseMaskApp(QWidget):
     # 创建关闭信号
     closed = pyqtSignal()
+    # 添加设备变化信号
+    device_changed = pyqtSignal()
+    # 设置缓存路径
     COMMANDS_FILE = os.path.join(APP_CACHE_DIR, "commands.json")
 
     def __init__(self):
@@ -45,6 +108,18 @@ class LogVerboseMaskApp(QWidget):
         self.initUI()
         self.setup_logging()
         self.refresh_devices()  # 初始化时刷新设备列表
+        
+        # 初始化USB设备监控
+        self.usb_monitor = USBDeviceMonitor(self.on_device_changed)
+        self.usb_monitor.start()
+        
+        # 连接设备变化信号到刷新函数
+        self.device_changed.connect(self.refresh_devices)
+        
+        # 设置定时器定期刷新设备列表（作为备用方案）
+        self.refresh_timer = QTimer()
+        self.refresh_timer.timeout.connect(self.refresh_devices)
+        self.refresh_timer.start(5000)  # 每5秒刷新一次
 
     def load_commands(self):
         """从文件加载命令"""
@@ -142,15 +217,23 @@ class LogVerboseMaskApp(QWidget):
                         device_id, status = line.strip().split('\t')
                         if status == 'device':  # 只添加已连接的设备
                             devices.append(device_id)
-                            print(f"获取到设备: {device_id}")
+                            print(f"[设备刷新] 获取到设备: {device_id}")
                 
                 # 更新设备下拉列表
+                current_device = self.device_combo.currentText() if self.device_combo.count() > 0 else ""
                 self.device_combo.clear()
                 if devices:
                     for device in devices:
                         self.device_combo.addItem(device)
-                    self.device_combo.setCurrentIndex(0)
+                    # 尝试保持之前选中的设备
+                    if current_device and current_device in devices:
+                        index = self.device_combo.findText(current_device)
+                        if index >= 0:
+                            self.device_combo.setCurrentIndex(index)
+                    else:
+                        self.device_combo.setCurrentIndex(0)
                     self.device_combo.setEnabled(True)  # 确保有设备时启用下拉列表
+                    print(f"[设备刷新] -->检测到 {len(devices)} 台设备")
                 else:
                     self.device_combo.addItem("未检测到设备")
                     self.device_combo.setEnabled(False)
@@ -158,10 +241,12 @@ class LogVerboseMaskApp(QWidget):
                 self.device_combo.clear()
                 self.device_combo.addItem("ADB命令执行失败")
                 self.device_combo.setEnabled(False)
+                print("[设备刷新] ADB命令执行失败")
         except Exception as e:
             self.device_combo.clear()
             self.device_combo.addItem(f"错误: {str(e)}")
             self.device_combo.setEnabled(False)
+            print(f"[设备刷新] 发生错误: {str(e)}")
 
     def get_selected_device(self):
         """获取当前选中的设备ID"""
@@ -931,6 +1016,25 @@ class LogVerboseMaskApp(QWidget):
             self.repaint()
         else:
             print("错误：未找到网格布局")
+
+    def on_device_changed(self):
+        """设备变化回调函数"""
+        # 在主线程中发送信号
+        self.device_changed.emit()
+
+    def closeEvent(self, event):
+        """窗口关闭事件处理"""
+        # 停止USB监控
+        if hasattr(self, 'usb_monitor'):
+            self.usb_monitor.stop()
+        
+        # 停止定时器
+        if hasattr(self, 'refresh_timer'):
+            self.refresh_timer.stop()
+
+        # 发送关闭信号
+        self.closed.emit()
+        event.accept()
 
     def keyPressEvent(self, event):
         """按下 Esc 键关闭窗口"""

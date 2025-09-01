@@ -177,13 +177,24 @@ class FrameReader(QThread):
         self.last_emit_time = time.time()  # 添加上次发射信号的时间
         self.playback_speed = 1.0  # 添加播放速度变量
         
+        # 性能优化：添加帧跳过机制
+        self.frame_skip_count = 0
+        self.adaptive_skip = False
+        
+        # 性能优化：缓冲区管理
+        self.frame_buffer_size = 3  # 减少缓冲区大小
+        self.last_decode_time = 0
+
         # 尝试不同的后端打开视频
         self.cap = None
         self.open_with_backends()
         
         if not self.cap or not self.cap.isOpened():
             raise Exception(f"无法打开视频: {video_path}")
-            
+
+        # 性能优化：设置视频解码参数
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # 减少内部缓冲
+        
         self.current_frame_number = 0
         self.current_time_ms = 0
         self.fps = self.cap.get(cv2.CAP_PROP_FPS)
@@ -202,18 +213,22 @@ class FrameReader(QThread):
     
     def open_with_backends(self):
         """尝试使用不同的后端打开视频"""
-        backends = [
-            cv2.CAP_FFMPEG,
-            cv2.CAP_GSTREAMER,
-            cv2.CAP_DSHOW,
-            cv2.CAP_ANY
-        ]
-        
+        # 性能优化：优先使用性能更好的后端
+        backends = [cv2.CAP_FFMPEG, cv2.CAP_DSHOW, cv2.CAP_GSTREAMER, cv2.CAP_ANY]
+
         for backend in backends:
             try:
                 print(f"尝试使用后端 {backend} 打开视频 {self.video_path}")
                 cap = cv2.VideoCapture(self.video_path, backend)
                 if cap.isOpened():
+                    # 性能优化：设置解码器参数
+                    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # 最小缓冲区
+                    # 尝试启用硬件加速（如果支持）
+                    try:
+                        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('H', '2', '6', '4'))
+                    except:
+                        pass  # 硬件加速不支持时忽略
+                    
                     self.cap = cap
                     return
                 else:
@@ -223,7 +238,9 @@ class FrameReader(QThread):
         
         # 最后尝试原始路径，不指定后端
         self.cap = cv2.VideoCapture(self.video_path)
-        
+        if self.cap.isOpened():
+            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
     def set_playback_speed(self, speed):
         """设置播放速度"""
         self.playback_speed = speed
@@ -232,7 +249,7 @@ class FrameReader(QThread):
     def run(self):
         while self.running:
             if self.paused:
-                time.sleep(0.01)  # 暂停时降低CPU使用
+                time.sleep(0.016)  # 暂停时降低CPU使用，约60fps检查频率
                 continue
             
             # 控制帧发送频率，根据视频帧率和播放速度调整
@@ -245,25 +262,46 @@ class FrameReader(QThread):
             )  # 秒
 
             if elapsed < target_frame_time:
-                # 等待直到达到正确的时间间隔再发送下一帧
+                # 性能优化：更精确的睡眠时间控制，支持极低速度
                 sleep_time = target_frame_time - elapsed
-                time.sleep(sleep_time / 2)  # 除以2避免过度睡眠
+                if sleep_time > 0.001:  # 只有当睡眠时间大于1ms时才睡眠
+                    # 对于极低速度，限制最大睡眠时间避免界面卡死
+                    max_sleep = 0.1 if self.playback_speed >= 0.1 else 0.5  # 低速时允许更长睡眠
+                    time.sleep(min(sleep_time, max_sleep))
                 continue
-                
+
+            # 性能优化：检测解码性能，自适应跳帧
+            decode_start = time.time()
+            
             with self.lock:
                 ret, frame = self.cap.read()
+                
+                decode_time = time.time() - decode_start
+                
                 if ret:
                     self.current_frame_number = int(
                         self.cap.get(cv2.CAP_PROP_POS_FRAMES)
                     )
                     self.current_time_ms = int(self.cap.get(cv2.CAP_PROP_POS_MSEC))
-                    
+
+                    # 性能优化：如果解码时间过长，启用自适应跳帧
+                    if decode_time > target_frame_time * 1.5:
+                        self.adaptive_skip = True
+                        self.frame_skip_count += 1
+                        if self.frame_skip_count < 3:  # 最多连续跳3帧
+                            continue
+                        else:
+                            self.frame_skip_count = 0
+                    else:
+                        self.adaptive_skip = False
+                        self.frame_skip_count = 0
+
                     # 记录发送时间
                     self.last_emit_time = time.time()
-                    
-                    # 发送信号
+
+                    # 性能优化：避免不必要的帧拷贝，直接传递引用
                     self.frame_ready.emit(
-                        self.current_frame_number, frame.copy(), self.current_time_ms
+                        self.current_frame_number, frame, self.current_time_ms
                     )
                 else:
                     # 视频结束时重置到开始
@@ -271,15 +309,30 @@ class FrameReader(QThread):
                     self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                     self.current_time_ms = 0
                     self.current_frame_number = 0
-                    time.sleep(0.5)  # 添加小延迟防止立即循环
-            
+                    time.sleep(0.1)  # 减少延迟时间
+
     def seek(self, frame_number):
         with self.lock:
             if frame_number >= 0:
+                # 使用更高效的seek方法
                 self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
                 self.current_frame_number = frame_number
                 self.current_time_ms = int(frame_number * self.frame_time)
-            
+                
+                # 立即读取一帧以确保位置正确
+                ret, frame = self.cap.read()
+                if ret:
+                    # 更新当前帧信息
+                    self.current_frame_number = int(self.cap.get(cv2.CAP_PROP_POS_FRAMES))
+                    self.current_time_ms = int(self.cap.get(cv2.CAP_PROP_POS_MSEC))
+                    
+                    # 将帧发送给播放器
+                    self.frame_ready.emit(self.current_frame_number, frame, self.current_time_ms)
+                else:
+                    # 如果读取失败，尝试重新定位
+                    print(f"Seek到帧 {frame_number} 失败，尝试重新定位")
+                    self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
+
     def seek_time(self, time_ms):
         """按时间戳定位视频位置"""
         with self.lock:
@@ -300,12 +353,11 @@ class FrameReader(QThread):
         if self.cap:
             self.cap.release()
 
+
 class VideoPlayer(QWidget):
     def __init__(self, video_path, parent=None):
         super().__init__(parent)
-        
-        # 保存 VideoWall 的引用
-        self.video_wall = parent  
+        self.video_wall = parent  # 保存 VideoWall 的引用
         self.video_path = video_path
 
         # 初始化字体管理器
@@ -346,16 +398,24 @@ class VideoPlayer(QWidget):
             self.current_time = 0  # 当前播放时间(毫秒)
             self.last_update_time = time.time()  # 上次更新帧的时间
             
+            # 添加进度条拖拽状态标志
+            self.slider_dragging = False
+            
             # 添加缩放比例属性
             self.scale_factor = 1.0
-            # 添加缩放后的帧缓存
+            # 性能优化：多级缓存系统
             self.scaled_frame_cache = None
             self.last_scale_factor = 1.0
+            self.last_frame_hash = None  # 用于检测帧是否变化
             # 控制缩放质量的阈值
             self.high_quality_threshold = 2.0
             # 添加节流变量，用于控制缩放频率
             self.last_scale_time = 0
-            self.scale_throttle_ms = 100  # 缩放操作间隔(毫秒)
+            self.scale_throttle_ms = 50  # 减少缩放操作间隔
+            
+            # 性能优化：预计算的缩放参数
+            self.cached_scale_params = {}
+            self.frame_size_cache = None
 
             # 添加缓冲最新帧
             self.latest_frame = None
@@ -364,6 +424,10 @@ class VideoPlayer(QWidget):
             
             # 标记是否处于循环播放的过渡期
             self.is_looping = False
+            
+            # 添加帧缓存机制，用于逐帧操作
+            self.frame_cache = {}
+            self.max_cache_size = 10  # 最多缓存10帧
 
             # 添加平移相关属性
             self.is_panning = False
@@ -371,6 +435,15 @@ class VideoPlayer(QWidget):
             self.pan_offset = np.array([0, 0]) # 使用numpy数组方便计算
             self.current_display_offset = np.array([0, 0])
 
+            # 性能优化：添加性能监控
+            self.performance_monitor = {
+                'frame_process_times': [],
+                'display_times': [],
+                'last_fps_check': time.time(),
+                'frames_processed': 0,
+                'adaptive_quality': True
+            }
+            
             # 添加析构时的清理
             self.destroyed.connect(self.cleanup)
             self.is_cleaning_up = False  # 添加清理标志
@@ -398,45 +471,102 @@ class VideoPlayer(QWidget):
         try:
             if frame is None:
                 return
-                
+
+            # 性能监控开始
+            process_start = time.time()
+
+            # 性能优化：轻量级帧变化检测
+            if hasattr(self, 'last_frame_number') and frame_number == self.last_frame_number:
+                return  # 帧号没有变化，跳过处理
+            self.last_frame_number = frame_number
+
             # 更新缓存的最新帧
             self.latest_frame = frame
             self.latest_frame_number = frame_number
             self.latest_frame_time = time_ms
-                
+            
+            # 缓存当前帧用于逐帧操作
+            self.cache_frame(frame_number, frame)
+
             # 更新当前帧和时间
             self.current_frame = frame_number
             self.current_time = time_ms
-                
-            # 更新进度条位置（基于时间）
-            if self.duration_ms > 0:
-                progress = (time_ms / self.duration_ms) * 100
-                self.slider.setValue(int(progress))
-                
-            # 应用旋转
-            if self.rotation_angle != 0:
-                frame = self.rotate_image(frame, self.rotation_angle)
 
-            # 清除缩放缓存，因为有新帧
-            self.scaled_frame_cache = None
+            # 性能优化：自适应UI更新频率
+            update_ui = (frame_number % 3 == 0) if self.performance_monitor['adaptive_quality'] else (frame_number % 2 == 0)
+            
+            if update_ui and not self.slider_dragging:  # 拖拽时不自动更新进度条
+                if self.duration_ms > 0:
+                    progress = (time_ms / self.duration_ms) * 100
+                    self.slider.setValue(int(progress))
+
+            # 应用旋转（性能优化：只在需要时旋转）
+            processed_frame = frame
+            if self.rotation_angle != 0:
+                processed_frame = self.rotate_image(frame, self.rotation_angle)
+
+            # 性能优化：只有当帧真正变化时才清除缓存
+            # 旋转后帧尺寸可能变化，需要清除缓存
+            if self.scaled_frame_cache is not None:
+                self.scaled_frame_cache = None
             
             # 显示帧
-            self.display_frame(frame)
-                
-            # 更新时间和帧信息显示
-            current_time_str = self.format_time(time_ms)
-            total_time_str = self.format_time(self.duration_ms)
-            info_text = f"帧: {frame_number}/{self.total_frames} 时间: {current_time_str}/{total_time_str}"
-            self.info_label.setText(info_text)
-                
+            display_start = time.time()
+            self.display_frame(processed_frame)
+            display_time = time.time() - display_start
+
+            # 性能优化：自适应信息更新
+            info_update_freq = 5 if self.performance_monitor['adaptive_quality'] else 3
+            if frame_number % info_update_freq == 0:
+                current_time_str = self.format_time(time_ms)
+                total_time_str = self.format_time(self.duration_ms)
+                info_text = f"帧: {frame_number}/{self.total_frames} 时间: {current_time_str}/{total_time_str}"
+                self.info_label.setText(info_text)
+
+            # 性能监控
+            process_time = time.time() - process_start
+            self.update_performance_stats(process_time, display_time)
+
         except Exception as e:
             print(f"处理帧时出错: {str(e)}")
+
+    def update_performance_stats(self, process_time, display_time):
+        """更新性能统计并自适应调整"""
+        monitor = self.performance_monitor
+        
+        # 记录处理时间
+        monitor['frame_process_times'].append(process_time)
+        monitor['display_times'].append(display_time)
+        monitor['frames_processed'] += 1
+        
+        # 保持最近100帧的统计
+        if len(monitor['frame_process_times']) > 100:
+            monitor['frame_process_times'].pop(0)
+            monitor['display_times'].pop(0)
+        
+        # 每秒检查一次性能并调整
+        current_time = time.time()
+        if current_time - monitor['last_fps_check'] >= 1.0:
+            avg_process_time = sum(monitor['frame_process_times']) / len(monitor['frame_process_times'])
+            avg_display_time = sum(monitor['display_times']) / len(monitor['display_times'])
+            
+            # 自适应质量调整
+            target_frame_time = 1.0 / 30  # 目标30fps
+            if avg_process_time > target_frame_time * 0.8:
+                monitor['adaptive_quality'] = False  # 降低质量
+                print("性能较低，启用低质量模式")
+            elif avg_process_time < target_frame_time * 0.5:
+                monitor['adaptive_quality'] = True   # 提高质量
+                
+            monitor['last_fps_check'] = current_time
 
     def cleanup(self):
         """清理资源"""
         self.is_cleaning_up = True  # 设置清理标志
-        if hasattr(self, 'frame_reader'):
+        if hasattr(self, "frame_reader"):
             self.frame_reader.stop()
+        if hasattr(self, "frame_cache"):
+            self.clear_frame_cache()
 
     def menu(self):
         """添加右键菜单函数"""
@@ -609,6 +739,9 @@ class VideoPlayer(QWidget):
         self.slider.setRange(0, 100)
         self.slider.sliderMoved.connect(self.seek_position)
         self.slider.sliderPressed.connect(self.handle_slider_pressed)
+        self.slider.sliderReleased.connect(self.handle_slider_released)
+        # 添加鼠标点击事件支持
+        self.slider.mousePressEvent = self.slider_mouse_press_event
 
         # 控制按钮和设置
         self.play_button = QPushButton(self)
@@ -628,9 +761,10 @@ class VideoPlayer(QWidget):
         self.speed_label = QLabel("速度:", self)
         self.speed_label.setFont(self.font_manager_small)
         self.speed_spinbox = QDoubleSpinBox(self)
-        self.speed_spinbox.setRange(0.1, 10.0)
+        self.speed_spinbox.setRange(0.05, 10.0)  # 支持最小0.05倍速
         self.speed_spinbox.setValue(1.0)
-        self.speed_spinbox.setSingleStep(0.1)
+        self.speed_spinbox.setSingleStep(0.05)  # 调整步长为0.05
+        self.speed_spinbox.setDecimals(2)  # 设置小数位数为2位
         self.speed_spinbox.valueChanged.connect(self.set_speed)
 
         # 跳帧数量
@@ -671,10 +805,10 @@ class VideoPlayer(QWidget):
         control_layout.addWidget(self.speed_spinbox)
         control_layout.addWidget(self.frame_skip_label)
         control_layout.addWidget(self.frame_skip_spin)
-        control_layout.addWidget(self.main_button)          # 添加 "main" 按钮到布局
+        control_layout.addWidget(self.main_button)  # 添加 "main" 按钮到布局
         control_layout.addWidget(self.play_button)
         control_layout.addWidget(self.replay_button)
-        control_layout.addWidget(self.rotate_left_button)   # 添加左转按钮
+        control_layout.addWidget(self.rotate_left_button)  # 添加左转按钮
         control_layout.addWidget(self.rotate_right_button)  # 添加右转按钮
         control_layout.addStretch()
 
@@ -691,10 +825,10 @@ class VideoPlayer(QWidget):
         self.setLayout(main_layout)
         self.setMinimumSize(300, 200)  # 设置最小大小，防止过小
 
-        # 添加一个定时器以确保UI定期更新，即使没有新帧
+        # 性能优化：降低UI更新频率
         self.ui_timer = QTimer(self)
         self.ui_timer.timeout.connect(self.update_ui)
-        self.ui_timer.start(16)  # 约60fps的UI刷新率
+        self.ui_timer.start(33)  # 约30fps的UI刷新率，减少CPU占用
 
     def update_ui(self):
         """确保UI定期更新，即使没有新帧到达"""
@@ -721,48 +855,57 @@ class VideoPlayer(QWidget):
             # 获取视频标签的当前大小
             label_w = self.video_label.width()
             label_h = self.video_label.height()
+            
+            # 修复旋转问题：使用当前帧的实际尺寸而不是缓存
             frame_h_orig, frame_w_orig = frame.shape[:2]
+            
+            # 性能优化：缓存缩放参数，但要考虑旋转角度
+            scale_key = (label_w, label_h, self.scale_factor, self.rotation_angle)
+            if scale_key not in self.cached_scale_params:
+                base_scale = min(label_w / frame_w_orig, label_h / frame_h_orig)
+                current_scale = base_scale * self.scale_factor
+                scaled_w = max(1, int(frame_w_orig * current_scale))
+                scaled_h = max(1, int(frame_h_orig * current_scale))
+                self.cached_scale_params[scale_key] = (current_scale, scaled_w, scaled_h)
+            
+            current_scale, scaled_w, scaled_h = self.cached_scale_params[scale_key]
 
             # 检查是否需要重新缩放
             needs_rescale = (self.scaled_frame_cache is None or 
                             abs(self.last_scale_factor - self.scale_factor) > 0.01)
             
             if needs_rescale:
-                # 计算基础缩放比例，再乘以用户设置的缩放因子
-                base_scale = min(
-                    label_w / frame_w_orig, label_h / frame_h_orig
-                )
-                current_scale = base_scale * self.scale_factor
-                
                 # 记录当前使用的缩放因子
                 self.last_scale_factor = self.scale_factor
                 
-                scaled_w = max(1, int(frame_w_orig * current_scale))
-                scaled_h = max(1, int(frame_h_orig * current_scale))
-
-                # 优化大尺寸图像的缩放方式
-                if self.scale_factor > self.high_quality_threshold:
-                    intermediate_scale = min(1.0, current_scale / 2)
-                    if intermediate_scale < 1.0:
-                        intermediate_w = max(1, int(frame_w_orig * intermediate_scale))
-                        intermediate_h = max(1, int(frame_h_orig * intermediate_scale))
-                        intermediate = cv2.resize(
-                            frame, (intermediate_w, intermediate_h), 
-                            interpolation=cv2.INTER_AREA
-                        )
-                        self.scaled_frame_cache = cv2.resize(
-                            intermediate, (scaled_w, scaled_h),
-                            interpolation=cv2.INTER_LINEAR
-                        )
-                    else:
-                        self.scaled_frame_cache = cv2.resize(
-                            frame, (scaled_w, scaled_h),
-                            interpolation=cv2.INTER_LINEAR
-                        )
+                # 性能优化：选择最佳的插值方法
+                if current_scale > 2.0:
+                    # 大幅放大时使用双线性插值
+                    interpolation = cv2.INTER_LINEAR
+                elif current_scale < 0.5:
+                    # 大幅缩小时使用区域插值
+                    interpolation = cv2.INTER_AREA
+                else:
+                    # 中等缩放使用立方插值
+                    interpolation = cv2.INTER_CUBIC
+                
+                # 性能优化：对于大幅缩放，使用分步缩放
+                if current_scale < 0.25:
+                    # 分两步缩放，先缩放到0.5，再缩放到目标大小
+                    intermediate_w = max(1, int(frame_w_orig * 0.5))
+                    intermediate_h = max(1, int(frame_h_orig * 0.5))
+                    intermediate = cv2.resize(
+                        frame, (intermediate_w, intermediate_h), 
+                        interpolation=cv2.INTER_AREA
+                    )
+                    self.scaled_frame_cache = cv2.resize(
+                        intermediate, (scaled_w, scaled_h),
+                        interpolation=cv2.INTER_AREA
+                    )
                 else:
                     self.scaled_frame_cache = cv2.resize(
                         frame, (scaled_w, scaled_h),
-                        interpolation=cv2.INTER_AREA if current_scale < 1 else cv2.INTER_LINEAR
+                        interpolation=interpolation
                     )
             
             # 使用缓存的缩放帧
@@ -824,16 +967,32 @@ class VideoPlayer(QWidget):
                 
                 display_frame = output_frame
 
-            # 使用 RGB 格式处理图像
+            # 性能优化：使用更高效的图像格式转换
             if len(display_frame.shape) == 3:
-                rgb_frame = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
+                # 检查是否已经是RGB格式
+                if display_frame.shape[2] == 3:
+                    # BGR to RGB 转换
+                    rgb_frame = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
+                else:
+                    rgb_frame = display_frame
+                    
                 height, width, channel = rgb_frame.shape
                 bytes_per_line = 3 * width
+                
+                # 性能优化：确保数据连续性
+                if not rgb_frame.flags['C_CONTIGUOUS']:
+                    rgb_frame = np.ascontiguousarray(rgb_frame)
+                
                 q_img = QImage(
                     rgb_frame.data, width, height, bytes_per_line, QImage.Format_RGB888
                 )
             else:
                 height, width = display_frame.shape
+                
+                # 性能优化：确保数据连续性
+                if not display_frame.flags['C_CONTIGUOUS']:
+                    display_frame = np.ascontiguousarray(display_frame)
+                    
                 q_img = QImage(
                     display_frame.data, width, height, width, QImage.Format_Grayscale8
                 )
@@ -893,14 +1052,37 @@ class VideoPlayer(QWidget):
         self.last_update_time = time.time()  # 重置时间基准
 
     def handle_slider_pressed(self):
-        # 获取鼠标点击的位置
-        mouse_pos = self.slider.mapFromGlobal(QCursor.pos()).x()
-        # 计算点击位置对应的滑块值
-        slider_value = int((mouse_pos / self.slider.width()) * self.slider.maximum())
-        # 设置滑块的位置
-        self.slider.setValue(slider_value)
-        # 调用 seek_position 方法并传递位置
-        self.seek_position(slider_value)
+        """滑块按下时的处理"""
+        # 暂停自动更新进度条，避免冲突
+        self.slider_dragging = True
+        
+    def handle_slider_released(self):
+        """滑块释放时的处理"""
+        # 恢复自动更新进度条
+        self.slider_dragging = False
+        # 执行跳转
+        self.seek_position(self.slider.value())
+        
+    def slider_mouse_press_event(self, event):
+        """自定义滑块鼠标点击事件"""
+        if event.button() == Qt.LeftButton:
+            # 计算点击位置对应的进度值
+            click_pos = event.pos().x()
+            slider_width = self.slider.width()
+            slider_min = self.slider.minimum()
+            slider_max = self.slider.maximum()
+            
+            # 计算点击位置对应的值
+            if slider_width > 0:
+                value = slider_min + (slider_max - slider_min) * click_pos / slider_width
+                value = max(slider_min, min(slider_max, int(value)))
+                
+                # 设置滑块位置并跳转
+                self.slider.setValue(value)
+                self.seek_position(value)
+        
+        # 调用原始的鼠标按下事件
+        QSlider.mousePressEvent(self.slider, event)
 
     def rotate_image(self, image, angle):
         if angle == 90:
@@ -999,11 +1181,48 @@ class VideoPlayer(QWidget):
 
     def rotate_left(self):
         self.rotation_angle = (self.rotation_angle - 90) % 360
+        # 清除缓存，因为旋转后尺寸会变化
+        self.clear_rotation_cache()
         self.update_ui()
 
     def rotate_right(self):
         self.rotation_angle = (self.rotation_angle + 90) % 360
+        # 清除缓存，因为旋转后尺寸会变化
+        self.clear_rotation_cache()
         self.update_ui()
+        
+    def clear_rotation_cache(self):
+        """清除旋转相关的缓存"""
+        self.frame_size_cache = None
+        self.scaled_frame_cache = None
+        self.cached_scale_params.clear()
+        # 重置平移偏移
+        self.pan_offset = np.array([0, 0])
+        
+        # 立即重新显示当前帧以应用旋转
+        if hasattr(self, 'latest_frame') and self.latest_frame is not None:
+            processed_frame = self.latest_frame
+            if self.rotation_angle != 0:
+                processed_frame = self.rotate_image(self.latest_frame, self.rotation_angle)
+            self.display_frame(processed_frame)
+
+    def get_cached_frame(self, frame_number):
+        """获取缓存的帧，如果没有则返回None"""
+        return self.frame_cache.get(frame_number)
+    
+    def cache_frame(self, frame_number, frame):
+        """缓存帧"""
+        # 如果缓存已满，移除最旧的帧
+        if len(self.frame_cache) >= self.max_cache_size:
+            oldest_frame = min(self.frame_cache.keys())
+            del self.frame_cache[oldest_frame]
+        
+        # 缓存当前帧
+        self.frame_cache[frame_number] = frame.copy()
+    
+    def clear_frame_cache(self):
+        """清空帧缓存"""
+        self.frame_cache.clear()
 
     # 添加鼠标滚轮事件处理函数
     def wheelEvent(self, event):
@@ -1108,20 +1327,22 @@ class VideoWall(QWidget):
 
     def __init__(self, video_list):
         super().__init__()
-        self.setWindowTitle("多视频播放程序")
-        icon_path = os.path.join(BasePath, "resource", "icons", "video_icon.ico")
-        self.setWindowIcon(QIcon(icon_path))
-        self.setAcceptDrops(True)
+        self.setWindowTitle("多视频播放器")
 
+        # 设置程序窗口图标
+        # 根据 icon_abs 选择路径
+        icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icon", "video.ico")
+        self.setWindowIcon(QIcon(icon_path))
+
+        self.setAcceptDrops(True)
+        self.init_ui()
         self.players = []
+        
         # 添加全局缩放因子
         self.global_scale_factor = 1.0
         # 添加节流变量，防止频繁缩放
         self.last_scale_time = 0
         self.scale_throttle_ms = 100  # 缩放操作间隔(毫秒)
-		
-        # 初始化相关组件
-        self.init_ui()
 
         # 设置快捷键
         self.shortcut()
@@ -1274,7 +1495,6 @@ class VideoWall(QWidget):
         self.refresh_layout()
         super().resizeEvent(event)
 
-
     def refresh_layout(self):
         # 清空现有布局
         while self.grid_layout.count():
@@ -1294,16 +1514,15 @@ class VideoWall(QWidget):
             self.grid_layout.addWidget(player, row, col)
             
             # 移除播放器内部的边距
-            if hasattr(player, 'layout'):
+            if hasattr(player, "layout"):
                 player.layout().setContentsMargins(0, 0, 0, 0)
 
     def toggle_fullscreen(self):
         if self.is_fullscreen:
-            # self.showNormal()
-            self.showMaximized() # 最大化
+            self.showNormal()
             self.is_fullscreen = False
         else:
-            self.showFullScreen() # 全屏
+            self.showFullScreen()
             self.is_fullscreen = True
 
     def clear_videos(self):
@@ -1351,13 +1570,27 @@ class VideoWall(QWidget):
 
     def speed_up_all_videos(self):
         for player in self.players:
-            new_speed = min(player.playback_speed + 0.1, 10.0)  # 限制最大速度为10.0
+            # 智能步长：低速时使用小步长，高速时使用大步长
+            if player.playback_speed < 0.2:
+                step = 0.05
+            elif player.playback_speed < 1.0:
+                step = 0.1
+            else:
+                step = 0.2
+            new_speed = min(player.playback_speed + step, 10.0)  # 限制最大速度为10.0
             player.set_speed(new_speed)
             player.speed_spinbox.setValue(new_speed)  # 同步更新spinbox的值
 
     def slow_down_all_videos(self):
         for player in self.players:
-            new_speed = max(player.playback_speed - 0.1, 0.1)  # 限制最小速度为0.1
+            # 智能步长：低速时使用小步长，高速时使用大步长
+            if player.playback_speed <= 0.2:
+                step = 0.05
+            elif player.playback_speed <= 1.0:
+                step = 0.1
+            else:
+                step = 0.2
+            new_speed = max(player.playback_speed - step, 0.05)  # 支持最小速度0.05
             player.set_speed(new_speed)
             player.speed_spinbox.setValue(new_speed)  # 同步更新spinbox的值
 
@@ -1404,112 +1637,95 @@ class VideoWall(QWidget):
 
     def frame_forward_all_videos(self):
         """所有视频前进一帧"""
-        try:
-            for player in self.players:
-                if hasattr(player, 'frame_reader'):
+        for player in self.players:
+            try:
+                if hasattr(player, "frame_reader"):
                     # 计算下一帧的时间
                     next_frame = min(player.total_frames - 1, player.current_frame + 1)
                     
                     # 暂停视频（如果正在播放）
                     if not player.is_paused:
                         player.play_pause()
-                    
-                    # 使用临时的视频捕获器来准确读取帧
-                    cap = cv2.VideoCapture(player.video_path)
-                    
-                    # 使用逐帧读取的方式获取目标帧
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    current = 0
-                    frame = None
-                    ret = False
-                    
-                    # 读取到目标帧
-                    while current <= next_frame:
-                        ret, temp_frame = cap.read()
-                        if not ret:
-                            break
-                        frame = temp_frame
-                        current += 1
-                    
-                    cap.release()
-                    
-                    if frame is not None:
-                        # 更新播放器状态
+
+                    # 检查是否有缓存的帧
+                    cached_frame = player.get_cached_frame(next_frame)
+                    if cached_frame is not None:
+                        # 使用缓存的帧，避免重新读取
                         player.current_frame = next_frame
                         player.current_time = int(next_frame * (1000 / player.fps))
                         
                         # 应用旋转（如果有）
                         if player.rotation_angle != 0:
-                            frame = player.rotate_image(frame, player.rotation_angle)
-                            
+                            cached_frame = player.rotate_image(cached_frame, player.rotation_angle)
+                        
                         # 显示帧
-                        player.display_frame(frame)
+                        player.display_frame(cached_frame)
                         
                         # 更新进度条
                         if player.duration_ms > 0:
                             progress = (player.current_time / player.duration_ms) * 100
                             player.slider.setValue(int(progress))
-                            
-                        # 更新帧读取器的位置
+                    else:
+                        # 如果没有缓存，使用帧读取器跳转
                         player.frame_reader.seek(next_frame)
-                
-        except Exception as e:
-            print(f"前进一帧时出错: {str(e)}")
+                        
+                        # 更新播放器状态
+                        player.current_frame = next_frame
+                        player.current_time = int(next_frame * (1000 / player.fps))
+                        
+                        # 更新进度条
+                        if player.duration_ms > 0:
+                            progress = (player.current_time / player.duration_ms) * 100
+                            player.slider.setValue(int(progress))
+
+            except Exception as e:
+                print(f"前进一帧时出错: {str(e)}")
 
     def frame_backward_all_videos(self):
         """所有视频后退一帧"""
-        
-        try:
-            for player in self.players:
-                if hasattr(player, 'frame_reader'):
+        for player in self.players:
+            try:
+                if hasattr(player, "frame_reader"):
                     # 计算上一帧的时间
                     prev_frame = max(0, player.current_frame - 1)
                     
                     # 暂停视频（如果正在播放）
                     if not player.is_paused:
                         player.play_pause()
-                    
-                    # 使用临时的视频捕获器来准确读取帧
-                    cap = cv2.VideoCapture(player.video_path)
-                    
-                    # 使用逐帧读取的方式获取目标帧
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    current = 0
-                    frame = None
-                    ret = False
-                    
-                    # 读取到目标帧
-                    while current <= prev_frame:
-                        ret, temp_frame = cap.read()
-                        if not ret:
-                            break
-                        frame = temp_frame
-                        current += 1
-                    
-                    cap.release()
-                    
-                    if frame is not None:
-                        # 更新播放器状态
+
+                    # 检查是否有缓存的帧
+                    cached_frame = player.get_cached_frame(prev_frame)
+                    if cached_frame is not None:
+                        # 使用缓存的帧，避免重新读取
                         player.current_frame = prev_frame
                         player.current_time = int(prev_frame * (1000 / player.fps))
                         
                         # 应用旋转（如果有）
                         if player.rotation_angle != 0:
-                            frame = player.rotate_image(frame, player.rotation_angle)
-                            
+                            cached_frame = player.rotate_image(cached_frame, player.rotation_angle)
+                        
                         # 显示帧
-                        player.display_frame(frame)
+                        player.display_frame(cached_frame)
                         
                         # 更新进度条
                         if player.duration_ms > 0:
                             progress = (player.current_time / player.duration_ms) * 100
                             player.slider.setValue(int(progress))
-                            
-                        # 更新帧读取器的位置
+                    else:
+                        # 如果没有缓存，使用帧读取器跳转
                         player.frame_reader.seek(prev_frame)
-                
-        except Exception as e:
-            print(f"后退一帧时出错: {str(e)}")
+                        
+                        # 更新播放器状态
+                        player.current_frame = prev_frame
+                        player.current_time = int(prev_frame * (1000 / player.fps))
+                        
+                        # 更新进度条
+                        if player.duration_ms > 0:
+                            progress = (player.current_time / player.duration_ms) * 100
+                            player.slider.setValue(int(progress))
+
+            except Exception as e:
+                print(f"后退一帧时出错: {str(e)}")
 
     def closeEvent(self, event):
         """程序关闭时的清理"""
