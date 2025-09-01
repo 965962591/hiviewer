@@ -98,10 +98,25 @@ class DragTableWidget(QTableWidget):
             # 选择项数量为1时直接获取预览区域的pixmap
             if len(urls) == 1:
                 # 直接获取主界面预览区域的pixmap
-                if hasattr(self.main_window, 'image_viewer') and hasattr(self.main_window.image_viewer, 'pixmap_item'):
-                    _pixmap = self.main_window.image_viewer.pixmap_item.pixmap()
-                    preview = _pixmap.scaled(128, 128, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                else:
+                try:
+                    if (hasattr(self.main_window, 'image_viewer') 
+                        and self.main_window.image_viewer is not None
+                        and hasattr(self.main_window.image_viewer, 'pixmap_item')
+                        and self.main_window.image_viewer.pixmap_item is not None
+                        and hasattr(self.main_window.image_viewer.pixmap_item, 'pixmap')):
+                        
+                        _pixmap = self.main_window.image_viewer.pixmap_item.pixmap()
+                        if _pixmap and not _pixmap.isNull():
+                            preview = _pixmap.scaled(128, 128, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                    else:
+                        file_type = file_path_list[0].split(".")[-1]
+                        preview = self.create_preview_image(f"{file_type}")
+                except RuntimeError:
+                    # QGraphicsPixmapItem 已被删除，使用默认预览
+                    file_type = file_path_list[0].split(".")[-1]
+                    preview = self.create_preview_image(f"{file_type}")
+                except Exception as e:
+                    print(f"获取预览pixmap时发生错误: {e}")
                     file_type = file_path_list[0].split(".")[-1]
                     preview = self.create_preview_image(f"{file_type}")
 

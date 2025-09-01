@@ -217,7 +217,7 @@ def log_error_decorator(tips="程序异常! "):
         @wraps(func)
         def wrapper(*args, **kwargs):
             try: # 执行函数
-                logging.info(f"{func.__name__}()-->执行函数任务")
+                logging.info(f"{func.__name__}()-->执行函数任务,{tips}")
                 result = func(*args, **kwargs)
                 return result
             except Exception as e:

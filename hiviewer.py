@@ -2225,14 +2225,31 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def clear_preview_layout(self):
         """清空预览区域"""
         try:
+            # 清理 image_viewer 引用
+            if hasattr(self, 'image_viewer') and self.image_viewer:
+                try:
+                    # 先调用自定义清理方法
+                    if hasattr(self.image_viewer, 'cleanup'):
+                        self.image_viewer.cleanup()
+                    # 然后删除对象
+                    self.image_viewer.deleteLater()
+                except Exception as e:
+                    self.logger.error(f"clear_preview_layout()-->清理image_viewer失败: {e}")
+                finally:
+                    self.image_viewer = None
+            
+            # 清理布局中的所有组件
             while self.verticalLayout_left_2.count():
                 item = self.verticalLayout_left_2.takeAt(0)
                 widget = item.widget()
                 if widget:
-                    widget.deleteLater()
+                    try:
+                        widget.deleteLater()
+                    except Exception as e:
+                        self.logger.error(f"clear_preview_layout()-->清理widget失败: {e}")
         except Exception as e:
-            print(f"[clear_preview_layout]-->清空预览区域失败: {e}")
-            self.logger.error(f"clear_preview_layout-->清空预览区域 | 报错: {e}")
+            show_message_box("清空预览区域报错!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
+            self.logger.error(f"【clear_preview_layout】-->清空预览区域 | 报错: {e}")
 
     
     def create_image_preview(self, path):
@@ -2240,122 +2257,91 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         try:
             # 清空旧预览内容
             self.clear_preview_layout()
-            # 创建 ImageViewer 实例
+            # 创建 ImageViewer 实例-->加载图片-->添加到layout
             self.image_viewer = ImageViewer(self.Left_QFrame)
-            # 加载图片
             self.image_viewer.load_image(path)
-            # 添加 ImageViewer 到 layout
             self.verticalLayout_left_2.addWidget(self.image_viewer)
-            # 调整 self.Left_QFrame 的尺寸策略
             self.Left_QFrame.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         except Exception as e:
-            self.show_preview_error("图片预览不可用")
+            show_message_box("创建图片预览报错!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
             self.logger.error(f"【create_image_preview】-->创建图片预览 | 报错: {e}")
 
 
     def show_preview_error(self, message):
         """显示预览错误信息"""
-        # 显示错误信息
-        error_label = QLabel(message)
-        error_label.setStyleSheet("color: white;")
-        error_label.setFont(self.custom_font_jetbrains)
-        error_label.setAlignment(Qt.AlignCenter)
-        self.verticalLayout_left_2.addWidget(error_label)
+        try:
+            error_label = QLabel(message)
+            error_label.setStyleSheet("color: white;")
+            error_label.setFont(self.custom_font_jetbrains)
+            error_label.setAlignment(Qt.AlignCenter)
+            self.verticalLayout_left_2.addWidget(error_label)
+        except Exception as e:
+            show_message_box("显示预览错误信息报错!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
+            self.logger.error(f"【show_preview_error】-->显示预览错误信息 | 报错：{e}")
 
     def handle_sort_option(self):
         """处理排序选项"""
-        print("[handle_sort_option]-->处理排序选项")
         try:
+            self.logger.info(f"handle_sort_option()-->执行函数任务，处理排序下拉框事件")
             sort_option = self.RT_QComboBox2.currentText()
             if self.simple_mode:
                 if sort_option == "按曝光时间排序" or sort_option == "按曝光时间逆序排序":
-                    # 弹出提示框
+                    # 弹出提示框，设置排序选项为默认排序
                     show_message_box("极简模式下不使能曝光时间排序，\nALT+I快捷键可切换进入极简模式", "提示", 1000)
-                    # 设置排序选项为默认排序
                     self.RT_QComboBox2.setCurrentText("按文件名称排序")
-                    
                 elif sort_option == "按ISO排序" or sort_option == "按ISO逆序排序":
-                    # 弹出提示框    
-                    show_message_box("极简模式下不使能ISO排序，\nALT+I快捷键可切换进入极简模式", "提示", 1000)
-                    # 设置排序选项为默认排序
+                    # 弹出提示框，设置排序选项为默认排序
+                    show_message_box("极简模式下不使能ISO排序, \nALT+I快捷键可切换进入极简模式", "提示", 1000)
                     self.RT_QComboBox2.setCurrentText("按文件名称排序")
-            # 更新右侧表格
-            self.update_RB_QTableWidget0()  
+            self.update_RB_QTableWidget0() # 更新右侧表格 
         except Exception as e:
-            print(f"[handle_sort_option]-->处理排序选项失败: {e}")
+            show_message_box("处理排序下拉框事件!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
+            self.logger.error(f"【handle_sort_option】-->处理排序下拉框事件 | 报错：{e}")
 
-    def handle_theme_selection(self):
-        """处理下拉框选择"""
-        # 获取下拉框的当前选择
-        print("[handle_theme_selection]-->处理下拉框选择")
-        try:
-            selected_theme = self.RT_QComboBox3.currentText()
-            if selected_theme == "默认主题":
-                self.current_theme = "默认主题"
-            elif selected_theme == "暗黑主题":  # 修改为 "暗黑主题"
-                self.current_theme = "暗黑主题"
-            
-            # 更新主题
-            self.apply_theme()
-        except Exception as e:
-            print(f"[handle_theme_selection]-->处理下拉框选择失败: {e}")
 
+    @log_error_decorator(tips=f"处理主题切换下拉框选择事件")
+    def handle_theme_selection(self, index=None):
+        """处理下拉框选择事件"""
+        self.current_theme = "默认主题" if self.RT_QComboBox3.currentText() == "默认主题" else "暗黑主题"
+        self.apply_theme()
+    
     def toggle_theme(self):
         """切换主题"""
-        try:
-            if self.current_theme == "默认主题":
-                self.current_theme = "暗黑主题"
-            else:
-                self.current_theme = "默认主题"
-
-            # 更新主题
-            self.logger.info(f"toggle_theme()-->切换到{self.current_theme}")
-            self.apply_theme()
-        except Exception as e:
-            self.logger.error(f"toggle_theme()-->切换主题失败: {e}")
+        self.current_theme = "暗黑主题" if self.current_theme == "默认主题" else "默认主题"
+        self.apply_theme()
 
     def apply_theme(self):
         """初始化主题"""
         try:
-            if self.current_theme == "暗黑主题":
-                self.setStyleSheet(self.dark_style())     # 暗黑主题
-            else:
-                self.setStyleSheet(self.default_style())  # 默认主题
             self.logger.info(f"apply_theme()-->当前主题更新为{self.current_theme}")
+            self.setStyleSheet(self.dark_style() if self.current_theme == "暗黑主题" else self.default_style())
         except Exception as e:
-            self.logger.error(f"apply_theme()-->应用当前主题失败: {e}")
-
+            self.logger.error(f"【apply_theme】-->更新主题 | 报错：{e}")
 
     def default_style(self):
         """返回默认模式的样式表"""
-
         # 定义通用颜色变量
         BACKCOLOR = self.background_color_default  # 浅蓝色背景
         FONTCOLOR = self.font_color_default        # 默认字体颜色
         GRAY = "rgb(127, 127, 127)"                # 灰色
         WHITE = "rgb(238,238,238)"                 # 白色
         QCOMBox_BACKCOLOR = "rgb(255,242,223)"     # 下拉框背景色
-
-        
         table_style = f"""
             QTableWidget#RB_QTableWidget0 {{
                 /* 表格整体样式 */
                 background-color: {GRAY};
                 color: {FONTCOLOR};
             }}
-            
             QTableWidget#RB_QTableWidget0::item {{
                 /* 单元格样式 */
                 background-color: {GRAY};
                 color: {FONTCOLOR};
             }}
-            
             QTableWidget#RB_QTableWidget0::item:selected {{
                 /* 选中单元格样式 */
                 background-color: {BACKCOLOR};
                 color: {FONTCOLOR};
             }}
-            
             /* 添加表头样式 */
             QHeaderView::section {{
                 background-color: {BACKCOLOR};
@@ -2366,7 +2352,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 font-family: "{self.custom_font.family()}";
                 font-size: {self.custom_font.pointSize()}pt;
             }}
-            
             /* 修改左上角区域样式 */
             QTableWidget#RB_QTableWidget0::corner {{
                 background-color: {BACKCOLOR};  /* 设置左上角背景色 */
@@ -2381,7 +2366,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 border: 1px solid {GRAY};
             }}
         """
-
         # 按钮组件和复选框组件样式
         button_style = f"""
             QPushButton {{
@@ -2397,7 +2381,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 color: {FONTCOLOR};
             }}
         """
-
         # 左侧文件浏览区域样式 使用 QFrame 包裹 QTreeView,可以不破坏圆角
         left_area_style = f"""
             QTreeView#Left_QTreeView {{
@@ -2410,7 +2393,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 background: {GRAY};       /* 纵向滚动条背景色 */
                 width: 5px;               /* 设置滚动条高度 */
             }}
-
             QScrollBar:horizontal {{
                 background: {GRAY};        /* 横向滚动条背景色 */
                 height: 5px;               /* 设置滚动条高度 */
@@ -2423,7 +2405,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 background: none; /* 隐藏箭头 */
             }}
         """
-        
         # 下拉框通用样式模板
         combobox_style = f"""
             QComboBox {{
@@ -2436,7 +2417,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 font-family: "{self.custom_font.family()}";
                 font-size: {self.custom_font.pointSize()}pt;
             }}
-            
             QComboBox QAbstractItemView {{
                 /* 下拉列表样式 */
                 background-color: {QCOMBox_BACKCOLOR};
@@ -2446,7 +2426,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 font-family: "{self.custom_font.family()}";
                 font-size: {self.custom_font.pointSize()}pt;
             }}
-            
             QComboBox QAbstractItemView::item {{
                 /* 下拉项样式 */
                 min-height: 25px;
@@ -2454,14 +2433,11 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 font-family: "{self.custom_font.family()}";
                 font-size: {self.custom_font.pointSize()}pt;
             }}
-
             QComboBox::hover {{
                 background-color: {BACKCOLOR};
                 color: {FONTCOLOR};
             }}  
-
         """
-
         # 下拉框通用样式模板2
         combobox_style2 = f"""
             QComboBox {{
@@ -2474,7 +2450,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 font-family: "{self.custom_font.family()}";
                 font-size: {self.custom_font.pointSize()}pt;
             }}
-            
             QComboBox QAbstractItemView {{
                 /* 下拉列表样式 */
                 background-color: {QCOMBox_BACKCOLOR};
@@ -2484,7 +2459,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 font-family: "{self.custom_font.family()}";
                 font-size: {self.custom_font.pointSize()}pt;
             }}
-            
             QComboBox QAbstractItemView::item {{
                 /* 下拉项样式 */
                 min-height: 25px;
@@ -2494,7 +2468,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             }}
 
         """
-
         # 标签的样式表
         statusbar_label_style = f"""
             QLabel {{
@@ -2511,7 +2484,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 color: {FONTCOLOR};
             }}*/
         """
-
         # 普通按钮样式表
         statusbar_button_style = f"""
             QPushButton {{
@@ -2527,7 +2499,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 color: {FONTCOLOR};
             }}
         """
-
         # 检查到新版本的按钮样式表
         statusbar_button_style_version = f"""
             QPushButton {{
@@ -2544,8 +2515,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 color: {FONTCOLOR};
             }}
         """        
-
-        # self.custom_font_jetbrains_small   "rgb(234, 211, 32)"
         statusbar_style = f"""
             border: none;
             background-color: {GRAY};
@@ -2554,8 +2523,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
             
         """
-
-
         # 设置左上侧文件浏览区域样式
         self.Left_QTreeView.setStyleSheet(left_area_style)
         # 设置左下角侧框架样式
@@ -2585,7 +2552,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.statusbar_label0.setStyleSheet(statusbar_label_style)
         self.statusbar_label1.setStyleSheet(statusbar_label_style)
 
-
         # 返回主窗口样式
         return f""" 
                 /* 浅色模式 */
@@ -2593,34 +2559,28 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
     def dark_style(self):
             """返回暗黑模式的样式表"""
-
             BACKCOLOR_ = self.background_color_default  # 配置中的背景色
             # 定义通用颜色变量
             BACKCOLOR = "rgb( 15, 17, 30)"   # 浅蓝色背景
             GRAY = "rgb(127, 127, 127)"      # 灰色
             WHITE = "rgb(238,238,238)"       # 白色
             BLACK = "rgb( 34, 40, 49)"       # 黑色
-
-            
             table_style = f"""
                 QTableWidget#RB_QTableWidget0 {{
                     /* 表格整体样式 */
                     background-color: {BLACK};
                     color: {WHITE};
                 }}
-                
                 QTableWidget#RB_QTableWidget0::item {{
                     /* 单元格样式 */
                     background-color: {GRAY};
                     color: {BLACK};
                 }}
-                
                 QTableWidget#RB_QTableWidget0::item:selected {{
                     /* 选中单元格样式 */
                     background-color: {BLACK};
                     color: {WHITE};
                 }}
-                
                 /* 添加表头样式 */
                 QHeaderView::section {{
                     background-color: {BLACK};
@@ -2631,12 +2591,10 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     font-family: "{self.custom_font.family()}";
                     font-size: {self.custom_font.pointSize()}pt;
                 }}
-              
                 /* 设置空列头的背景色 */
                 QTableWidget::verticalHeader {{
                     background-color: {BACKCOLOR}; /* 空列头背景色 */
                 }}                
-                
                 /* 修改滚动条样式 */
                 QScrollBar:vertical {{
                     background: {BLACK}; /* 滚动条背景 */
@@ -2678,7 +2636,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     border: 1px solid {GRAY};
                 }}
             """
-
             # 按钮组件和复选框组件样式
             button_style = f"""
                 QPushButton {{
@@ -2693,8 +2650,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     background-color: {BACKCOLOR};
                 }}
             """
-
-
             # 左侧文件浏览区域样式
             left_area_style = f"""
                 QTreeView#Left_QTreeView {{
@@ -2702,7 +2657,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     color: {WHITE};
                     border-radius: 10px;
                 }}
-
                 /* 修改滚动条样式 */
                 QScrollBar:vertical {{
                     background: {BLACK}; /* 滚动条背景 */
@@ -2734,9 +2688,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 QScrollBar::left-arrow:horizontal, QScrollBar::right-arrow:horizontal {{
                     background: none; /* 隐藏箭头 */
                 }}
-
             """
-            
             # 下拉框通用样式模板
             combobox_style = f"""
                 QComboBox {{
@@ -2749,7 +2701,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     font-family: "{self.custom_font.family()}";
                     font-size: {self.custom_font.pointSize()}pt;
                 }}
-                
                 QComboBox QAbstractItemView {{
                     /* 下拉列表样式 */
                     background-color: {BLACK};
@@ -2759,7 +2710,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     font-family: "{self.custom_font.family()}";
                     font-size: {self.custom_font.pointSize()}pt;
                 }}
-                
                 QComboBox QAbstractItemView::item {{
                     /* 下拉项样式 */
                     min-height: 25px;
@@ -2767,14 +2717,12 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     font-family: "{self.custom_font.family()}";
                     font-size: {self.custom_font.pointSize()}pt;
                 }}
-
                 QComboBox::hover {{
                     background-color: {BACKCOLOR};
                     color: {WHITE};
                 }}  
 
             """
-
             # 下拉框通用样式模板2
             combobox_style2 = f"""
                 QComboBox {{
@@ -2787,7 +2735,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     font-family: "{self.custom_font.family()}";
                     font-size: {self.custom_font.pointSize()}pt;
                 }}
-                
                 QComboBox QAbstractItemView {{
                     /* 下拉列表样式 */
                     background-color: {WHITE};
@@ -2797,7 +2744,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     font-family: "{self.custom_font.family()}";
                     font-size: {self.custom_font.pointSize()}pt;
                 }}
-                
                 QComboBox QAbstractItemView::item {{
                     /* 下拉项样式 */
                     min-height: 25px;
@@ -2805,18 +2751,13 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     font-family: "{self.custom_font.family()}";
                     font-size: {self.custom_font.pointSize()}pt;
                 }}
-
             """
-    
-    
             statusbar_label_style = f"""
                 border: none;
                 color: {WHITE};
                 font-family: {self.custom_font_jetbrains_small.family()};
                 font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
-                
             """
-
             statusbar_button_style = f"""
                 QPushButton {{
                     background-color: {BLACK};
@@ -2831,7 +2772,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     color: {WHITE};
                 }}
             """
-
             statusbar_button_style_version = f"""
                 QPushButton {{
                     background-color: {"rgb(245,108,108)"};
@@ -2846,28 +2786,22 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     color: {WHITE};
                 }}
             """  
-
             statusbar_style = f"""
                 border: none;
                 background-color: {BLACK};
                 color: {WHITE};
             """
-
-
             # 设置左上侧文件浏览区域样式
             self.Left_QTreeView.setStyleSheet(left_area_style)
 
             # 设置左下角侧框架样式
             self.Left_QFrame.setStyleSheet(left_qframe_style)
 
-
             # 设置右侧顶部按钮下拉框样式
             self.RT_QPushButton3.setStyleSheet(button_style)
             self.RT_QPushButton5.setStyleSheet(button_style)
-
             self.RT_QComboBox.setStyleSheet(combobox_style2)
             self.RT_QComboBox1.setStyleSheet(combobox_style2)
-
             self.RT_QComboBox0.setStyleSheet(combobox_style)
             self.RT_QComboBox2.setStyleSheet(combobox_style)
             self.RT_QComboBox3.setStyleSheet(combobox_style)
@@ -2880,14 +2814,12 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.statusbar_button1.setStyleSheet(statusbar_button_style)
             self.statusbar_button3.setStyleSheet(statusbar_button_style)
             # 设置版本按钮更新样式
+            self.statusbar_button2.setStyleSheet(statusbar_button_style)
             if self.new_version_info:
                 self.statusbar_button2.setStyleSheet(statusbar_button_style_version)
-            else:
-                self.statusbar_button2.setStyleSheet(statusbar_button_style)
             self.statusbar_label.setStyleSheet(statusbar_label_style)
             self.statusbar_label0.setStyleSheet(statusbar_label_style)
             self.statusbar_label1.setStyleSheet(statusbar_label_style)
-
             # 返回主窗口样式
             return f"""
                 QWidget#main_body {{ /* 主窗口背景色 */
@@ -2947,26 +2879,153 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     color: white;
                 }}
                 
-                /* 表格样式 */
-                
             """
 
+    @log_error_decorator(tips="清理资源")
     def cleanup(self):
-        """清理资源"""
-        self.cancel_preloading()
-        if self.compare_window:
-            self.compare_window.deleteLater()
-            self.compare_window = None
-            
-        self.threadpool.clear()
-        self.threadpool.waitForDone()
+        """清理资源 - 优化版本"""
+        try:
+            # 1. 取消预加载任务
+            self.cancel_preloading()
+            # 2. 清理所有子窗口
+            self._cleanup_sub_windows()
+            # 3. 清理所有工具窗口
+            self._cleanup_tool_windows()
+            # 4. 清理所有对话框
+            self._cleanup_dialogs()
+            # 5. 清理所有线程
+            self._cleanup_threads()
+            # 6. 清理线程池
+            if hasattr(self, 'threadpool'):
+                self.threadpool.clear()
+                self.threadpool.waitForDone()
+            # 7. 清理压缩相关资源
+            self._cleanup_compression_resources()
+            # 10. 清理表格数据
+            if hasattr(self, 'RB_QTableWidget0'):
+                self.RB_QTableWidget0.clear()
+                self.RB_QTableWidget0.setRowCount(0)
+                self.RB_QTableWidget0.setColumnCount(0)
+            # 11. 清理列表数据
+            self.files_list = []
+            self.paths_list = []
+            self.dirnames_list = []
+            self.preloading_file_name_paths = []
+            # 12. 强制垃圾回收
+            gc.collect()
+            self.logger.info("cleanup()-->资源清理完成")
+        except Exception as e:
+            self.logger.error(f"cleanup()-->资源清理过程中发生错误: {e}")
+    
+    def _cleanup_sub_windows(self):
+        """清理所有子窗口"""
+        # 清理看图子窗口
+        if hasattr(self, 'compare_window') and self.compare_window:
+            try:
+                self.compare_window.deleteLater()
+                self.compare_window = None
+            except Exception as e:
+                self.logger.error(f"_cleanup_sub_windows()-->清理compare_window失败: {e}")
         
-        gc.collect()
+        # 清理视频播放器
+        if hasattr(self, 'video_player') and self.video_player:
+            try:
+                self.video_player.deleteLater()
+                self.video_player = None
+            except Exception as e:
+                self.logger.error(f"_cleanup_sub_windows()-->清理video_player失败: {e}")
+        
+        # 清理搜索窗口
+        if hasattr(self, 'search_window') and self.search_window:
+            try:
+                self.search_window.deleteLater()
+                self.search_window = None
+            except Exception as e:
+                self.logger.error(f"_cleanup_sub_windows()-->清理search_window失败: {e}")
+    
+    def _cleanup_tool_windows(self):
+        """清理所有工具窗口"""
+        tool_windows = [
+            'rename_tool',
+            'image_process_window', 
+            'bat_tool',
+            'raw2jpg_tool'
+        ]
+        
+        for tool_name in tool_windows:
+            if hasattr(self, tool_name) and getattr(self, tool_name):
+                try:
+                    tool = getattr(self, tool_name)
+                    tool.deleteLater()
+                    setattr(self, tool_name, None)
+                except Exception as e:
+                    self.logger.error(f"_cleanup_tool_windows()-->清理{tool_name}失败: {e}")
+    
+    def _cleanup_dialogs(self):
+        """清理所有对话框"""
+        # 清理帮助对话框
+        if hasattr(self, 'help_dialog') and self.help_dialog:
+            try:
+                del self.help_dialog
+            except Exception as e:
+                self.logger.error(f"_cleanup_dialogs()-->清理help_dialog失败: {e}")
+        
+        # 清理进度对话框
+        if hasattr(self, 'progress_dialog') and self.progress_dialog:
+            try:
+                self.progress_dialog.close()
+                self.progress_dialog.deleteLater()
+                self.progress_dialog = None
+            except Exception as e:
+                self.logger.error(f"_cleanup_dialogs()-->清理progress_dialog失败: {e}")
+    
+    def _cleanup_threads(self):
+        """清理所有线程"""
+        thread_names = [
+            'qualcom_thread',
+            'mtk_thread', 
+            'unisoc_thread',
+            'compress_worker'
+        ]
+        
+        for thread_name in thread_names:
+            if hasattr(self, thread_name) and getattr(self, thread_name):
+                try:
+                    thread = getattr(self, thread_name)
+                    # 对于QThread类型的线程
+                    if hasattr(thread, 'quit') and hasattr(thread, 'wait'):
+                        thread.quit()
+                        if not thread.wait(1000):  # 等待1秒
+                            thread.terminate()  # 强制终止
+                            thread.wait(1000)
+                    # 对于QRunnable类型的工作线程
+                    elif hasattr(thread, 'cancel'):
+                        thread.cancel()
+                    # 清理引用
+                    if hasattr(thread, 'deleteLater'):
+                        thread.deleteLater()
+                    setattr(self, thread_name, None)
+                except Exception as e:
+                    self.logger.error(f"_cleanup_threads()-->清理{thread_name}失败: {e}")
+    
+    def _cleanup_compression_resources(self):
+        """清理压缩相关资源"""
+        # 清理压缩工作线程
+        if hasattr(self, 'compress_worker') and self.compress_worker:
+            try:
+                self.compress_worker.cancel()
+                self.compress_worker = None
+            except Exception as e:
+                self.logger.error(f"_cleanup_compression_resources()-->清理compress_worker失败: {e}")
+        
+        # 清理压缩包路径
+        if hasattr(self, 'zip_path'):
+            self.zip_path = None
 
     @log_performance_decorator(tips="从JSON文件加载之前的设置", log_args=False, log_result=False)
     def load_settings(self):
         """从JSON文件加载设置"""
-        print("[load_settings]-->从JSON文件加载之前的设置")
+        self.logger.info("load_settings()-->执行函数任务, 从JSON文件加载之前的设置")
         try:
             settings_path = os.path.join(os.path.dirname(__file__), "config", "basic_settings.json")
             if os.path.exists(settings_path):
@@ -3004,7 +3063,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     # 恢复文件夹选择状态
                     all_items = settings.get("combobox1_all_items", [])
                     checked_items = settings.get("combobox1_checked_items", [])
-                    
                     if all_items:
                         self.model = CheckBoxListModel(all_items)
                         self.RT_QComboBox1.setModel(self.model)
@@ -3034,11 +3092,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     self.api_flag = settings.get("api_flag", False)
                     self.statusbar_checkbox.setChecked(self.api_flag)
                     self.fast_api_switch()
-
             else:
                 # 若没有cache/设置，则在此初始化主题设置--默认主题
                 self.apply_theme()
-
         except Exception as e:
             print(f"[load_settings]-->加载设置时出错: {e}")
             return
@@ -3295,10 +3351,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """
         self.logger.info("on_p_pressed()-->P键已按下, 准备切换主题")
         try:
-            # 设置下拉框显示并更新
+            # 设置下拉框显示并切换主题
             theme = "暗黑主题" if self.current_theme == "默认主题" else "默认主题"
             self.RT_QComboBox3.setCurrentIndex(self.RT_QComboBox3.findText(theme))
-            # 切换主题
             self.toggle_theme()
         except Exception as e:
             self.logger.error(f"【on_p_pressed】-->P键按下事件报错: {e}")
@@ -3866,10 +3921,31 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def closeEvent(self, event):
         """重写关闭事件以保存设置和清理资源"""
         self.logger.info("closeEvent()-->触发【hiviewer.exe】主程序关闭事件")
-        self.save_settings()
-        self.cleanup() 
-        self.logger.info("closeEvent()-->接受【hiviewer.exe】关闭事件, 成功保存配置并清理内存！")
-        event.accept()
+        try:
+            # 保存设置
+            self.save_settings()
+            # 清理资源
+            self.cleanup()
+            # 等待一小段时间确保清理完成
+            QTimer.singleShot(100, lambda: self._final_cleanup())
+            self.logger.info("closeEvent()-->接受【hiviewer.exe】关闭事件, 成功保存配置并清理内存！")
+        except Exception as e:
+            self.logger.error(f"closeEvent()-->关闭事件处理失败: {e}")
+        finally:
+            event.accept()
+    
+    def _final_cleanup(self):
+        """最终清理，确保所有资源都被释放"""
+        try:
+            # 再次强制垃圾回收
+            gc.collect()
+            # 清理任何剩余的定时器
+            if hasattr(self, 'splash_progress_timer'):
+                self.splash_progress_timer.stop()
+            # 记录最终清理完成
+            self.logger.info("_final_cleanup()-->最终清理完成")
+        except Exception as e:
+            self.logger.error(f"_final_cleanup()-->最终清理失败: {e}")
 
 
 """
