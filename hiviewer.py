@@ -22,6 +22,8 @@ BASEICONPATH = Path(sys.argv[0]).parent
 
 """记录程序启动时间"""
 import time
+
+from cv2 import randShuffle
 flag_start = time.time()
 
 """导入python内置模块"""
@@ -150,11 +152,13 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.dirnames_list = []                 # 选中的同级文件夹列表
         self.image_index_max = []               # 存储当前选中及复选框选中的，所有图片列有效行最大值
         self.preloading_file_name_paths = []    # 预加载图标前的文件路径列表
+        self.additional_folders_for_table = []  # 存储通过右键菜单添加到表格的文件夹的完整路径
         self.compare_window = None              # 添加子窗口引用
         self.last_key_press = False             # 记录第一次按下键盘空格键或B键
         self.left_tree_file_display = False     # 设置左侧文件浏览器初始化标志位，只显示文件夹
         self.simple_mode = True                 # 设置默认模式为简单模式，同EXIF信息功能
         self.current_theme = "默认主题"          # 设置初始主题为默认主题
+        
 
         # 添加预加载相关的属性初始化
         self.current_preloader = None 
@@ -520,7 +524,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 添加常用操作
         show_file_action = self.treeview_context_menu.addAction(
             "显示所有文件" if not self.left_tree_file_display else "隐藏所有文件")
+        add_to_table_action = self.treeview_context_menu.addAction("添加到表格")
         send_path_to_aebox = self.treeview_context_menu.addAction("发送到aebox")
+        
 
         zoom_action = self.treeview_context_menu.addAction("按zoom分类")
         size_action = self.treeview_context_menu.addAction("按size分类")
@@ -544,6 +550,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             show_file_action.triggered.connect(self.show_file_visibility)
             breakup_acton.triggered.connect(lambda: self.breakup_folder(file_path))
             delete_action.triggered.connect(lambda: self.delete_file(file_path))
+            add_to_table_action.triggered.connect(lambda: self.add_folder_to_table(file_path))
 
             # 连接zoom值分类信号槽函数
             zoom_action.triggered.connect(lambda: self.zoom_file(file_path))
@@ -773,23 +780,44 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     """
     左侧信号槽函数
     """
+
     def show_file_visibility(self):
         """设置左侧文件浏览器的显示"""
-        self.left_tree_file_display = not self.left_tree_file_display
+        try:
+            # 标志位为 TRUE 时，显示所有文件
+            self.left_tree_file_display = not self.left_tree_file_display
+            if self.left_tree_file_display:
+                self.file_system_model.setFilter(QDir.NoDot | QDir.NoDotDot |QDir.AllEntries)  # 显示所有文件和文件夹
+                return
 
-        if not self.left_tree_file_display:
+            # 默认只显示文件夹
             self.file_system_model.setFilter(QDir.NoDot | QDir.NoDotDot | QDir.AllDirs)    # 使用QDir的过滤器,只显示文件夹  
-        else:
-            self.file_system_model.setFilter(QDir.NoDot | QDir.NoDotDot |QDir.AllEntries)  # 显示所有文件和文件夹
+        except Exception as e:
+            self.logger.error(f"【show_file_visibility】-->设置左侧文件浏览器的显示 | 报错：{e}")
+            raise e
 
     def zoom_file(self, path):
         """按zoom值分类"""
         from src.utils.cls_zoom_size import classify_images_by_zoom
+
+        # 检查路径是否为文件夹
+        if not os.path.isdir(path):
+            show_message_box("🚩选中的不是文件夹，请确保选中文件夹后重试", "提示", 1000)
+            return
+            
+        # 调用分类函数
         classify_images_by_zoom(path)
 
     def size_file(self, path):
         """按尺寸分类"""
         from src.utils.cls_zoom_size import classify_images_by_size
+
+        # 检查路径是否为文件夹
+        if not os.path.isdir(path):
+            show_message_box("🚩选中的不是文件夹，请确保选中文件夹后重试", "提示", 1000)
+            return
+
+        # 调用分类函数
         classify_images_by_size(path)
 
 
@@ -797,18 +825,16 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """解散选中的文件夹，将文件夹中的所有文件移动到上一级文件夹后删除空文件夹"""
         try:
             # 检查路径是否存在且为文件夹
-            if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
+            if not os.path.isdir(folder_path):
+                show_message_box("🚩仅支持解散文件夹，请确保选中文件夹后重试", "提示", 1500)
                 return
-
-            # 获取父文件夹路径
-            parent_folder = os.path.dirname(folder_path)
 
             # 获取文件夹中的所有文件（包括子文件夹中的文件）
             all_files = []
             for root, dirs, files in os.walk(folder_path):
                 for file in files:
-                    file_path = os.path.join(root, file)
                     # 计算相对路径，用于在父文件夹中重建目录结构
+                    file_path = os.path.join(root, file)
                     rel_path = os.path.relpath(file_path, folder_path)
                     all_files.append((file_path, rel_path))
 
@@ -817,7 +843,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 os.rmdir(folder_path)
                 return
 
-            # 移动所有文件
+            # 获取父文件夹路径,并将解散的文件夹内所有文件移动到父文件夹中
+            parent_folder = os.path.dirname(folder_path)
             for file_path, rel_path in all_files:
                 try:
                     # 构建目标路径
@@ -825,7 +852,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     target_dir = os.path.dirname(target_path)
 
                     # 创建目标目录（如果不存在）
-                    if not os.path.exists(target_dir):
+                    if not os.path.isdir(target_dir):
                         os.makedirs(target_dir, exist_ok=True)
 
                     # 处理文件名冲突
@@ -835,24 +862,21 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                         while os.path.exists(target_path):
                             target_path = f"{base_name}_{counter}{ext}"
                             counter += 1
-
                     # 移动文件
                     shutil.move(file_path, target_path)
-
                 except Exception as e:
-                    print(f"移动文件失败 {file_path}: {e}")
+                    self.logger.error(f"【breakup_folder】-->移动文件:{file_path}失败时 | 报错: {e}")
                     continue
-
             # 删除原文件夹（现在应该是空的）
             shutil.rmtree(folder_path, ignore_errors=True)
-
             # 刷新文件系统模型和表格
             self.file_system_model.setRootPath('')
             self.Left_QTreeView.viewport().update()
             self.update_RB_QTableWidget0()
-
         except Exception as e:
-            print(f"[breakup_folder]-->解散文件夹失败: {e}")
+            show_message_box("🚩处理解散文件夹任务发生错误!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
+            self.logger.error(f"【breakup_folder】-->处理解散文件夹事件时 | 报错: {e}")
+            
 
     def delete_file(self, path):
         """安全删除文件/文件夹"""
@@ -898,6 +922,26 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """复制文件路径到剪贴板"""
         clipboard = QApplication.clipboard()
         clipboard.setText(path)
+
+    def add_folder_to_table(self, folder_path):
+        """将选中的文件夹添加到右侧表格中作为新的一列"""
+        try:
+            # 检查文件夹是否存在
+            if not os.path.isdir(folder_path):
+                show_message_box("只能添加文件夹到右侧表格", "提示", 1000)
+                return
+            # 检查文件夹是否已存在
+            if folder_path in self.additional_folders_for_table:
+                show_message_box(f"文件夹 '{os.path.basename(folder_path)}' 已存在于表格中", "提示", 1000)
+                return
+            # 添加到新增的文件夹列表,更新右侧表格
+            self.additional_folders_for_table.append(folder_path)
+            self.update_RB_QTableWidget0()
+
+        except Exception as e:
+            error_msg = f"添加文件夹到表格失败: {str(e)}"
+            show_message_box(error_msg, "错误", 2000)
+            self.logger.error(f"【add_folder_to_table】-->添加文件夹到表格失败: {e}")
 
     def send_file_path_to_aebox(self, path): 
         """将文件夹路径发送到aebox"""
@@ -1689,12 +1733,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     左侧文件浏览器与地址栏联动功能函数 self.locate_in_tree_view, selfupdate_combobox
     右侧表格显示功能函数 self.update_RB_QTableWidget0()
     """
-
-
     def dragEnterEvent(self, event):
         # 如果拖入的是文件夹，则接受拖拽
         if event.mimeData().hasUrls():
-
             event.accept()
 
     def dropEvent(self, event):
@@ -1714,12 +1755,12 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         
     # 点击左侧文件浏览器时的功能函数
     def update_combobox(self, index):
-        """左侧文件浏览器点击定位更新右侧combobox函数"""
+        """左侧文件浏览器点击事件处理, 定位更新右侧combobox事件处理函数"""
         try:
-            print("[update_combobox]-->处理左侧文件浏览器点击定位更新右侧combobox事件")
-            
-            # 清空历史的已选择
+            print("[update_combobox]-->处理左侧文件浏览器点击事件,定位更新右侧combobox事件")
+            # 清空历史的已选择,清空新增的文件夹列表
             self.statusbar_label.setText(f"💦已选文件数[0]个")
+            self.additional_folders_for_table = []
 
             # 更新左侧文件浏览器中的预览区域显示-->先清空旧预览内容-->然后显示预览信息
             self.clear_preview_layout() 
@@ -1742,38 +1783,38 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.update_RB_QTableWidget0()
 
         except Exception as e:
-            self.logger.error(f"【update_combobox】-->左侧文件浏览器点击定位更新右侧combobox任务 | 报错：{e}")
+            self.logger.error(f"【update_combobox】-->左侧文件浏览器点击事件,定位更新右侧combobox事件处理函数 | 报错：{e}")
         
     # 在左侧文件浏览器中定位地址栏(RT_QComboBox)中当前显示的目录
     def locate_in_tree_view(self):
-        """左侧文件浏览器点击定位函数"""
-        print("[locate_in_tree_view]-->在左侧文件浏览器中定位地址栏路径")
+        """地址栏或者拖拽文件夹定位到左侧文件浏览器函数"""
         try:
-            current_directory = self.RT_QComboBox.currentText()
+            # 打印信息,输出日志文件,用于调试
+            print("[locate_in_tree_view]-->地址栏或拖拽文件夹路径开始定位到左侧文件浏览器中")
+            self.logger.info(f"locate_in_tree_view()-->地址栏或拖拽文件夹路径开始定位到左侧文件浏览器中")
+
             # 检查路径是否有效
-            if not os.path.exists(current_directory): 
-                print("[locate_in_tree_view]-->地址栏路径不存在")
+            current_directory = self.RT_QComboBox.currentText()
+            if not os.path.isdir(current_directory): 
+                show_message_box("🚩[locate_in_tree_view]-->地址栏文件夹路径无效，无法定位到左侧文件浏览器中", "提示", 1500)
                 return  
-            # 获取当前目录的索引
-            index = self.file_system_model.index(current_directory)  
-            # 检查索引是否有效
-            if index.isValid():
-                # 设置当前索引
-                self.Left_QTreeView.setCurrentIndex(index)    
-                # 展开该目录
-                self.Left_QTreeView.setExpanded(index, True)  
-                # 滚动到该项，确保垂直方向居中
-                self.Left_QTreeView.scrollTo(index, QAbstractItemView.PositionAtCenter)
-                
-                # 手动设置水平方向进度条
-                self.Left_QTreeView.horizontalScrollBar().setValue(0)
             
-            else:
-                print("[locate_in_tree_view]-->索引无效-无法定位")
+            # 获取当前目录的索引,并检查索引是否有效
+            index = self.file_system_model.index(current_directory)
+            if not index.isValid():
+                show_message_box("🚩[locate_in_tree_view]-->索引无效，无法定位到左侧文件浏览器中", "提示", 1500)
+                return
+
+            # 设置当前索引,展开该目录,滚动到该项，确保垂直方向居中,水平滚动条置0
+            self.Left_QTreeView.setCurrentIndex(index)    
+            self.Left_QTreeView.setExpanded(index, True)  
+            self.Left_QTreeView.scrollTo(index, QAbstractItemView.PositionAtCenter)
+            self.Left_QTreeView.horizontalScrollBar().setValue(0)
 
         except Exception as e:
-            print(f"[locate_in_tree_view]-->定位失败: {e}")
-            return
+            show_message_box("🚩地址栏或者拖拽文件夹路径定位到左侧文件浏览器中失败!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
+            self.logger.error(f"【locate_in_tree_view】-->地址栏或者拖拽文件夹定位到左侧文件浏览器函数 | 报错：{e}")
+            raise
 
 
     def update_RB_QTableWidget0_from_list(self, file_infos_list, file_paths, dir_name_list):
@@ -1803,7 +1844,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
         except Exception as e:
             print(f"[update_RB_QTableWidget0_from_list]-->error--从当前列表中更新表格任务失败: {e}")
-            self.logger.error(f"[update_RB_QTableWidget0_from_list]-->从当前列表中更新表格任务失败: {e}")
+            self.logger.error(f"【update_RB_QTableWidget0_from_list】-->从当前列表中更新表格任务失败: {e}")
 
 
     def update_RB_QTableWidget0(self):
@@ -1840,7 +1881,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 self.start_image_preloading(file_name_paths)
 
         except Exception as e:
-            self.logger.error(f"update_RB_QTableWidget0()-->执行报错--更新右侧表格功能函数任务失败: {e}")
+            self.logger.error(f"【update_RB_QTableWidget0】-->更新右侧表格功能函数任务时 | 报错: {e}")
 
     def init_table_structure(self, file_name_list, dir_name_list):
         """初始化表格结构和内容，不包含图标"""
@@ -1923,6 +1964,11 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # 构建所有需要显示的文件夹路径
             selected_folders_path = [os.path.join(parent_directory, path) for path in selected_folders]
             selected_folders_path.insert(0, current_directory)  # 将当前选中的文件夹路径插入到列表的最前面
+            
+            # 添加通过右键菜单添加到表格的文件夹
+            for folder_path in self.additional_folders_for_table:
+                if folder_path not in selected_folders_path:
+                    selected_folders_path.append(folder_path)
             
             # 检测当前文件夹路径是否包含文件，没有则剔除该文件夹，修复多级空文件夹显示错乱的bug
             selected_option = self.RT_QComboBox0.currentText()
@@ -2060,7 +2106,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """
         filename = os.path.basename(file_path)
         folder = os.path.basename(os.path.dirname(file_path))
-        
         # 先在每一行中查找文件名
         for row in range(self.RB_QTableWidget0.rowCount()):
             # 遍历每一列查找匹配的文件夹
@@ -2077,7 +2122,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def update_preload_progress(self, current, total):
         """处理预加载进度"""
         try:
-            # 更新状态栏信息显示
             self.statusbar_label1.setText(f"📢:图标加载进度...{current}/{total}🍃")
         except Exception as e:
             self.logger.error(f"【update_preload_progress】-->处理预加载进度时 | 报错: {e}")    
@@ -2919,6 +2963,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.paths_list = []
             self.dirnames_list = []
             self.preloading_file_name_paths = []
+            self.additional_folders_for_table = []
             # 12. 强制垃圾回收
             gc.collect()
             self.logger.info("cleanup()-->资源清理完成")

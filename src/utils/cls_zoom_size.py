@@ -59,6 +59,7 @@ def classify_images_by_zoom(source_folder):
 
         except Exception as e:
             print(f"\n❌ 处理文件 {filename} 失败: {str(e)}")
+            raise
 
     # 预过滤图片文件
     files = [f for f in os.listdir(source_folder) 
@@ -121,6 +122,7 @@ def classify_images_by_size(source_folder):
 
         except Exception as e:
             print(f"\n❌ 处理文件 {filename} 失败: {str(e)}")
+            raise
 
     # 预过滤图片文件
     files = [f for f in os.listdir(source_folder) 
