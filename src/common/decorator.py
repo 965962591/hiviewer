@@ -216,13 +216,18 @@ def log_error_decorator(tips="程序异常! "):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            try: # 执行函数
-                logging.info(f"{func.__name__}()-->执行函数任务,{tips}")
+            try:
+                # 提示信息
+                print(f"[{func.__name__}]-->执行函数任务,{tips}")
+                logging.info(f"[{func.__name__}]-->执行函数任务,{tips}")
+                
+                # 执行函数
                 result = func(*args, **kwargs)
+
+                # 返回执行结果
                 return result
             except Exception as e:
-                from src.components.custom_qMbox_showinfo import show_message_box
-                show_message_box(f"🚩{tips}发生错误!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
+                print(f"[{func.__name__}]-->error--{tips} | 报错: {str(e)}")
                 logging.error(f"【{func.__name__}】-->{tips} | 报错: {str(e)}", exc_info=True)
                 raise e
         return wrapper
@@ -247,7 +252,7 @@ def log_performance_decorator(tips=None, log_args=True, log_result=True):
                 if log_args:
                     logging.debug(f"开始执行: {op_name} | 参数: args={args}, kwargs={kwargs}")
                 else:
-                    logging.info(f"{func.__name__}()-->开始执行--函数说明：{tips}")
+                    logging.info(f"[{func.__name__}]-->开始执行--函数说明：{tips}")
                 
                 # 执行函数
                 result = func(*args, **kwargs)
@@ -258,14 +263,14 @@ def log_performance_decorator(tips=None, log_args=True, log_result=True):
                 if log_result:
                     logging.info(f"执行完成: {op_name} | 耗时: {duration:.3f}s | 结果: {result}")
                 else:
-                    logging.info(f"{func.__name__}()-->执行完成 | 耗时: {duration:.3f}s | 结果: {result}")
+                    logging.info(f"[{func.__name__}]-->执行完成 | 耗时: {duration:.3f}s | 结果: {result}")
                 
                 return result
                 
             except Exception as e:
                 end_time = time.time()
                 duration = end_time - start_time
-                logging.error(f"{func.__name__}()--执行失败!!! | 耗时: {duration:.3f}s | 错误: {str(e)}", exc_info=True)
+                logging.error(f"【{func.__name__}】--执行失败!!! | 耗时: {duration:.3f}s | 错误: {str(e)}", exc_info=True)
                 raise e
                 
         return wrapper
