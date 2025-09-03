@@ -88,7 +88,6 @@ class MultiFontManager:
                 except Exception as e:
                     print(f"[initialize]-->字体初始化错误: {e}")
                     cls._initialized[font_path] = True
-        # print("[initialize]-->多字体类-MultiFontManager--初始化成功")
 
     @classmethod
     def get_font(cls, font_family, size=12):

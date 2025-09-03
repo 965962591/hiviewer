@@ -115,7 +115,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 创建启动画面、启动画面、显示主窗口以及相关初始化在self.update_splash_message()函数通过定时器实现
         self.create_splash_screen()
 
-    @CC_TimeDec(tips="初始化所有组件", show_time=True, show_args=False)
     @log_performance_decorator(tips="初始化所有组件", log_args=False, log_result=False)
     def initialize_components(self):
         """初始化所有组件"""
@@ -921,15 +920,11 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.logger.error(f"【open_file_location】-->在资源管理器中打开路径(适用于window系统)时 | 报错: {e}")
             raise
 
-
+    @log_error_decorator(tips="处理左侧文件浏览区复制文件路径到剪贴板事件")
     def copy_file_path(self, path): 
         """复制文件路径到剪贴板"""
-        try:
-            clipboard = QApplication.clipboard()
-            clipboard.setText(path)
-        except Exception as e:
-            self.logger.error(f"【copy_file_path】-->复制文件路径到剪贴板时 | 报错：{e}")
-            raise
+        clipboard = QApplication.clipboard()
+        clipboard.setText(path)
 
 
     def add_folder_to_table(self, folder_path):
@@ -956,7 +951,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.update_RB_QTableWidget0()
 
         except Exception as e:
-            self.logger.error(f"【add_folder_to_table】-->添加文件夹到表格失败: {e}")
+            print(f"[add_folder_to_table]-->error--添加文件夹到表格时 | 报错: {e}")
+            self.logger.error(f"【add_folder_to_table】-->添加文件夹到表格时 | 报错: {e}")
             raise
 
     def send_file_path_to_aebox(self, path): 
@@ -974,30 +970,26 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 show_message_box(f"未启用Fast_API功能, 请先手动打开界面底部复选框启用", "提示", 1500)
                 return
 
-            # url编码
-            image_path_url = urlencode_folder_path(path)
-            if image_path_url:
-                # 拼接文件夹
+            # 获取url编码，拼接文件夹, 发送请求通信到aebox
+            if image_path_url := urlencode_folder_path(path):
                 image_path_url = f"http://{self.fast_api_host}:{self.fast_api_port}/set_image_folder/{image_path_url}"
-                # 发送请求通信到aebox
                 response = get_api_data(url=image_path_url, timeout=3)
-                if response:
-                    print(f"[send_file_path_to_aebox]-->发送文件夹成功")
-                else:
-                    print(f"[send_file_path_to_aebox]-->发送文件夹失败")
+                message = "发送文件夹成功" if response else "发送文件夹失败"
+                print(f"[send_file_path_to_aebox]-->执行函数任务, {message}")
             
         except Exception as e:
-            self.logger.error(f"【send_file_path_to_aebox】-->将文件夹路径发送到aebox | 报错: {e}")
+            print(f"[send_file_path_to_aebox]-->error--将文件夹路径发送到aebox时 | 报错: {e}")
+            self.logger.error(f"【send_file_path_to_aebox】-->将文件夹路径发送到aebox时 | 报错: {e}")
             raise
 
     def rename_file(self, path):
         """重命名文件/文件夹"""
         try:
-            old_name = os.path.basename(path)
-            dialog = QInputDialog(self)  # 创建自定义对话框实例
+            
+            dialog = QInputDialog(self)
             dialog.setWindowTitle("重命名")
             dialog.setLabelText("请输入新名称:")
-            dialog.setTextValue(old_name)
+            dialog.setTextValue(old_name := os.path.basename(path))
             
             # 设置对话框尺寸
             dialog.setMinimumSize(100, 100)  # 最小尺寸
@@ -1032,15 +1024,14 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                         
         except Exception as e:
             show_message_box("🚩重命名任务发生错误!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
+            print(f"[rename_file]-->error--执行重命名事件时 | 报错: {e}")
             self.logger.error(f"【rename_file】-->执行重命名事件时 | 报错: {e}")
 
     """
     右侧信号槽函数
     """
-    @log_performance_decorator(tips="模仿用户按下回车键", log_args=False, log_result=False)
-    def input_enter_action(self):
-        # 输出相关log信息
-        print("[input_enter_action]-->在地址栏按下回车/拖拽了文件进来,开始在左侧文浏览器中定位") 
+    @log_performance_decorator(tips="处理模仿用户在地址栏按下回车键任务", log_args=False, log_result=False)
+    def input_enter_action(self): 
         # 定位到左侧文件浏览器中
         self.locate_in_tree_view()
         # 初始化同级文件夹下拉框选项
@@ -1049,51 +1040,49 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.update_RB_QTableWidget0()
 
 
-    def clear_combox(self):
-        print("[clear_combox]-清除按钮被点击")
+    @log_error_decorator(tips="处理右上角清除按钮点击事件")
+    def clear_combox(self, index):
         # 清空地址栏
         self.RT_QComboBox.clear()
         # 刷新右侧表格
         self.update_RB_QTableWidget0()
         # 手动清除图标缓存
         IconCache.clear_cache()
-        # 清除日志文件
+        # 清除日志文件和缓存
         self.clear_log_and_cache_files()
         # 释放内存
         self.cleanup() 
         
-
-
-    def compare(self):
-        print("[compare]-对比按钮被点击")
+    @log_error_decorator(tips="处理右上角对比按钮点击事件")
+    def compare(self, index):
         self.on_space_pressed()
 
-
-    def setting(self):
-        print("[setting]-设置按钮被点击")
-        # 暂时调用关于信息，后续添加设置界面
+    @log_error_decorator(tips="处理底部栏设置按钮点击事件")
+    def setting(self, index):
         self.on_ctrl_h_pressed()
     
-
-    def update(self):
-        print("[update]-版本按钮被点击")
+    @log_performance_decorator(tips="底部栏点击版本信息按钮检查更新任务", log_args=False, log_result=False)
+    def update(self, index):
         check_update()
 
 
     def fast_api_switch(self):
         """设置fast_api服务的开关使能"""
         try:
+            # 设置开关使能标志位,勾选复选框使能服务关闭横线，反之有横线
+            flag_fast_api = not self.statusbar_checkbox.isChecked()
             font = self.statusbar_button3.font()
-            if self.statusbar_checkbox.isChecked(): # False = 关闭横线
-                font.setStrikeOut(False)        
-                self.statusbar_button3.setFont(font)
-            else: # True = 显示横线
-                font.setStrikeOut(True)        
-                self.statusbar_button3.setFont(font)
+            font.setStrikeOut(flag_fast_api)
+            self.statusbar_button3.setFont(font)
+            
+            # 提示信息，输出日志
+            meesage = "开启" if not flag_fast_api else "关闭"
+            print(f"[fast_api_switch]-->执行函数任务, {meesage}FastAPI服务")
+            self.logger.info(f"[fast_api_switch]-->执行函数任务, {meesage}FastAPI服务")
         except Exception as e:
-            show_message_box("🚩设置fast_api服务的开关使能时发生错误!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
-            print(f"【fast_api_switch】-->设置fast_api开关使能时 | 报错: {e}")
-            return
+            print(f"[fast_api_switch]-->error--设置fast_api开关使能时 | 报错: {e}")
+            self.logger.error(f"【fast_api_switch】-->设置fast_api开关使能时 | 报错: {e}")
+            raise
 
     def fast_api(self):
         """设置fast_api服务地址"""
@@ -1101,12 +1090,12 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             from src.components.custom_qdialog_fastapi import FastApiDialog 
             dialog = FastApiDialog(self)
             if dialog.exec_() == QDialog.Accepted:
+                # 获取会话框上面的用户输入的IP地址和端口
                 self.fast_api_host, self.fast_api_port = dialog.get_result()
                 
-                # 打印log
-                print(f"[fast_api]-->设置FastAPI服务地址: {self.fast_api_host}:{self.fast_api_port}")
-
-                # 更新底部信息栏按钮信息显示
+                # 打印提示信息，输出日志，更新底部信息栏
+                print(f"[fast_api]-->执行函数任务, 设置FastAPI服务地址为: {self.fast_api_host}:{self.fast_api_port}")
+                self.logger.info(f"[fast_api]-->执行函数任务, 设置FastAPI服务地址为: {self.fast_api_host}:{self.fast_api_port}")
                 self.statusbar_button3.setText(f"{self.fast_api_host}:{self.fast_api_port}")
 
                 # 保存fast_api地址和端口到ipconfig.ini配置文件
@@ -1116,9 +1105,11 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 with open(default_version_path, 'w', encoding='utf-8') as f:
                     f.write(FASTAPI)
             else:
-                print("[fast_api]-->取消设置FastAPI服务地址")
+                print(f"[fast_api]-->执行函数任务, 取消设置FastAPI服务地址会话")
+                self.logger.info(f"[fast_api]-->执行函数任务, 取消设置FastAPI服务地址会话")
         except Exception as e:
-            print(f"[fast_api]-error--设置fast_api失败: {e}")
+            print(f"[fast_api]-->error--设置fast_api服务地址时 | 报错: {e}")
+            self.logger.error(f"【fast_api】-->设置fast_api服务地址时 | 报错: {e}")
             return
 
 
@@ -1127,25 +1118,21 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """预更新版本函数
         检查更新版本信息，并更新状态栏按钮，如果耗时超过2秒，则提示用户更新失败
         """
-        try:
-            # 预检查更新
-            self.new_version_info = pre_check_update()
-            
-            if self.new_version_info:
-                self.statusbar_button2.setText(f"🚀有新版本可用")  
-                self.statusbar_button2.setToolTip(f"🚀新版本: {self.version_info}-->{self.new_version_info}")
-                self.apply_theme() 
-            else:
-                self.statusbar_button2.setToolTip("已是最新版本")
-
-        except Exception as e:
-            print(f"[pre_update]-error--预更新版本失败: {e}")
+        # 预检查更新,检查是否有最新版本
+        self.new_version_info = pre_check_update()
+        if not self.new_version_info:
+            self.statusbar_button2.setToolTip("已是最新版本")
             return
+        # 有新版本可用
+        self.statusbar_button2.setText(f"🚀有新版本可用") 
+        self.statusbar_button2.setToolTip(f"🚀新版本: {self.version_info}-->{self.new_version_info}")
+        self.apply_theme() 
+
         
     def show_exif(self):
-        """打开Exif信息显示，类似快捷键CTRL+P功能  """
-        print("[show_exif]-打开Exif信息显示")
-
+        """打开Exif信息显示"""
+        print("[show_exif]-->执行函数任务,处理【Alt+I】键事件, 打开Exif信息显示")
+        self.logger.info("[show_exif]-->执行函数任务,处理【Alt+I】键事件, 打开Exif信息显示")
         try:
             # 获取当前选中的文件类型
             selected_option = self.RT_QComboBox0.currentText()
@@ -1163,7 +1150,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             else:
                 show_message_box("打开Exif信息显示", "提示", 500)
         except Exception as e:
-            print(f"[show_exif]-error--打开Exif信息显示失败: {e}")
+            print(f"[show_exif]-->error--使用【Alt+I】键打开Exif信息显示时 | 报错: {e}")
+            self.logger.error(f"【show_exif】-->使用【Alt+I】键打开Exif信息显示时 | 报错: {e}")
         finally:
             # 更新 RB_QTableWidget0 中的内容    
             self.update_RB_QTableWidget0() 
@@ -1171,7 +1159,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     
     def show_filter_rows(self, row_type):
         """显示筛选行"""
-        print(f"show_filter_rows()--显示筛选行")
+        print(f"[show_filter_rows]-->执行函数任务, 显示筛选行")
+        self.logger.error(f"[show_filter_rows]-->执行函数任务, 显示筛选行")
         try:
             # 按照传入的行类型，筛选行，显示需要的行
             if row_type == 'odd': # 传入奇数行，需要先选中偶数行，然后从列表中删除偶数行，最后显示奇数行
@@ -1192,19 +1181,18 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             else:
                 show_message_box(f"未知筛选模式: {row_type}", "错误", 1000)
         except Exception as e:
-            print(f"[show_filter_rows]-error--显示筛选行失败: {e}")
+            print(f"[show_filter_rows]-error--显示筛选行时 | 报错: {e}")
+            self.logger.error(f"【show_filter_rows】-->显示筛选行时 | 报错: {e}")
             return
 
     def filter_rows(self, row_type):
         """批量选中指定模式行（使用类switch结构优化）"""
-        
         # 清空选中状态
         self.RB_QTableWidget0.clearSelection()
-        # 获取总行数
+
+        # 获取总行数，获取选中状态,定义选择范围
         total_rows = self.RB_QTableWidget0.rowCount()
-        # 获取选中状态
         selection = self.RB_QTableWidget0.selectionModel()
-        # 定义选择范围
         selection_range = QItemSelection()
 
         # 定义条件映射字典（实际行号从1开始计算）
@@ -1216,14 +1204,11 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             'five_1': lambda r: (r + 1) % 5 == 1,  # 5选1（1,6,11...）
             'five_4': lambda r: (r + 1) % 5 != 1  # 5选4（2,3,4,5...）
         }
-
-        # 获取判断条件
-        condition = condition_map.get(row_type)
-        if not condition:
-            show_message_box(f"未知筛选模式: {row_type}", "错误", 1000)
-            return
-
         try:
+            # 获取判断条件
+            if not (condition := condition_map.get(row_type)):
+                show_message_box(f"未知筛选模式: {row_type}", "错误", 1000)
+                return
             # 批量选择符合条件的行
             for row in range(total_rows):
                 if condition(row):
@@ -1243,12 +1228,14 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 )
 
         except Exception as e:
-            print(f"[filter_rows]-error--批量选中指定模式行失败: {e}")
+            print(f"[filter_rows]-error--批量选中指定模式行时 | 报错: {e}")
+            self.logger.error(f"【filter_rows】-->批量选中指定模式行时 | 报错: {e}")
             return
 
     def jpg_lossless_rotator(self, para=''):
         """无损旋转图片"""
-        print(f"[jpg_lossless_rotator]-启动无损旋转图片任务:")
+        print(f"[jpg_lossless_rotator]-->执行函数任务, 启动无损旋转图片任务...")
+        self.logger.info(f"[jpg_lossless_rotator]-->执行函数任务, 启动无损旋转图片任务...")
         try:
             # 取消当前的预加载任务
             self.cancel_preloading()
@@ -1360,7 +1347,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 self.update_RB_QTableWidget0() 
 
         except subprocess.CalledProcessError as e:
-            print(f"[jpg_lossless_rotator]-error--无损旋转图片失败: {e}")
+            print(f"[jpg_lossless_rotator]-error--无损旋转图片 | 报错: {e}")
+            self.logger.error(f"【jpg_lossless_rotator】-->无损旋转图片 | 报错: {e}")
             return
 
 
@@ -1411,14 +1399,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
     def copy_selected_file_path(self,flag=1):
         """复制所有选中的单元格的文件路径到系统粘贴板"""
-        selected_items = self.RB_QTableWidget0.selectedItems()  # 获取选中的项
-        if not selected_items:
-            show_message_box("没有选中的项！", "提示", 500)
-            return
-        
         # 用于存储所有选中的文件路径
         file_paths = []  
         try:
+            # 获取选中的项
+            if not (selected_items := self.RB_QTableWidget0.selectedItems()):
+                show_message_box("没有选中的项！", "提示", 500)
+                return
+            
+            # 遍历选中的文件
             for item in selected_items:
                 row = item.row()
                 col = item.column()
@@ -1449,20 +1438,22 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 show_message_box("没有有效的文件路径", "提示", 2000)
 
         except Exception as e:
-            print(f"[copy_selected_file_path]-error--复制文件路径失败: {e}")
+            print(f"[copy_selected_file_path]-->error--复制选中的单元格文件路径到系统剪贴板时 | 报错: {e}")
+            self.logger.error(f"【copy_selected_file_path】-->复制选中的单元格文件路径到系统剪贴板时 | 报错: {e}")
             return
 
 
     def copy_selected_files(self):
         """复制选中的单元格对应的所有文件到系统剪贴板"""
-        selected_items = self.RB_QTableWidget0.selectedItems()  # 获取选中的项
-        if not selected_items:
-            show_message_box("没有选中的项！", "提示", 500)
-            return
-
         # 用于存储所有选中的文件路径
         file_paths = []  
         try:
+            # 获取选中的项
+            if not (selected_items := self.RB_QTableWidget0.selectedItems()):
+                show_message_box("没有选中的项！", "提示", 500)
+                return
+
+            # 遍历选中的文件
             for item in selected_items:
                 row = item.row()
                 col = item.column()
@@ -1473,8 +1464,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 current_directory = self.RT_QComboBox.currentText()  # 获取当前选中的目录
                 full_path = str(Path(current_directory).parent / column_name / file_name)
 
+                # 添加有效文件路径到列表
                 if os.path.isfile(full_path):
-                    file_paths.append(full_path)  # 添加有效文件路径到列表
+                    file_paths.append(full_path)  
 
             if file_paths:
                 # 创建QMimeData对象
@@ -1490,22 +1482,21 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 show_message_box("没有有效的文件路径", "提示", 2000)
 
         except Exception as e:
-            print(f"[copy_selected_files]-error--复制文件失败: {e}")
+            print(f"[copy_selected_files]-->error--复制选中的单元格文件到系统剪贴板时 | 报错: {e}")
+            self.logger.error(f"【copy_selected_files】-->复制选中的单元格文件到系统剪贴板时 | 报错: {e}")
             return
 
 
     def delete_from_list(self):
-        """从列表中删除选中的单元格"""
-        print(f"[delete_from_list]-从列表中删除选中的单元格")
-
-        selected_items = self.RB_QTableWidget0.selectedItems()
-        if not selected_items:
-            show_message_box("没有选中的项！", "提示", 500)
-            return
-        
+        """从列表中移除选中的单元格"""
         # 收集要删除的项目信息
         items_to_delete = []
         try:
+            # 获取选中的项并判断是否选中
+            if not (selected_items := self.RB_QTableWidget0.selectedItems()):
+                show_message_box("没有选中的项！", "提示", 500)
+                return
+            # 遍历选中项
             for item in selected_items:
                 col = item.column()
                 row = item.row()
@@ -1534,22 +1525,22 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             
             # 更新表格显示
             self.update_RB_QTableWidget0_from_list(self.files_list, self.paths_list, self.dirnames_list)
-    
         except Exception as e:
-            print(f"[delete_from_list]-error--删除失败: {e}")
+            print(f"[delete_from_list]-->error--从列表中移除选中的单元格时 | 报错: {e}")
+            self.logger.error(f"【delete_from_list】-->从列表中移除选中的单元格时 | 报错: {e}")
             return
 
     def delete_from_file(self):
-        """从源文件删除选中的单元格并删除原文件"""
-        print(f"[delete_from_file]-从原文件删除选中的单元格并删除原文件")
-
-        selected_items = self.RB_QTableWidget0.selectedItems()  # 获取选中的项
-        if not selected_items:
-            show_message_box("没有选中的项！", "提示", 500)
-            return
+        """从源文件删除选中的单元格文件"""
         # 收集要删除的文件路径
         file_paths_to_delete = []
         try:
+            # 获取选中的项并判断是否选中
+            if not (selected_items := self.RB_QTableWidget0.selectedItems()):
+                show_message_box("没有选中的项！", "提示", 500)
+                return
+
+            # 遍历选中项
             for item in selected_items:
                 row = item.row()
                 col = item.column()
@@ -1563,23 +1554,20 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
             # 删除文件
             for file_path in file_paths_to_delete:
-                try:
-                    os.remove(file_path)  # 删除文件
-                except Exception as e:
-                    show_message_box(f"删除文件失败: {file_path}, 错误: {e}", "提示", 500)
+                os.remove(file_path)
 
             # 删除表格中的行，可以直接更新表格
             show_message_box(f"{len(file_paths_to_delete)} 个文件已从列表中删除并删除原文件", "提示", 1000)
             self.update_RB_QTableWidget0()
 
         except Exception as e:
-            print(f"[delete_from_file]-error--删除失败: {e}")
+            print(f"[delete_from_file]-->error--从源文件删除选中的单元格文件时 | 报错: {e}")
+            self.logger.error(f"【delete_from_file】-->从源文件删除选中的单元格文件时 | 报错: {e}")
             return
 
 
     def compress_selected_files(self):
         """压缩选中的文件并复制压缩包文件到剪贴板"""
-        print("[compress_selected_files]-启动压缩文件任务")
         try:
             selected_items = self.RB_QTableWidget0.selectedItems()
             if not selected_items:
@@ -1630,17 +1618,17 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
             # 启动压缩任务
             self.threadpool.start(self.compress_worker)
-
+            print(f"[compress_selected_files]-->启动压缩压缩任务线程")
+            self.logger.info(f"[compress_selected_files]-->启动压缩压缩任务线程")
         except Exception as e:
-            print(f"[compress_selected_files]-error--压缩失败: {e}")
+            print(f"[compress_selected_files]-->error--压缩选中的文件并复制压缩包文件到剪贴板时 | 报错: {e}")
+            self.logger.error(f"[compress_selected_files]-->压缩选中的文件并复制压缩包文件到剪贴板时 | 报错: {e}")
             return  
 
+    @log_error_decorator(tips="打开【T】键截图界面")
     def screen_shot_tool(self):
         """截图功能"""
-        try:
-            WScreenshot.run() # 调用截图工具
-        except Exception as e:
-            show_message_box(f"启动截图功能失败: {str(e)}", "错误", 2000)
+        WScreenshot.run()
 
     def jpgc_tool(self):
         """打开图片体积压缩工具_升级版"""
@@ -1658,7 +1646,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             
         except Exception as e:
             show_message_box(f"启动JPGC工具失败: {str(e)}", "错误", 2000)
-
+            print(f"[jpgc_tool]-->error--打开图片体积压缩工具_升级版时 | 报错: {e}")
+            self.logger.error(f"【jpgc_tool】-->打开图片体积压缩工具_升级版时 | 报错: {e}")
+            raise
 
     def reveal_in_explorer(self):
         """在资源管理器中高亮定位选中的文件(适用于window系统)"""
@@ -1699,15 +1689,22 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             else: # ... 可代替 pass ，是一个单例，也是numpy的语法糖
                 ...
         except Exception as e:
-            show_message_box(f"定位文件失败: {str(e)}", "错误", 2000)
-
+            show_message_box("🚩在资源管理器中高亮定位选中的文件时发生错误!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
+            print(f"[reveal_in_explorer]-->error--在资源管理器中高亮定位选中的文件时 | 报错: {e}")
+            self.logger.error(f"【reveal_in_explorer】-->在资源管理器中高亮定位选中的文件时 | 报错: {e}")
+            raise
 
     def on_compress_progress(self, current, total):
         """处理压缩进度"""
-        progress_value = int((current / total) * 100)  # 计算进度百分比
-        self.progress_dialog.update_progress(progress_value)
-        self.progress_dialog.set_message(f"显示详情：正在压缩文件... {current}/{total}")
+        try:
+            progress_value = int((current / total) * 100)  # 计算进度百分比
+            self.progress_dialog.update_progress(progress_value)
+            self.progress_dialog.set_message(f"显示详情：正在压缩文件... {current}/{total}")
+        except Exception as e:
+            print(f"[on_compress_progress]-->error--压缩进度信号 | 报错：{e}")
+            self.logger.error(f"【on_compress_progress】-->压缩进度信号 | 报错：{e}")
 
+    @log_error_decorator(tips="压缩线程-->触发取消压缩信号")
     def cancel_compression(self):
         """取消压缩任务"""
         if self.compress_worker:
@@ -1721,6 +1718,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # 强制删除缓存文件中的zip文件
             force_delete_folder(cache_dir, '.zip')
 
+    @log_error_decorator(tips="压缩线程-->触发压缩完成信号")
     def on_compress_finished(self, zip_path):
         """处理压缩完成"""
         self.progress_dialog.close()
@@ -1733,11 +1731,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.statusbar_label1.setText(f"📢:压缩完成🍃")
         show_message_box(f"文件已压缩为: {zip_path} 并复制到剪贴板", "提示", 500)
 
+    @log_error_decorator(tips="压缩线程-->触发压缩错误信号")
     def on_compress_error(self, error_msg):
         """处理压缩错误"""
         self.progress_dialog.close()  
         # 更新状态栏信息显示
         self.statusbar_label1.setText(f"📢:压缩出错🍃")
+        print(f"[on_compress_error]-->error--触发压缩错误信号 | 报错：{error_msg}")
+        self.logger.error(f"【on_compress_error】-->触发压缩错误信号 | 报错：{error_msg}")
+        # 弹出提示框
         show_message_box(error_msg, "错误", 2000)
 
 
@@ -1803,37 +1805,26 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.logger.error(f"【update_combobox】-->左侧文件浏览器点击事件,定位更新右侧combobox事件处理函数 | 报错：{e}")
             raise
         
-    # 在左侧文件浏览器中定位地址栏(RT_QComboBox)中当前显示的目录
+    @log_performance_decorator(tips="定位到左侧文件浏览器中(地址栏或拖拽文件夹路径)", log_args=False, log_result=False)
     def locate_in_tree_view(self):
         """地址栏或者拖拽文件夹定位到左侧文件浏览器函数"""
-        try:
-            # 打印信息,输出日志文件,用于调试
-            print("[locate_in_tree_view]-->执行函数任务, 地址栏或拖拽文件夹路径开始定位到左侧文件浏览器中")
-            self.logger.info(f"[locate_in_tree_view]-->执行函数任务, 地址栏或拖拽文件夹路径开始定位到左侧文件浏览器中")
+        # 检查路径是否有效
+        current_directory = self.RT_QComboBox.currentText()
+        if not os.path.isdir(current_directory): 
+            show_message_box("🚩[locate_in_tree_view]-->地址栏文件夹路径无效，无法定位到左侧文件浏览器中", "提示", 1500)
+            return  
+        
+        # 获取当前目录的索引,并检查索引是否有效
+        index = self.file_system_model.index(current_directory)
+        if not index.isValid():
+            show_message_box("🚩[locate_in_tree_view]-->索引无效，无法定位到左侧文件浏览器中", "提示", 1500)
+            return
 
-            # 检查路径是否有效
-            current_directory = self.RT_QComboBox.currentText()
-            if not os.path.isdir(current_directory): 
-                show_message_box("🚩[locate_in_tree_view]-->地址栏文件夹路径无效，无法定位到左侧文件浏览器中", "提示", 1500)
-                return  
-            
-            # 获取当前目录的索引,并检查索引是否有效
-            index = self.file_system_model.index(current_directory)
-            if not index.isValid():
-                show_message_box("🚩[locate_in_tree_view]-->索引无效，无法定位到左侧文件浏览器中", "提示", 1500)
-                return
-
-            # 设置当前索引,展开该目录,滚动到该项，确保垂直方向居中,水平滚动条置0
-            self.Left_QTreeView.setCurrentIndex(index)    
-            self.Left_QTreeView.setExpanded(index, True)  
-            self.Left_QTreeView.scrollTo(index, QAbstractItemView.PositionAtCenter)
-            self.Left_QTreeView.horizontalScrollBar().setValue(0)
-
-        except Exception as e:
-            show_message_box("🚩地址栏或者拖拽文件夹路径定位到左侧文件浏览器中失败!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
-            print(f"[locate_in_tree_view]-->error--地址栏或者拖拽文件夹定位到左侧文件浏览器函数 | 报错：{e}")
-            self.logger.error(f"【locate_in_tree_view】-->地址栏或者拖拽文件夹定位到左侧文件浏览器函数 | 报错：{e}")
-            raise
+        # 设置当前索引,展开该目录,滚动到该项，确保垂直方向居中,水平滚动条置0
+        self.Left_QTreeView.setCurrentIndex(index)    
+        self.Left_QTreeView.setExpanded(index, True)  
+        self.Left_QTreeView.scrollTo(index, QAbstractItemView.PositionAtCenter)
+        self.Left_QTreeView.horizontalScrollBar().setValue(0)
 
 
     def update_RB_QTableWidget0_from_list(self, file_infos_list, file_paths, dir_name_list):
@@ -2075,13 +2066,11 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             return []
 
         
-
-        
     def start_image_preloading(self, file_paths):
         """开始预加载图片"""
         # 输出打印日志文件
-        print("[start_image_preloading]-->开始预加载图标, 启动预加载线程")
-        self.logger.info(f"[start_image_preloading]-->开始预加载图标, 启动预加载线程")
+        print("[start_image_preloading]-->执行函数任务, 开始预加载图标, 启动预加载线程")
+        self.logger.info(f"[start_image_preloading]-->执行函数任务, 开始预加载图标, 启动预加载线程")
         try:
             # 执行取消预加载任务
             if self.current_preloader and self.preloading:
@@ -2103,8 +2092,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             
             # 启动预加载
             self.threadpool.start(self.current_preloader)
-            print("-->重新启动预加载线程, 开始后台预加载图标...")
-            self.logger.info(f"[start_image_preloading]-->重新启动预加载线程, 开始后台预加载图标...")
+            print("-->开始后台预加载图标...")
+            self.logger.info(f"[start_image_preloading]-->开始后台预加载图标...")
         except Exception as e:
             print(f"[start_image_preloading]-->error--开始预加载图标, 启动预加载线程失败: {e}")
             self.logger.error(f"【start_image_preloading】-->开始预加载图标,启动预加载线程失败: {e}")
@@ -2155,7 +2144,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         
     def on_preload_finished(self):
         """处理预加载完成"""
-        print(f"[on_preload_finished]-->所有图标预加载完成,耗时:{time.time()-self.start_time_image_preloading:.2f}秒")
+        print(f"[on_preload_finished]-->所有图标预加载完成, 耗时:{time.time()-self.start_time_image_preloading:.2f}秒")
         self.logger.info(f"[on_preload_finished]-->所有图标预加载完成 | 耗时:{time.time()-self.start_time_image_preloading:.2f}秒")
         self.statusbar_label1.setText(f"📢:图标已全部加载-^-耗时:{time.time()-self.start_time_image_preloading:.2f}秒🍃")
         gc.collect()
@@ -2202,7 +2191,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         try:
             # 链式三目表达式选择显示文件类型，记录log信息
             display_txt = "图片" if index == 0 else ("视频" if index == 1 else "所有")
-            self.logger.info(f"handleComboBox0Pressed()-->处理显示{display_txt}文件下拉框选项按下事件")
+            self.logger.info(f"[handleComboBox0Pressed]-->处理显示{display_txt}文件下拉框选项按下事件")
             self.update_RB_QTableWidget0()
         except Exception as e:
             print(f"[handleComboBox0Pressed]-->error--处理显示{display_txt}文件下拉框选项按下事件失败: {e}")
@@ -2211,8 +2200,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
     def updateComboBox1Text(self):
         """更新 RT_QComboBox1 的显示文本。"""
-        print("[updateComboBox1Text]-->更新显示文本")
-        self.logger.info(f"[updateComboBox1Text]-->更新<RT_QComboBox1>同级文件夹下拉框的显示文本")
+        print("[updateComboBox1Text]-->执行函数任务, 更新<RT_QComboBox1>同级文件夹下拉框的显示文本")
+        self.logger.info(f"[updateComboBox1Text]-->执行函数任务, 更新<RT_QComboBox1>同级文件夹下拉框的显示文本")
         try:# 获取选中的文件夹,并更新RT_QComboBox1显示
             current_text = '; '.join(selected_folders) if (selected_folders := self.model.getCheckedItems()) else "(请选择)"
             self.RT_QComboBox1.setCurrentText(current_text)
@@ -2232,7 +2221,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 if os.path.isdir(os.path.join(parent_folder, name)) and name != os.path.basename(folder_path)  
                 ]
             # 打印提示信息
-            print(f"[getSiblingFolders]-->获取{folder_path}的同级文件夹列表: \n{sibling_folders}")
+            print(f"[getSiblingFolders]-->获取【{folder_path}】的同级文件夹列表: \n-->{sibling_folders}")
             # 返回同级文件夹列表
             return sibling_folders
         except Exception as e:
@@ -2393,8 +2382,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def apply_theme(self):
         """更新主题"""
         try:
-            print(f"[apply_theme]-->当前主题更新为{self.current_theme}")
-            self.logger.info(f"[apply_theme]-->当前主题更新为{self.current_theme}")
+            print(f"[apply_theme]-->执行函数任务, 当前主题更新为{self.current_theme}")
+            self.logger.info(f"[apply_theme]-->执行函数任务, 当前主题更新为{self.current_theme}")
             self.setStyleSheet(self.dark_style() if self.current_theme == "暗黑主题" else self.default_style())
         except Exception as e:
             print(f"[apply_theme]-->error-更新主题 | 报错：{e}")
@@ -3405,7 +3394,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """清除日志文件以及zip缓存文件"""
         # 使用工具函数清除日志文件以及zip等缓存
         clear_log_files()
-        clear_cache_files()
+        clear_cache_files(base_path=None, file_types=[".zip",".json"])
         # 重新初始化日志系统
         setup_logging()
         self.logger = get_logger(__name__)
@@ -3690,11 +3679,10 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.logger.error(error_msg)
 
     @log_error_decorator(tips="关闭关闭对话框")
-    def close_helpinfo(self):
+    def close_helpinfo(self, index):
         """关闭对话框事件"""
         if hasattr(self, 'help_dialog'):
             del self.help_dialog
-            self.logger.info("close_helpinfo()-->成功销毁关于对话框")
         
     @log_error_decorator(tips="处理【Ctrl+f】键按下事件,打开主界面图片模糊搜索工具")
     def on_ctrl_f_pressed(self):

@@ -218,8 +218,8 @@ def log_error_decorator(tips="程序异常! "):
         def wrapper(*args, **kwargs):
             try:
                 # 提示信息
-                print(f"[{func.__name__}]-->执行函数任务,{tips}")
-                logging.info(f"[{func.__name__}]-->执行函数任务,{tips}")
+                print(f"[{func.__name__}]-->执行函数任务, {tips}")
+                logging.info(f"[{func.__name__}]-->执行函数任务, {tips}")
                 
                 # 执行函数
                 result = func(*args, **kwargs)
@@ -251,8 +251,6 @@ def log_performance_decorator(tips=None, log_args=True, log_result=True):
                 # 记录函数调用
                 if log_args:
                     logging.debug(f"开始执行: {op_name} | 参数: args={args}, kwargs={kwargs}")
-                else:
-                    logging.info(f"[{func.__name__}]-->开始执行--函数说明：{tips}")
                 
                 # 执行函数
                 result = func(*args, **kwargs)
@@ -263,7 +261,8 @@ def log_performance_decorator(tips=None, log_args=True, log_result=True):
                 if log_result:
                     logging.info(f"执行完成: {op_name} | 耗时: {duration:.3f}s | 结果: {result}")
                 else:
-                    logging.info(f"[{func.__name__}]-->执行完成 | 耗时: {duration:.3f}s | 结果: {result}")
+                    logging.info(f"[{func.__name__}]-->{tips}, 执行完成 | 耗时: {duration:.3f}s | 结果: {result}")
+                    print(f"[{func.__name__}]-->{tips}, 执行完成 | 耗时: {duration:.3f}s")
                 
                 return result
                 

@@ -10,6 +10,7 @@ from pathlib import Path
 from PyQt5.QtWidgets import (QApplication, QMessageBox, QProgressDialog)
 from PyQt5.QtCore import Qt, QPoint
 from PyQt5.QtGui import QIcon, QCursor
+from src.common.decorator import log_error_decorator
 
 
 """设置本项目的入口路径,全局变量BasePath"""
@@ -81,10 +82,10 @@ class Updater:
                         download_url = f"{self.proxy_prefix}{asset['browser_download_url']}"
                         return download_url, self.latest_version
                 # 如果没有找到zip文件，返回None
-                print("[check_for_updates]-->未找到可下载的zip文件")
+                print("-->未找到可下载的zip文件")
                 return None, None
             else:
-                print("[check_for_updates]-->当前已是最新版本")
+                print("-->当前已是最新版本")
                 return None, None
                 
         except requests.RequestException as e:
@@ -285,19 +286,16 @@ def download_with_progress(zip_path, response, total_size, progress_dialog):
         print(f"下载错误: {e}")
         return "error"
 
+@log_error_decorator(tips="开始检查更新...")
 def pre_check_update():
-    """预检查更新函数，供主程序调用"""
-    try:
-        print("[pre_check_update]-->开始检查更新...")
-        updater = Updater()
-        download_url, version = updater.check_for_updates()
-        if download_url:
-            return version
-        else:
-            return False
-    except Exception as e:
-        print(f"预检查更新发生错误: {str(e)}")
-        return False
+    """预检查更新函数，供主程序调用""" 
+    updater = Updater()
+    download_url, version = updater.check_for_updates()
+    # 设置返回内容
+    if download_url:
+        return version
+    # 默认返回False
+    return False
 
 # 主函数
 def check_update(parent_window=None):

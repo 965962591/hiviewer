@@ -19,9 +19,11 @@ from PyQt5.QtGui import (QIcon, QPixmap,QImageReader,QImage)
 from PyQt5.QtCore import (QRunnable, QObject, pyqtSignal)
 
 # 自定义模块
+from src.utils.delete import force_delete_file
 from src.utils.heic import extract_jpg_from_heic
 from src.utils.video import extract_first_frame_from_video
 from src.view.sub_compare_image_view import pil_to_pixmap
+
 
 
 """设置本项目的入口路径,全局变量BASEICONPATH"""
@@ -398,11 +400,17 @@ class IconCache:
             # 清除lru_cache的缓存
             cls.get_icon.cache_clear()  
 
-            # 清理文件缓存
-            if cls._cache_base_dir.exists():
-                shutil.rmtree(cls._cache_base_dir)
+            # 清除图标文件缓存
+            if cls._cache_dir.exists():
+                shutil.rmtree(cls._cache_dir)
 
+            # 清除记录图标缓存json文件
+            if cls._cache_index_file.exists():
+                force_delete_file(cls._cache_index_file)
+
+            # 打印提示信息
+            print(f"[Icon.py-->clear_cache]-->成功清理lru缓存、图标文件缓存以及记录图标缓存的json文件")
         except Exception as e:
-            print(f"清理缓存失败: {e}")
+            print(f"[Icon.py-->clear_cache]-->清理缓存失败: {e}")
             
         

@@ -17,7 +17,6 @@ from src.common.decorator import CC_TimeDec, log_performance_decorator
 
 class Ui_MainWindow(object):
     """主窗口UI类"""
-    @CC_TimeDec(tips="设置主窗口界面UI")
     @log_performance_decorator(tips="设置主窗口界面UI", log_args=False, log_result=False)
     def setupUi(self, MainWindow):
         """设置主窗口"""
