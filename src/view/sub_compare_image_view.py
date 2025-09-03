@@ -2797,44 +2797,69 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         
         try:    
             def create_unified_overlay(source_view, target_view):
-                """创建统一尺寸的覆盖图像"""
+                """创建统一尺寸的覆盖图像(以目标项当前pixmap像素尺寸缩放)"""
                 try:
                     source_pixmap_item = source_view.pixmap_items[0]
-
+                    target_item = target_view.pixmap_items[0]
                     source_pixmap = source_pixmap_item.pixmap()
-
-                    target_display_size = target_view.pixmap_items[0].boundingRect().size().toSize()
-
-                    # 使用忽略宽高比的缩放方式
-                    scaled_pixmap = source_pixmap.scaled(
-                        target_display_size,
+                    target_size_px = target_item.pixmap().size()
+                    return source_pixmap.scaled(
+                        target_size_px,
                         Qt.IgnoreAspectRatio,
                         Qt.SmoothTransformation
                     )
-
-                    return scaled_pixmap
                 except Exception as e:
                     print(f"❌ [create_unified_overlay]-->创建统一覆盖图像失败: {str(e)}")
                     return None
 
+            # 懒初始化覆盖图元数组
+            if not hasattr(self, 'overlay_items'):
+                self.overlay_items = [None, None]
+
             if key == 'q':
-                source_view = self.graphics_views[1]
-                target_view = self.graphics_views[0]
-                if source_view and target_view and source_view.pixmap_items and target_view.pixmap_items:
-                    scaled = create_unified_overlay(source_view, target_view)
-                    source_rotation = self.original_rotation[1]
-                    target_view.pixmap_items[0].setPixmap(scaled)
-                    target_view.pixmap_items[0].setRotation(source_rotation)
-                    target_view.centerOn(target_view.mapToScene(target_view.viewport().rect().center()))
+                source_index = 1
+                target_index = 0
             elif key == 'w':
-                source_view = self.graphics_views[0]
-                target_view = self.graphics_views[1]
-                if source_view and target_view and source_view.pixmap_items and target_view.pixmap_items:
-                    scaled = create_unified_overlay(source_view, target_view)     
-                    source_rotation = self.original_rotation[0]
-                    target_view.pixmap_items[0].setPixmap(scaled)
-                    target_view.pixmap_items[0].setRotation(source_rotation)
-                    target_view.centerOn(target_view.mapToScene(target_view.viewport().rect().center()))
+                source_index = 0
+                target_index = 1
+            else:
+                return
+
+            source_view = self.graphics_views[source_index]
+            target_view = self.graphics_views[target_index]
+
+            if not (source_view and target_view and source_view.pixmap_items and target_view.pixmap_items):
+                return
+
+            # 若已有覆盖，先清理
+            if self.overlay_items[target_index] is not None:
+                try:
+                    target_view.scene().removeItem(self.overlay_items[target_index])
+                except Exception:
+                    pass
+                self.overlay_items[target_index] = None
+
+            # 创建覆盖pixmap并添加为临时图元
+            scaled = create_unified_overlay(source_view, target_view)
+            if scaled is None:
+                return
+
+            overlay_item = QGraphicsPixmapItem(scaled)
+            overlay_item.setZValue(9999)
+            # 变换中心设为图像中心
+            overlay_item.setTransformOriginPoint(scaled.rect().center())
+
+            # 对齐到目标项位置与旋转
+            target_item = target_view.pixmap_items[0]
+            overlay_item.setPos(target_item.pos())
+            if source_index == 1:
+                overlay_item.setRotation(self.original_rotation[1])
+            else:
+                overlay_item.setRotation(self.original_rotation[0])
+
+            # 添加到场景并记录
+            target_view.scene().addItem(overlay_item)
+            self.overlay_items[target_index] = overlay_item
 
         except Exception as e:
             print(f"❌ [handle_overlay]-->覆盖操作失败: {e}")
@@ -2847,34 +2872,27 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
         try:
             if key == 'q':
-                index = 0
+                target_index = 0
             elif key == 'w':
-                index = 1
+                target_index = 1
             else:
                 return
 
-            target_view = self.graphics_views[index]
-            original_pixmap = self.original_pixmaps[index]
-            original_rotation = self.original_rotation[index]
-
-
-            if not target_view or not target_view.pixmap_items or not original_pixmap:
+            if not hasattr(self, 'overlay_items'):
                 return
 
-            # 获取当前显示尺寸
-            current_display_size = target_view.pixmap_items[0].boundingRect().size().toSize()
+            target_view = self.graphics_views[target_index]
+            if not target_view:
+                return
 
-            # 重新缩放原始图像到当前显示尺寸
-            scaled = original_pixmap.scaled(
-                current_display_size,
-                Qt.IgnoreAspectRatio,
-                Qt.SmoothTransformation
-            )
-
-            # 直接设置缩放后的图像到目标视图
-            target_view.pixmap_items[0].setPixmap(scaled)
-            target_view.pixmap_items[0].setRotation(original_rotation)  
-            target_view.centerOn(target_view.mapToScene(target_view.viewport().rect().center()))
+            # 仅移除覆盖图元，不修改原图元
+            overlay = self.overlay_items[target_index]
+            if overlay is not None:
+                try:
+                    target_view.scene().removeItem(overlay)
+                except Exception:
+                    pass
+                self.overlay_items[target_index] = None
         except Exception as e:
             print(f"❌ [restore_images]-->恢复图片失败: {e}")
 
