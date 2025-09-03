@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 import os
+from pathlib import Path
 from PyQt5.QtWidgets import QLabel, QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QMessageBox, QCheckBox
 from PyQt5.QtCore import Qt, QSettings, QTimer
+from PyQt5.QtGui import QIcon
+from src.components.custom_qMbox_showinfo import show_message_box 
 
 
 class SingleFileRenameDialog(QDialog):
@@ -24,6 +27,10 @@ class SingleFileRenameDialog(QDialog):
         """初始化UI"""
         self.setWindowTitle("重命名文件")
         self.setFixedSize(650, 180)
+
+        # 设置图标
+        icon_path = (Path(__file__).parent.parent.parent / "resource" / "icons" / "rename_ico_96x96.ico").as_posix()
+        self.setWindowIcon(QIcon(icon_path))
         
         # 主布局
         layout = QVBoxLayout()
@@ -81,30 +88,12 @@ class SingleFileRenameDialog(QDialog):
         else:
             self.name_input.setText(self.name_without_ext)
 
-    def show_message_box(text, title="提示", timeout=None):
-        """显示消息框，宽度自适应文本内容
-        
-        Args:
-            text: 显示的文本内容
-            title: 窗口标题，默认为"提示" 
-            timeout: 自动关闭的超时时间(毫秒)，默认为None不自动关闭
-        """
-        msg_box = QMessageBox()
-        msg_box.setWindowTitle(title)
-        msg_box.setText(text)
-
-        # 设置定时器自动关闭
-        if timeout is not None:
-            QTimer.singleShot(timeout, msg_box.close)
-
-        # 使用 exec_ 显示模态对话框
-        msg_box.exec_() 
 
     def on_ok_clicked(self):
         """处理确定按钮点击"""
         new_name = self.name_input.text()
         if not new_name:
-            self.show_message_box("文件名不能为空！", "错误", 500)
+            show_message_box("文件名不能为空！", "错误", 500)
             return
             
         # 构建新文件路径
@@ -114,7 +103,7 @@ class SingleFileRenameDialog(QDialog):
         
         # 检查文件是否已存在
         if os.path.exists(new_path) and new_path != self.file_path:
-            self.show_message_box("文件已存在！", "错误", 500)
+            show_message_box("文件已存在！", "错误", 500)
             return
             
         try:
@@ -122,7 +111,7 @@ class SingleFileRenameDialog(QDialog):
             self.new_file_path = new_path  # 更新新文件路径
             self.accept()
         except Exception as e:
-            self.show_message_box(f"重命名失败: {str(e)}", "错误", 1000)
+            show_message_box(f"重命名失败: {str(e)}", "错误", 1000)
 
     def get_new_file_path(self):
         """返回新的文件路径"""

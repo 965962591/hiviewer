@@ -250,7 +250,8 @@ def log_performance_decorator(tips=None, log_args=True, log_result=True):
             try:
                 # 记录函数调用
                 if log_args:
-                    logging.debug(f"开始执行: {op_name} | 参数: args={args}, kwargs={kwargs}")
+                    print(f"[{func.__name__}]-->开始执行函数任务: {op_name}")
+                    logging.info(f"[{func.__name__}]-->开始执行函数任务: {op_name}")
                 
                 # 执行函数
                 result = func(*args, **kwargs)

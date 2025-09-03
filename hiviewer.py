@@ -2,9 +2,9 @@
 # -*- encoding: utf-8 -*-
 '''
 @File         :hiviewer.py
-@Time         :2025/06/04
+@Time         :2025/09/03
 @Author       :diamond_cz@163.com
-@Version      :release-v3.5.1
+@Version      :release-v3.6.1
 @Description  :hiviewer看图工具主界面
 
 python项目多文件夹路径说明:
@@ -22,8 +22,6 @@ BASEICONPATH = Path(sys.argv[0]).parent
 
 """记录程序启动时间"""
 import time
-
-from cv2 import randShuffle
 flag_start = time.time()
 
 """导入python内置模块"""
@@ -38,7 +36,8 @@ import shutil
 import stat
 
 """导入python第三方模块"""
-from PyQt5.QtGui import QIcon, QKeySequence, QPixmap
+from PyQt5.QtGui import (
+    QIcon, QKeySequence, QPixmap)
 from PyQt5.QtWidgets import (
     QFileSystemModel, QAbstractItemView, QTableWidgetItem, 
     QHeaderView, QShortcut, QSplashScreen, QMainWindow, 
@@ -344,8 +343,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             h = screen_geometry.height()
             return x, y, w, h
         except Exception as e:
-            self.logger.error(f"get_screen_geometry()-->无法获取当前鼠标所在屏幕信息 | 报错：{e}")
-
+            print(f"[get_screen_geometry]-->error--无法获取当前鼠标所在屏幕信息 | 报错：{e}")
+            self.logger.error(f"【get_screen_geometry】-->无法获取当前鼠标所在屏幕信息 | 报错：{e}")
 
 
     """
@@ -354,7 +353,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     """
     @log_performance_decorator(tips="设置右侧表格区域的右键菜单", log_args=False, log_result=False)
     def setup_context_menu(self):
-        """设置右侧表格区域的右键菜单"""
+        """设置右侧表格区域的右键菜单,连接右键菜单到表格"""
+        self.RB_QTableWidget0.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.RB_QTableWidget0.customContextMenuRequested.connect(self.show_table_context_menu)
+
+
+    @log_error_decorator(tips="显示表格区域右键菜单")
+    def show_table_context_menu(self, pos):
+        """显示左侧表格右键菜单"""
+        # 设置右侧表格区域的右键菜单栏
         self.context_menu = QMenu(self)
     
         # 设置菜单样式 modify by diamond_cz 20250217 优化右键菜单栏的显示
@@ -467,9 +474,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.context_menu.addMenu(sub_menu5) 
         self.context_menu.addMenu(sub_menu3)  
         
-        
         # 设置右键菜单槽函数
-        # self.context_menu.addAction(exif_icon, "高通AEC10解析图片(I)", self.on_i_pressed)
         self.context_menu.addAction(zip_icon, "压缩文件(Z)", self.compress_selected_files)
         self.context_menu.addAction(theme_icon, "切换主题(P)", self.on_p_pressed)
         self.context_menu.addAction(image_size_reduce_icon, "图片瘦身(X)", self.jpgc_tool) 
@@ -484,25 +489,18 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.context_menu.addAction(restart_icon, "重启程序", self.on_f12_pressed)
         self.context_menu.addAction(help_icon, "关于(Ctrl+H)", self.on_ctrl_h_pressed)
 
-        # 连接右键菜单到表格
-        self.RB_QTableWidget0.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.RB_QTableWidget0.customContextMenuRequested.connect(self.show_context_menu)
-
-
-    def show_context_menu(self, pos):
-        """显示右键菜单"""
+        # 设置右键菜单绑定右侧表格组件
         self.context_menu.exec_(self.RB_QTableWidget0.mapToGlobal(pos))
 
     @log_performance_decorator(tips="设置左侧文件浏览器右键菜单", log_args=False, log_result=False)
     def setup_treeview_context_menu(self):
-        """设置左侧文件浏览器右键菜单"""
-        # 添加右键菜单功能,连接到文件浏览树self.Left_QTreeView上
+        """设置左侧文件浏览器右键菜单,连接到文件浏览树self.Left_QTreeView上"""
         self.Left_QTreeView.setContextMenuPolicy(Qt.CustomContextMenu)
         self.Left_QTreeView.customContextMenuRequested.connect(self.show_treeview_context_menu)
 
+    @log_error_decorator(tips="显示文件树右键菜单")
     def show_treeview_context_menu(self, pos):
         """显示文件树右键菜单"""
-
         # 设置左侧文件浏览器的右键菜单栏
         self.treeview_context_menu = QMenu(self)
     
@@ -536,9 +534,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         breakup_acton = self.treeview_context_menu.addAction("解散")
         delete_action = self.treeview_context_menu.addAction("删除")
 
-        # 获取选中的文件信息
-        index = self.Left_QTreeView.indexAt(pos)
-        if index.isValid():
+        # 获取选中的文件信息, 并链接相应事件函数
+        if (index := self.Left_QTreeView.indexAt(pos)).isValid():
             file_path = self.file_system_model.filePath(index)
 
             # 连接想信号槽函数
@@ -557,7 +554,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
             # 设置右键菜单绑定左侧文件浏览器
             self.treeview_context_menu.exec_(self.Left_QTreeView.viewport().mapToGlobal(pos))
-
 
     
     """
@@ -792,33 +788,44 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # 默认只显示文件夹
             self.file_system_model.setFilter(QDir.NoDot | QDir.NoDotDot | QDir.AllDirs)    # 使用QDir的过滤器,只显示文件夹  
         except Exception as e:
-            self.logger.error(f"【show_file_visibility】-->设置左侧文件浏览器的显示 | 报错：{e}")
+            print(f"[show_file_visibility]-->error--设置左侧文件浏览器的显示时 | 报错: {e}")
+            self.logger.error(f"【show_file_visibility】-->设置左侧文件浏览器的显示时 | 报错：{e}")
             raise e
 
     def zoom_file(self, path):
         """按zoom值分类"""
-        from src.utils.cls_zoom_size import classify_images_by_zoom
+        try:
+            # 导入分类函数
+            from src.utils.cls_zoom_size import classify_images_by_zoom
 
-        # 检查路径是否为文件夹
-        if not os.path.isdir(path):
-            show_message_box("🚩选中的不是文件夹，请确保选中文件夹后重试", "提示", 1000)
-            return
-            
-        # 调用分类函数
-        classify_images_by_zoom(path)
+            # 检查路径是否为文件夹
+            if not os.path.isdir(path):
+                show_message_box("🚩选中的不是文件夹，请确保选中文件夹后重试", "提示", 1000)
+                return
+                
+            # 调用分类函数
+            classify_images_by_zoom(path)
+        except Exception as e:
+            print(f"[zoom_file]-->error--处理文件夹内图片按Zoom大小分类事件时 | 报错: {e}")
+            self.logger.error(f"【zoom_file】-->处理文件夹内图片按Zoom大小分类事件时 | 报错: {e}")
+
 
     def size_file(self, path):
         """按尺寸分类"""
-        from src.utils.cls_zoom_size import classify_images_by_size
+        try:
+            # 导入分类函数
+            from src.utils.cls_zoom_size import classify_images_by_size
 
-        # 检查路径是否为文件夹
-        if not os.path.isdir(path):
-            show_message_box("🚩选中的不是文件夹，请确保选中文件夹后重试", "提示", 1000)
-            return
+            # 检查路径是否为文件夹
+            if not os.path.isdir(path):
+                show_message_box("🚩选中的不是文件夹，请确保选中文件夹后重试", "提示", 1000)
+                return
 
-        # 调用分类函数
-        classify_images_by_size(path)
-
+            # 调用分类函数
+            classify_images_by_size(path)
+        except Exception as e:
+            print(f"[size_file]-->error--处理文件夹内图片按尺寸分类事件时 | 报错: {e}")
+            self.logger.error(f"【size_file】-->处理文件夹内图片按尺寸分类事件时 | 报错: {e}")
 
     def breakup_folder(self, folder_path):
         """解散选中的文件夹，将文件夹中的所有文件移动到上一级文件夹后删除空文件夹"""
@@ -874,6 +881,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.update_RB_QTableWidget0()
         except Exception as e:
             show_message_box("🚩处理解散文件夹任务发生错误!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
+            print(f"[breakup_folder]-->error--处理解散文件夹事件时 | 报错: {e}")
             self.logger.error(f"【breakup_folder】-->处理解散文件夹事件时 | 报错: {e}")
             
 
@@ -897,7 +905,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 shutil.rmtree(path, onerror=remove_readonly if os.name == 'nt' else None)
 
         except Exception as e:
-            self.logger.error(f"delete_file-->安全删除文件/文件夹事件时 | 报错: {e}")
+            print(f"[delete_file]-->error--安全删除文件/文件夹事件时 | 报错: {e}")
+            self.logger.error(f"【delete_file】-->安全删除文件/文件夹事件时 | 报错: {e}")
             raise
 
 
@@ -917,6 +926,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 subprocess.run(command, shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
 
         except Exception as e:
+            print(f"[open_file_location]-->error--在资源管理器中打开路径(适用于window系统)时 | 报错: {e}")
             self.logger.error(f"【open_file_location】-->在资源管理器中打开路径(适用于window系统)时 | 报错: {e}")
             raise
 
@@ -982,55 +992,29 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.logger.error(f"【send_file_path_to_aebox】-->将文件夹路径发送到aebox时 | 报错: {e}")
             raise
 
+
     def rename_file(self, path):
         """重命名文件/文件夹"""
         try:
-            
-            dialog = QInputDialog(self)
-            dialog.setWindowTitle("重命名")
-            dialog.setLabelText("请输入新名称:")
-            dialog.setTextValue(old_name := os.path.basename(path))
-            
-            # 设置对话框尺寸
-            dialog.setMinimumSize(100, 100)  # 最小尺寸
-            dialog.setFixedSize(500, 150)    # 固定尺寸（宽400px，高150px）
-            
-            # 设置输入框样式
-            dialog.setStyleSheet("""
-                QInputDialog {
-                    font-family: "JetBrains Mono";
-                    font-size: 14px;
-                }
-                QLineEdit {
-                    padding: 8px;
-                    border: 1px solid #ccc;
-                    border-radius: 4px;
-                }
-            """)
-        
+            dialog = SingleFileRenameDialog(path, self)
+            dialog.setWindowTitle("重命名文件/文件夹")
             if dialog.exec_() == QDialog.Accepted:
-                if (new_name := dialog.textValue()) and new_name != old_name:
-                    # 检查新路径是否已存在
-                    if os.path.exists(new_path := os.path.join(os.path.dirname(path), new_name)):
-                        show_message_box("名称已存在！", "错误", 500)
-                        return
-                    
-                    # 执行重命名
+                if (new_path := dialog.get_new_file_path()):
+                    # 执行重命名事件
                     os.rename(path, new_path)
-                    
+
                     # 更新文件系统模型
                     self.file_system_model.setRootPath('')
                     self.Left_QTreeView.viewport().update()
                         
         except Exception as e:
-            show_message_box("🚩重命名任务发生错误!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
             print(f"[rename_file]-->error--执行重命名事件时 | 报错: {e}")
             self.logger.error(f"【rename_file】-->执行重命名事件时 | 报错: {e}")
 
     """
     右侧信号槽函数
     """
-    @log_performance_decorator(tips="处理模仿用户在地址栏按下回车键任务", log_args=False, log_result=False)
+    @log_error_decorator(tips="模仿用户在地址栏按下回车键")
     def input_enter_action(self): 
         # 定位到左侧文件浏览器中
         self.locate_in_tree_view()
@@ -1805,7 +1789,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.logger.error(f"【update_combobox】-->左侧文件浏览器点击事件,定位更新右侧combobox事件处理函数 | 报错：{e}")
             raise
         
-    @log_performance_decorator(tips="定位到左侧文件浏览器中(地址栏或拖拽文件夹路径)", log_args=False, log_result=False)
+    @log_error_decorator(tips="定位到左侧文件浏览器中(地址栏或拖拽文件夹路径)")
     def locate_in_tree_view(self):
         """地址栏或者拖拽文件夹定位到左侧文件浏览器函数"""
         # 检查路径是否有效
@@ -3113,84 +3097,81 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         if hasattr(self, 'zip_path'):
             self.zip_path = None
 
-    
+    @log_performance_decorator(tips="从JSON文件加载上一次关闭时的设置", log_args=True, log_result=False)
     def load_settings(self):
         """从JSON文件加载设置"""
-        print("[load_settings]-->执行函数任务, 从JSON文件加载之前的设置")
-        self.logger.info("[load_settings]-->执行函数任务, 从JSON文件加载之前的设置")
-        try:
-            if os.path.exists(
-                settings_path := os.path.join(os.path.dirname(__file__), "config", "basic_settings.json")):
-                with open(settings_path, "r", encoding='utf-8', errors='ignore') as f:
-                    settings = json.load(f)
+        if os.path.exists(
+            settings_path := os.path.join(os.path.dirname(__file__), "config", "basic_settings.json")):
+            with open(settings_path, "r", encoding='utf-8', errors='ignore') as f:
+                settings = json.load(f)
 
-                    # 恢复地址栏历史记录和当前目录
-                    combobox_history = settings.get("combobox_history", [])
-                    self.RT_QComboBox.clear()
-                    self.RT_QComboBox.addItems(combobox_history)
-                    current_directory = settings.get("current_directory", "")
-                    if current_directory and os.path.exists(current_directory):
-                        self.RT_QComboBox.setCurrentText(current_directory)
+                # 恢复地址栏历史记录和当前目录
+                combobox_history = settings.get("combobox_history", [])
+                self.RT_QComboBox.clear()
+                self.RT_QComboBox.addItems(combobox_history)
+                current_directory = settings.get("current_directory", "")
+                if current_directory and os.path.exists(current_directory):
+                    self.RT_QComboBox.setCurrentText(current_directory)
 
-                    # 恢复文件类型选择
-                    selected_option = settings.get("file_type_option", "显示图片文件")
-                    index = self.RT_QComboBox0.findText(selected_option)
-                    if index >= 0:
-                        self.RT_QComboBox0.setCurrentIndex(index)
+                # 恢复文件类型选择
+                selected_option = settings.get("file_type_option", "显示图片文件")
+                index = self.RT_QComboBox0.findText(selected_option)
+                if index >= 0:
+                    self.RT_QComboBox0.setCurrentIndex(index)
 
-                    # 恢复排序方式
-                    sort_option = settings.get("sort_option", "按创建时间排序")
-                    index = self.RT_QComboBox2.findText(sort_option)
-                    if index >= 0:
-                        self.RT_QComboBox2.setCurrentIndex(index)
+                # 恢复排序方式
+                sort_option = settings.get("sort_option", "按创建时间排序")
+                index = self.RT_QComboBox2.findText(sort_option)
+                if index >= 0:
+                    self.RT_QComboBox2.setCurrentIndex(index)
 
-                    # 恢复主题设置
-                    theme_option = settings.get("theme_option", "默认主题")
-                    index = self.RT_QComboBox3.findText(theme_option)
-                    if index >= 0:
-                        self.RT_QComboBox3.setCurrentIndex(index)
-                        self.current_theme = settings.get("current_theme", "默认主题")
-                        self.apply_theme()
+                # 恢复主题设置
+                theme_option = settings.get("theme_option", "默认主题")
+                index = self.RT_QComboBox3.findText(theme_option)
+                if index >= 0:
+                    self.RT_QComboBox3.setCurrentIndex(index)
+                    self.current_theme = settings.get("current_theme", "默认主题")
+                    self.apply_theme()
 
-                    # 恢复文件夹选择状态
-                    all_items = settings.get("combobox1_all_items", [])
-                    checked_items = settings.get("combobox1_checked_items", [])
-                    if all_items:
-                        self.model = CheckBoxListModel(all_items)
-                        self.RT_QComboBox1.setModel(self.model)
-                        self.RT_QComboBox1.setItemDelegate(CheckBoxDelegate())
-                        self.RT_QComboBox1.setContextMenuPolicy(Qt.NoContextMenu)
+                # 恢复文件夹选择状态
+                all_items = settings.get("combobox1_all_items", [])
+                checked_items = settings.get("combobox1_checked_items", [])
+                if all_items:
+                    self.model = CheckBoxListModel(all_items)
+                    self.RT_QComboBox1.setModel(self.model)
+                    self.RT_QComboBox1.setItemDelegate(CheckBoxDelegate())
+                    self.RT_QComboBox1.setContextMenuPolicy(Qt.NoContextMenu)
 
-                        # 恢复选中状态
-                        for i, item in enumerate(self.model.items):
-                            if item in checked_items:
-                                self.model.setChecked(self.model.index(i))
-                        # 更新同级文件夹下拉框选项
-                        self.updateComboBox1Text()
-                    else:
-                        # 初始化同级文件夹下拉框选项
-                        self.RT_QComboBox1_init()
+                    # 恢复选中状态
+                    for i, item in enumerate(self.model.items):
+                        if item in checked_items:
+                            self.model.setChecked(self.model.index(i))
+                    # 更新同级文件夹下拉框选项
+                    self.updateComboBox1Text()
+                else:
+                    # 初始化同级文件夹下拉框选项
+                    self.RT_QComboBox1_init()
 
-                    # 定位地址栏文件夹到左侧文件浏览器中
-                    self.locate_in_tree_view()
+                # 定位地址栏文件夹到左侧文件浏览器中
+                self.locate_in_tree_view()
 
-                    # 恢复极简模式状态,默认开启
-                    self.simple_mode = settings.get("simple_mode", True)
+                # 恢复极简模式状态,默认开启
+                self.simple_mode = settings.get("simple_mode", True)
 
-                    # 恢复拖拽模式状态,默认开启
-                    self.drag_flag = settings.get("drag_flag", True)
+                # 恢复拖拽模式状态,默认开启
+                self.drag_flag = settings.get("drag_flag", True)
 
-                    # 恢复fast_api使能开关,默认关闭,并初始化一下
-                    self.api_flag = settings.get("api_flag", False)
-                    self.statusbar_checkbox.setChecked(self.api_flag)
-                    self.fast_api_switch()
-            else:
-                # 若没有cache/设置，则在此初始化主题设置--默认主题
-                self.apply_theme()
-        except Exception as e:
-            print(f"[load_settings]-->加载设置时出错: {e}")
-            self.logger.error(f"【load_settings】-->从JSON文件加载设置 | 报错: {e}")
-            raise
+                # 恢复fast_api使能开关,默认关闭,并初始化一下
+                self.api_flag = settings.get("api_flag", False)
+                self.statusbar_checkbox.setChecked(self.api_flag)
+                self.fast_api_switch()
+                
+                # 直接退出函数
+                return
+        
+        # 若没有cache/设置，则在此初始化主题设置--默认主题
+        self.apply_theme()
+
 
     def save_settings(self):
         """保存当前设置到JSON文件"""
