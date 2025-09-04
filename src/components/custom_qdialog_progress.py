@@ -55,20 +55,18 @@ class ProgressDialog(QDialog):
 
         # 使用无边框窗口风格
         self.setWindowFlags(Qt.Dialog | Qt.WindowTitleHint | Qt.WindowCloseButtonHint | Qt.FramelessWindowHint)
-
         self.layout = QVBoxLayout(self)
         self.progress_bar = QProgressBar(self)
-        self.message_label = QLabel(self)  # 新增 QLabel 用于显示消息
+        self.message_label = QLabel(self)  
         self.cancel_button = QPushButton("取消", self)
 
         # 添加进度条、消息标签和取消按钮到布局
         self.layout.addWidget(self.progress_bar)
-        self.layout.addWidget(self.message_label)  # 添加消息标签到布局
+        self.layout.addWidget(self.message_label)  
         self.layout.addWidget(self.cancel_button)
 
         # 设置窗口大小
-        self.setFixedSize(450, 150)
-
+        self.setFixedSize(400, 200)
         self.cancel_button.clicked.connect(self.cancel_compression)
 
         # 设置窗口位置为当前鼠标所在显示屏的中央
@@ -93,8 +91,8 @@ class ProgressDialog(QDialog):
     def update_progress(self, value):
         self.progress_bar.setValue(value)
 
-    def set_message(self, message):
-        self.message_label.setText(message)  # 更新 QLabel 内容
+    def set_message(self, message):# 更新 QLabel 内容
+        self.message_label.setText(message)  
 
     def cancel_compression(self):
         # 发送取消信号

@@ -1561,7 +1561,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # 获取压缩包名称
             zip_name, ok = QInputDialog.getText(self, "输入压缩包名称", "请输入压缩包名称（不带扩展名）:")
             if not ok or not zip_name:
-                show_message_box("未输入有效的名称！", "提示", 500)
+                print(f"[compress_selected_files]-->取消压缩文件 | 未输入有效压缩文件名")
+                self.logger.error(f"[compress_selected_files]-->取消压缩文件 | 未输入有效压缩文件名")
                 return
 
             # 准备要压缩的文件列表
@@ -3091,12 +3092,14 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 settings = json.load(f)
 
                 # 恢复地址栏历史记录和当前目录
-                combobox_history = settings.get("combobox_history", [])
                 self.RT_QComboBox.clear()
-                self.RT_QComboBox.addItems(combobox_history)
+                self.RT_QComboBox.addItems(settings.get("combobox_history", []))
                 current_directory = settings.get("current_directory", "")
-                if current_directory and os.path.exists(current_directory):
-                    self.RT_QComboBox.setCurrentText(current_directory)
+                current_directory = current_directory if os.path.isdir(current_directory) else self.root_path.as_posix()
+                self.RT_QComboBox.setCurrentText(current_directory)
+
+                # 恢复地址栏后，定位地址栏文件夹到左侧文件浏览器中
+                self.locate_in_tree_view()
 
                 # 恢复文件类型选择
                 selected_option = settings.get("file_type_option", "显示图片文件")
@@ -3118,28 +3121,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     self.current_theme = settings.get("current_theme", "默认主题")
                     self.apply_theme()
 
-                # 恢复文件夹选择状态
-                all_items = settings.get("combobox1_all_items", [])
-                checked_items = settings.get("combobox1_checked_items", [])
-                if all_items:
-                    self.model = CheckBoxListModel(all_items)
-                    self.RT_QComboBox1.setModel(self.model)
-                    self.RT_QComboBox1.setItemDelegate(CheckBoxDelegate())
-                    self.RT_QComboBox1.setContextMenuPolicy(Qt.NoContextMenu)
-
-                    # 恢复选中状态
-                    for i, item in enumerate(self.model.items):
-                        if item in checked_items:
-                            self.model.setChecked(self.model.index(i))
-                    # 更新同级文件夹下拉框选项
-                    self.updateComboBox1Text()
-                else:
-                    # 初始化同级文件夹下拉框选项
-                    self.RT_QComboBox1_init()
-
-                # 定位地址栏文件夹到左侧文件浏览器中
-                self.locate_in_tree_view()
-
                 # 恢复极简模式状态,默认开启
                 self.simple_mode = settings.get("simple_mode", True)
 
@@ -3150,13 +3131,38 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 self.api_flag = settings.get("api_flag", False)
                 self.statusbar_checkbox.setChecked(self.api_flag)
                 self.fast_api_switch()
-                
-                # 直接退出函数
-                return
-        
-        # 若没有cache/设置，则在此初始化主题设置--默认主题
-        self.apply_theme()
 
+
+                # 恢复同级文件夹选择状态，放在最后
+                all_items = settings.get("combobox1_all_items", [])
+                checked_items = settings.get("combobox1_checked_items", [])
+                if all_items and checked_items:
+                    # 判断同级文件夹选中项是否存在
+                    if any(p for p in [Path(current_directory).parent / name for name in checked_items] if p.exists()):
+                        # 设置同级下拉框初始化
+                        self.model = CheckBoxListModel(all_items)
+                        self.RT_QComboBox1.setModel(self.model)
+                        self.RT_QComboBox1.setItemDelegate(CheckBoxDelegate())
+                        self.RT_QComboBox1.setContextMenuPolicy(Qt.NoContextMenu)
+
+                        # 恢复选中状态
+                        for i, item in enumerate(self.model.items):
+                            if item in checked_items:
+                                self.model.setChecked(self.model.index(i))
+
+                        # 更新同级文件夹下拉框选项, 会触发更新表格事件self.update_RB_QTableWidget0()
+                        self.updateComboBox1Text()
+
+                        # 执行完上述初始化操作后直接退出函数
+                        return
+                
+                # 模仿用户按下回车
+                self.input_enter_action()
+                
+        # 初始化主题设置，并模仿用户在地址栏按下回车
+        self.apply_theme()
+        self.input_enter_action()
+        
 
     def save_settings(self):
         """保存当前设置到JSON文件"""
