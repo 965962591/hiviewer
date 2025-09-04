@@ -563,8 +563,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """设置主界面图标以及标题"""
         # print("[set_stylesheet]-->设置主界面相关组件")
 
-        icon_path = (self.icon_path / "viewer_3.ico").as_posix()
-        self.setWindowIcon(QIcon(icon_path))
+        self.main_ui_icon = (self.icon_path / "viewer_3.ico").as_posix()
+        self.setWindowIcon(QIcon(self.main_ui_icon))
         self.setWindowTitle(f"HiViewer")
 
         # 根据鼠标的位置返回当前光标所在屏幕的几何信息
@@ -1069,6 +1069,10 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         try:
             from src.components.custom_qdialog_fastapi import FastApiDialog 
             dialog = FastApiDialog(self)
+            if dialog: # 设置图标以及host和port
+                dialog.setWindowIcon(QIcon(self.main_ui_icon))
+                dialog.ip_edit.setText(self.fast_api_host)
+                dialog.port_edit.setText(self.fast_api_port)
             if dialog.exec_() == QDialog.Accepted:
                 # 获取会话框上面的用户输入的IP地址和端口
                 self.fast_api_host, self.fast_api_port = dialog.get_result()
