@@ -56,7 +56,7 @@ from src.components.custom_qdialog_rename import SingleFileRenameDialog     # �
 from src.components.custom_qCombox_spinner import (                         # 导入自定义下拉框类中的数据模型和委托代理类
 CheckBoxListModel, CheckBoxDelegate)       
 from src.components.custom_qdialog_progress import (                        # 导入自定义压缩进度对话框类
-ProgressDialog, CompressWorker)      
+ProgressDialog, InputDialog, CompressWorker)      
 from src.common.img_preview import ImageViewer                              # 导入自定义图片预览组件  
 from src.common.manager_font import MultiFontManager                        # 字体管理器
 from src.common.manager_version import version_init, fastapi_init           # 版本号&IP地址初始化
@@ -187,8 +187,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.threadpool = QThreadPool()
         self.threadpool.setMaxThreadCount(max(4, os.cpu_count()))  
 
-        # 初始化压缩工作线程,压缩包路径
-        self.zip_path = None  
+        # 初始化压缩工作线程,压缩包路径  
         self.compress_worker = None
 
         """加载颜色相关设置""" # 设置背景色和字体颜色，使用保存的设置或默认值
@@ -1553,43 +1552,30 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def compress_selected_files(self):
         """压缩选中的文件并复制压缩包文件到剪贴板"""
         try:
-            selected_items = self.RB_QTableWidget0.selectedItems()
-            if not selected_items:
-                show_message_box("没有选中的项！", "提示", 500)
+            # 获取将要压缩的文件路径列表
+            files_to_compress = self.get_selected_file_path()
+            if not files_to_compress:
+                show_message_box("🚩没有选中的项 | 没有有效的文件可压缩!!!", "提示", 1000)
                 return
 
             # 获取压缩包名称
-            zip_name, ok = QInputDialog.getText(self, "输入压缩包名称", "请输入压缩包名称（不带扩展名）:")
-            if not ok or not zip_name:
+            zip_name_dialog = InputDialog(self)
+            if zip_name_dialog.exec_() == QDialog.Accepted:
+                # 获取输入框的名称，确保不为空
+                zip_name = zip_name if (zip_name := zip_name_dialog.get_result()) else "zip压缩文件"
+            else:
                 print(f"[compress_selected_files]-->取消压缩文件 | 未输入有效压缩文件名")
                 self.logger.error(f"[compress_selected_files]-->取消压缩文件 | 未输入有效压缩文件名")
                 return
 
-            # 准备要压缩的文件列表
-            files_to_compress = []
-            current_directory = self.RT_QComboBox.currentText()
-        
-            for item in selected_items:
-                row = item.row()
-                col = item.column()
-                file_name = self.RB_QTableWidget0.item(row, col).text().split('\n')[0]
-                column_name = self.RB_QTableWidget0.horizontalHeaderItem(col).text()
-                full_path = str(Path(current_directory).parent / column_name / file_name)
-                
-                if os.path.isfile(full_path):
-                    files_to_compress.append((full_path, file_name))
-
-            if not files_to_compress:
-                show_message_box("没有有效的文件可压缩", "提示", 500)
-                return
 
             # 设置压缩包文件路径存在; 确保父目录存在; 将path格式转换为str格式
-            self.zip_path = self.root_path / "cache" / f"{zip_name}.zip"
-            self.zip_path.parent.mkdir(parents=True, exist_ok=True)
-            self.zip_path = self.zip_path.as_posix()
+            zip_path = self.root_path / "cache" / f"{zip_name}.zip"
+            zip_path.parent.mkdir(parents=True, exist_ok=True)
+            zip_path = zip_path.as_posix()
 
             # 创建并启动压缩工作线程
-            self.compress_worker = CompressWorker(files_to_compress, self.zip_path)
+            self.compress_worker = CompressWorker(files_to_compress, zip_path)
             
             # 连接信号
             self.compress_worker.signals.progress.connect(self.on_compress_progress)
@@ -1694,7 +1680,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         if self.compress_worker:
             self.compress_worker.cancel()  
         self.progress_dialog.close()  
-        show_message_box("压缩已取消", "提示", 500)
+
+        # 提示信息
+        show_message_box("🚩已取消压缩, 并清除压缩缓存-v-", "提示", 800)
 
         # 若是压缩取消，则删除缓存文件中的zip文件
         if (cache_dir := self.root_path / "cache").exists():
@@ -3080,9 +3068,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 self.logger.error(f"【_cleanup_compression_resources】-->清理compress_worker失败: {e}")
                 raise
         
-        # 清理压缩包路径
-        if hasattr(self, 'zip_path'):
-            self.zip_path = None
 
     @log_performance_decorator(tips="从JSON文件加载上一次关闭时的设置", log_args=True, log_result=False)
     def load_settings(self):
