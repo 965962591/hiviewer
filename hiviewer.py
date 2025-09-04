@@ -1024,12 +1024,12 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def clear_combox(self, index):
         # 清空地址栏
         self.RT_QComboBox.clear()
-        # 刷新右侧表格
-        self.update_RB_QTableWidget0()
         # 手动清除图标缓存
         IconCache.clear_cache()
         # 清除日志文件和缓存
         self.clear_log_and_cache_files()
+        # 模拟用户在地址回车
+        self.input_enter_action()
         # 释放内存
         self.cleanup() 
         
@@ -2128,10 +2128,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # 写入日志信息
             print("[RT_QComboBox1_init]-->开始添加地址栏文件夹的同级文件夹到下拉复选框中")
             self.logger.info(f"[RT_QComboBox1_init]-->开始添加地址栏文件夹的同级文件夹到下拉复选框中")
-            # 检查地址栏当前路径是否有效
-            if not os.path.exists(current_directory := self.RT_QComboBox.currentText()): 
-                print("[RT_QComboBox1_init]-->地址栏路径不存在")
-                return  
+            # 获取地址栏显示，没有路径也会返回空字符串""，此时调用相当于初始化同级下拉框
+            current_directory = self.RT_QComboBox.currentText()
             # 获取父目录中的文件夹列表,始化模型，绑定模型到 QComboBox,设置自定义委托，禁用右键菜单
             sibling_folders = self.getSiblingFolders(current_directory)    
             self.model = CheckBoxListModel(sibling_folders)  
@@ -3347,9 +3345,10 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """  
         # 弹出刷新表格&清除缓存的提示框
         show_message_box("刷新表格&清除缓存-", "提示", 500)
-        # 清除日志文件，清除图标缓存
-        self.clear_log_and_cache_files()
+        # 清除icon缓存
         IconCache.clear_cache()
+        # 清除指定后缀缓存
+        clear_cache_files(base_path=None, file_types=[".jpg", ".png", ".json"])
         # 重新更新表格
         self.update_RB_QTableWidget0()
 
@@ -3358,7 +3357,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """清除日志文件以及zip缓存文件"""
         # 使用工具函数清除日志文件以及zip等缓存
         clear_log_files()
-        clear_cache_files(base_path=None, file_types=[".zip",".json"])
+        clear_cache_files(base_path=None, file_types=[".zip",".json",".ini"])
         # 重新初始化日志系统
         setup_logging(self.root_path)
         self.logger = get_logger(__name__)
