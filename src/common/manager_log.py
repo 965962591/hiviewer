@@ -76,9 +76,9 @@ logging.getLogger().setLevel(logging.DEBUG if DEBUG else logging.INFO)
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 """
 
-def load_log_config():
+def load_log_config(root_path):
     """加载日志配置文件"""
-    config_path = BASE_PATH / "config" / "log_config.json"
+    config_path = root_path / "config" / "log_config.json"
     default_config = {
         "console_level": "DEBUG",
         "file_level": "INFO", 
@@ -110,14 +110,18 @@ def load_log_config():
         print(f"加载日志配置失败: {e}, 使用默认配置")
         return default_config
 
-def setup_logging():
+def setup_logging(root_path):
     """设置日志系统"""
     try:
+        if not root_path:
+            print("[setup_logging]-->warning--传入日志初始化模块的程序根目录为空")
+            return
+
         # 加载配置
-        config = load_log_config()
+        config = load_log_config(root_path)
         
         # 创建日志目录
-        log_dir = BASE_PATH / "cache" / "logs"
+        log_dir = root_path / "cache" / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         
         # 获取日志级别
@@ -187,6 +191,7 @@ def setup_logging():
             ]
         )
         logging.error(f"日志系统初始化失败，使用后备配置: {e}")
+        raise
 
 def get_logger(name=None):
     """获取指定名称的日志器"""

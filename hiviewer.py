@@ -6,18 +6,9 @@
 @Author       :diamond_cz@163.com
 @Version      :release-v3.6.1
 @Description  :hiviewer看图工具主界面
-
-python项目多文件夹路径说明:
-(1)获取当前py文件的路径: 
-os.path.abspath(__file__)
-(2)获取当前py文件的父文件夹路径: 
-os.path.dirname(os.path.abspath(__file__))
-BASEICONPATH = Path(__file__).parent
-(1)获取主函数py文件的路径: 
-os.path.abspath(sys.argv[0])
-(2)获取主函数py文件的父文件夹路径: 
-os.path.dirname(os.path.abspath(sys.argv[0]))
-BASEICONPATH = Path(sys.argv[0]).parent
+注意事项：
+  1. 使用函数get_app_dir()获取当前程序根目录,避免在冻结态使用 __file__ 推导资源路径，
+    会出现短文件名别名报错(如:HIVIEW~1.DIS)
 '''
 
 """记录程序启动时间"""
@@ -90,9 +81,33 @@ check_process_running, urlencode_folder_path, get_api_data)
 
 
 """
+设置全局函数的方法
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+"""
+def get_app_dir():
+    """获取应用程序根目录（冻结态优先使用可执行文件目录，并尽量展开为长路径）"""
+    if getattr(sys, "frozen", False):
+        base = Path(sys.executable).resolve().parent
+    else:
+        base = Path(__file__).resolve().parent
+
+    if os.name == "nt":
+        try:
+            import ctypes  # 延迟导入，避免非 Windows 环境报错
+            GetLongPathNameW = ctypes.windll.kernel32.GetLongPathNameW
+            GetLongPathNameW.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint]
+            buf = ctypes.create_unicode_buffer(32768)
+            if GetLongPathNameW(str(base), buf, 32768):
+                return Path(buf.value)
+        except Exception:
+            pass
+    return base
+
+"""
 设置主界面类区域开始线
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 """
+
 class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def __init__(self, parent=None):
         super(HiviewerMainwindow, self).__init__(parent)
@@ -100,14 +115,20 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 记录程序启动时间；设置图标路径；读取本地版本信息，并初始化新版本信息
         self.start_time = flag_start
 
+        # 设置根目录和icon图标目录
+        self.root_path = get_app_dir()
+        self.icon_path =  self.root_path / "resource" / "icons"
+        
+        # 初始化日志信息
+        setup_logging(self.root_path) 
+
         # 获取活动的日志记录器,打印相关信息
         self.logger = get_logger(__name__)
         self.logger.info(f""" {"-" * 25} hiviewer主程序开始启动 {"-" * 25}""")
         print(f"----------[程序预启动时间]----------: {(time.time()-self.start_time):.2f} 秒")
         self.logger.info(f"""【程序预启动】-->耗时: {(time.time()-self.start_time):.2f} 秒""")
 
-        # 设置icon路径以及版本信息和fast api地址端口的初始化
-        self.base_icon_path = Path(__file__).parent / "resource" / "icons"
+        # 版本信息和fast api地址端口的初始化
         self.version_info, self.new_version_info,  = version_init(), False     
         self.fast_api_host, self.fast_api_port = fastapi_init()
         
@@ -179,9 +200,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
         """加载字体相关设置""" # 初始化字体管理器,并获取字体，设置默认字体 self.custom_font
         font_paths = [
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "resource", "fonts", "JetBrainsMapleMono_Regular.ttf"), # JetBrains Maple Mono
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "resource", "fonts", "xialu_wenkai.ttf"),               # LXGW WenKai
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "resource", "fonts", "MapleMonoNormal_Regular.ttf")     # Maple Mono Normal
+            (self.root_path / "resource" / "fonts" / "JetBrainsMapleMono_Regular.ttf").as_posix(), # JetBrains Maple Mono
+            (self.root_path / "resource" / "fonts" / "xialu_wenkai.ttf").as_posix(),               # LXGW WenKai
+            (self.root_path / "resource" / "fonts" / "MapleMonoNormal_Regular.ttf").as_posix()     # Maple Mono Normal
         ]
         MultiFontManager.initialize(font_paths=font_paths)
         self.custom_font = MultiFontManager.get_font(font_family="LXGW WenKai", size=12)
@@ -199,7 +220,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def create_splash_screen(self):
         """创建带渐入渐出效果的启动画面"""
         # 加载启动画面图片
-        splash_path = (self.base_icon_path / "viewer_0.png").as_posix()
+        splash_path = (self.icon_path / "viewer_0.png").as_posix()
         splash_pixmap = QPixmap(splash_path)
         
         # 如果启动画面图片为空，则创建一个空白图片
@@ -379,54 +400,30 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """)
 
         # 添加主菜单项并设置图标
-        icon_path = (self.base_icon_path / "delete_ico_96x96.ico").as_posix()
-        delete_icon = QIcon(icon_path) 
-        icon_path = (self.base_icon_path / "paste_ico_96x96.ico").as_posix()
-        paste_icon = QIcon(icon_path) 
-        icon_path = (self.base_icon_path / "update_ico_96x96.ico").as_posix()
-        refresh_icon = QIcon(icon_path) 
-        icon_path = (self.base_icon_path / "theme_ico_96x96.ico").as_posix()
-        theme_icon = QIcon(icon_path) 
-        icon_path = (self.base_icon_path / "image_size_reduce_ico_96x96.ico").as_posix()
-        image_size_reduce_icon = QIcon(icon_path)
-        icon_path = (self.base_icon_path / "ps_ico_96x96.ico").as_posix()
-        ps_icon = QIcon(icon_path) 
-        icon_path = (self.base_icon_path / "cmd_ico_96x96.ico").as_posix()
-        command_icon = QIcon(icon_path)
-        icon_path = (self.base_icon_path / "exif_ico_96x96.ico").as_posix()
-        exif_icon = QIcon(icon_path)
-        icon_path = (self.base_icon_path / "raw_ico_96x96.ico").as_posix()
-        raw_icon = QIcon(icon_path)
-        icon_path = (self.base_icon_path / "rename_ico_96x96.ico").as_posix()
-        rename_icon = QIcon(icon_path)
-        icon_path = (self.base_icon_path / "about.ico").as_posix()
-        help_icon = QIcon(icon_path) 
-        icon_path = (self.base_icon_path / "file_zip_ico_96x96.ico").as_posix()
-        zip_icon = QIcon(icon_path)
-        icon_path = (self.base_icon_path / "TCP_ico_96x96.ico").as_posix()
-        tcp_icon = QIcon(icon_path)
-        icon_path = (self.base_icon_path / "rorator_plus_ico_96x96.ico").as_posix()
-        rotator_icon = QIcon(icon_path)
-        icon_path = (self.base_icon_path / "line_filtrate_ico_96x96.ico").as_posix()
-        filtrate_icon = QIcon(icon_path)
-        icon_path = (self.base_icon_path / "win_folder_ico_96x96.ico").as_posix()
-        win_folder_icon = QIcon(icon_path)
-        icon_path = (self.base_icon_path / "log.png").as_posix()
-        log_icon = QIcon(icon_path)
-        icon_path = (self.base_icon_path / "restart_ico_96x96.ico").as_posix()
-        restart_icon = QIcon(icon_path)
-        icon_path = (self.base_icon_path / "16gl-0.png").as_posix()
-        icon_0 = QIcon(icon_path)
-        icon_path = (self.base_icon_path / "16gl-1.png").as_posix()
-        icon_1 = QIcon(icon_path)
-        icon_path = (self.base_icon_path / "16gl-2.png").as_posix()
-        icon_2 = QIcon(icon_path)
-        icon_path = (self.base_icon_path / "16gl-3.png").as_posix()
-        icon_3 = QIcon(icon_path)
-        icon_path = (self.base_icon_path / "16gl-4.png").as_posix()
-        icon_4 = QIcon(icon_path)
-        icon_path = (self.base_icon_path / "16gl-5.png").as_posix()
-        icon_5 = QIcon(icon_path)
+        delete_icon = QIcon((self.icon_path / "delete_ico_96x96.ico").as_posix()) 
+        paste_icon = QIcon((self.icon_path / "paste_ico_96x96.ico").as_posix()) 
+        refresh_icon = QIcon((self.icon_path / "update_ico_96x96.ico").as_posix()) 
+        theme_icon = QIcon((self.icon_path / "theme_ico_96x96.ico").as_posix()) 
+        image_size_reduce_icon = QIcon((self.icon_path / "image_size_reduce_ico_96x96.ico").as_posix())
+        ps_icon = QIcon((self.icon_path / "ps_ico_96x96.ico").as_posix()) 
+        command_icon = QIcon((self.icon_path / "cmd_ico_96x96.ico").as_posix())
+        exif_icon = QIcon((self.icon_path / "exif_ico_96x96.ico").as_posix())
+        raw_icon = QIcon((self.icon_path / "raw_ico_96x96.ico").as_posix())
+        rename_icon = QIcon((self.icon_path / "rename_ico_96x96.ico").as_posix())
+        help_icon = QIcon((self.icon_path / "about.ico").as_posix()) 
+        zip_icon = QIcon((self.icon_path / "file_zip_ico_96x96.ico").as_posix())
+        tcp_icon = QIcon((self.icon_path / "TCP_ico_96x96.ico").as_posix())
+        rotator_icon = QIcon((self.icon_path / "rorator_plus_ico_96x96.ico").as_posix())
+        filtrate_icon = QIcon((self.icon_path / "line_filtrate_ico_96x96.ico").as_posix())
+        win_folder_icon = QIcon((self.icon_path / "win_folder_ico_96x96.ico").as_posix())
+        log_icon = QIcon((self.icon_path / "log.png").as_posix())
+        restart_icon = QIcon((self.icon_path / "restart_ico_96x96.ico").as_posix())
+        icon_0 = QIcon((self.icon_path / "16gl-0.png").as_posix())
+        icon_1 = QIcon((self.icon_path / "16gl-1.png").as_posix())
+        icon_2 = QIcon((self.icon_path / "16gl-2.png").as_posix())
+        icon_3 = QIcon((self.icon_path / "16gl-3.png").as_posix())
+        icon_4 = QIcon((self.icon_path / "16gl-4.png").as_posix())
+        icon_5 = QIcon((self.icon_path / "16gl-5.png").as_posix())
 
         # 创建二级菜单-删除选项
         sub_menu = QMenu("删除选项", self.context_menu) 
@@ -486,7 +483,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.context_menu.addAction(log_icon, "打开日志文件(F3)", self.on_f3_pressed)
         self.context_menu.addAction(win_folder_icon, "打开资源管理器(W)", self.reveal_in_explorer)
         self.context_menu.addAction(refresh_icon, "刷新(F5)", self.on_f5_pressed)
-        self.context_menu.addAction(restart_icon, "重启程序", self.on_f12_pressed)
+        self.context_menu.addAction(restart_icon, "重启程序", self.restart)
         self.context_menu.addAction(help_icon, "关于(Ctrl+H)", self.on_ctrl_h_pressed)
 
         # 设置右键菜单绑定右侧表格组件
@@ -566,8 +563,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """设置主界面图标以及标题"""
         # print("[set_stylesheet]-->设置主界面相关组件")
 
-        self.icon_path = os.path.join(self.base_icon_path, "viewer_3.ico")
-        self.setWindowIcon(QIcon(self.icon_path))
+        icon_path = (self.icon_path / "viewer_3.ico").as_posix()
+        self.setWindowIcon(QIcon(icon_path))
         self.setWindowTitle(f"HiViewer")
 
         # 根据鼠标的位置返回当前光标所在屏幕的几何信息
@@ -628,8 +625,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.RT_QPushButton5.setText("对比")
 
         # 设置当前目录到地址栏，并将地址栏的文件夹定位到左侧文件浏览器中
-        current_directory = os.path.dirname(os.path.abspath(__file__).capitalize())
-        self.RT_QComboBox.addItem(current_directory)
+        self.RT_QComboBox.addItem(self.root_path.as_posix())
         self.RT_QComboBox.lineEdit().setPlaceholderText("请在地址栏输入一个有效的路径")  # 设置提示文本
         
         # RB_QTableWidget0表格设置
@@ -1084,7 +1080,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
                 # 保存fast_api地址和端口到ipconfig.ini配置文件
                 FASTAPI=f"[API]\nhost = {self.fast_api_host}\nport = {self.fast_api_port}"
-                default_version_path = Path(__file__).parent / "config" / "ipconfig.ini"
+                default_version_path = self.root_path / "config" / "ipconfig.ini"
                 default_version_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(default_version_path, 'w', encoding='utf-8') as f:
                     f.write(FASTAPI)
@@ -1225,7 +1221,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.cancel_preloading()
 
             # 构建jpegoptim的完整路径
-            jpegr_path = os.path.join(os.path.dirname(__file__), "resource", 'tools', 'jpegr_lossless_rotator', 'jpegr.exe')
+            jpegr_path = (self.root_path / "resource" / 'tools' / 'jpegr_lossless_rotator' / 'jpegr.exe').as_posix()
             if not os.path.exists(jpegr_path):
                 show_message_box(f"jpegr.exe 不存在，请检查/tools/jpegr_lossless_rotator/", "提示", 1500)
                 return
@@ -1582,10 +1578,10 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 show_message_box("没有有效的文件可压缩", "提示", 500)
                 return
 
-            # 设置压缩包路径
-            cache_dir = os.path.join(os.path.dirname(__file__), "cache")
-            os.makedirs(cache_dir, exist_ok=True)
-            self.zip_path = os.path.join(cache_dir, f"{zip_name}.zip")
+            # 设置压缩包文件路径存在; 确保父目录存在; 将path格式转换为str格式
+            self.zip_path = self.root_path / "cache" / f"{zip_name}.zip"
+            self.zip_path.parent.mkdir(parents=True, exist_ok=True)
+            self.zip_path = self.zip_path.as_posix()
 
             # 创建并启动压缩工作线程
             self.compress_worker = CompressWorker(files_to_compress, self.zip_path)
@@ -1617,10 +1613,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def jpgc_tool(self):
         """打开图片体积压缩工具_升级版"""
         try:
-            tools_dir = os.path.join(os.path.dirname(__file__), "resource", "tools")
-            tcp_path = os.path.join(tools_dir, "JPGC.exe")
-            
-            if not os.path.isfile(tcp_path):
+            # 检查图片体积压缩工具是否存在
+            tcp_path = self.root_path / "resource" / "tools" / "JPGC.exe"
+            if not tcp_path.exists():
                 show_message_box(f"未找到JPGC工具: {tcp_path}", "错误", 1500)
                 return
                 
@@ -1697,10 +1692,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         show_message_box("压缩已取消", "提示", 500)
 
         # 若是压缩取消，则删除缓存文件中的zip文件
-        cache_dir = os.path.join(os.path.dirname(__file__), "cache")
-        if os.path.exists(cache_dir):
+        if (cache_dir := self.root_path / "cache").exists():
             # 强制删除缓存文件中的zip文件
-            force_delete_folder(cache_dir, '.zip')
+            force_delete_folder(cache_dir.as_posix(), '.zip')
 
     @log_error_decorator(tips="压缩线程-->触发压缩完成信号")
     def on_compress_finished(self, zip_path):
@@ -1792,23 +1786,13 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     @log_error_decorator(tips="定位到左侧文件浏览器中(地址栏或拖拽文件夹路径)")
     def locate_in_tree_view(self):
         """地址栏或者拖拽文件夹定位到左侧文件浏览器函数"""
-        # 检查路径是否有效
-        current_directory = self.RT_QComboBox.currentText()
-        if not os.path.isdir(current_directory): 
-            show_message_box("🚩[locate_in_tree_view]-->地址栏文件夹路径无效，无法定位到左侧文件浏览器中", "提示", 1500)
-            return  
-        
-        # 获取当前目录的索引,并检查索引是否有效
-        index = self.file_system_model.index(current_directory)
-        if not index.isValid():
-            show_message_box("🚩[locate_in_tree_view]-->索引无效，无法定位到左侧文件浏览器中", "提示", 1500)
-            return
-
-        # 设置当前索引,展开该目录,滚动到该项，确保垂直方向居中,水平滚动条置0
-        self.Left_QTreeView.setCurrentIndex(index)    
-        self.Left_QTreeView.setExpanded(index, True)  
-        self.Left_QTreeView.scrollTo(index, QAbstractItemView.PositionAtCenter)
-        self.Left_QTreeView.horizontalScrollBar().setValue(0)
+        # 检查路径是否有效; 获取当前目录的索引,并确保索引有效
+        if os.path.isdir(current_directory := self.RT_QComboBox.currentText()) and (index := self.file_system_model.index(current_directory)).isValid():
+            # 设置当前索引,展开该目录,滚动到该项，确保垂直方向居中,水平滚动条置0
+            self.Left_QTreeView.setCurrentIndex(index)    
+            self.Left_QTreeView.setExpanded(index, True)  
+            self.Left_QTreeView.scrollTo(index, QAbstractItemView.PositionAtCenter)
+            self.Left_QTreeView.horizontalScrollBar().setValue(0)
 
 
     def update_RB_QTableWidget0_from_list(self, file_infos_list, file_paths, dir_name_list):
@@ -3100,8 +3084,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     @log_performance_decorator(tips="从JSON文件加载上一次关闭时的设置", log_args=True, log_result=False)
     def load_settings(self):
         """从JSON文件加载设置"""
-        if os.path.exists(
-            settings_path := os.path.join(os.path.dirname(__file__), "config", "basic_settings.json")):
+        if (settings_path := self.root_path / "config" / "basic_settings.json").exists():
             with open(settings_path, "r", encoding='utf-8', errors='ignore') as f:
                 settings = json.load(f)
 
@@ -3177,7 +3160,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """保存当前设置到JSON文件"""
         try:
             # 使用 pathlib.Path 统一路径处理，确保目录存在
-            settings_path = Path(__file__).parent / "config" / "basic_settings.json"
+            settings_path = self.root_path / "config" / "basic_settings.json"
             settings_path.parent.mkdir(parents=True, exist_ok=True)
             # 收集所有需要保存的设置
             settings = {
@@ -3306,7 +3289,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.raw2jpg_tool = Mipi2RawConverterApp()
         self.raw2jpg_tool.setWindowTitle("MIPI RAW文件转换为JPG文件")
         # 设置窗口图标
-        icon_path = (self.base_icon_path / "raw_ico_96x96.ico").as_posix()
+        icon_path = (self.icon_path / "raw_ico_96x96.ico").as_posix()
         self.raw2jpg_tool.setWindowIcon(QIcon(icon_path))
         # 添加链接关闭事件
         self.raw2jpg_tool.closed.connect(self.on_raw2jpg_tool_closed)
@@ -3317,15 +3300,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def on_f3_pressed(self):
         """处理F3键按下事件"""
         # 定位日志文件路径
-        if not (log_path := Path(__file__).parent / "cache" / "logs" / "hiviewer.log").exists():
+        if not (log_path := self.root_path / "cache" / "logs" / "hiviewer.log").exists():
             show_message_box("🚩定位日志文件【hiviewer.log】失败!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
             self.logger.warning(f"on_f3_pressed()-->日志文件【hiviewer.log】不存在 | 路径:{log_path.as_posix()}")
             return
 
         # 使用系统记事本打开日志文件
-        subprocess.Popen(["notepad.exe", str(log_path)])
-        print(f"[on_f3_pressed]-->使用系统记事本打开日志文件成功")
-        self.logger.info(f"[on_f3_pressed]-->使用系统记事本打开日志文件成功")
+        subprocess.Popen(["notepad.exe", log_path])
+        print(f"[on_f3_pressed]-->使用系统记事本打开日志文件成功 | 路径: {log_path} ")
+        self.logger.info(f"[on_f3_pressed]-->使用系统记事本打开日志文件成功 | 路径: {log_path} ")
 
 
     """键盘按下事件处理""" 
@@ -3377,29 +3360,30 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         clear_log_files()
         clear_cache_files(base_path=None, file_types=[".zip",".json"])
         # 重新初始化日志系统
-        setup_logging()
+        setup_logging(self.root_path)
         self.logger = get_logger(__name__)
         self.logger.info("---->成功清除日志文件，并重新初始化日志系统<----")
         print("---->成功清除日志文件，并重新初始化日志系统<----")
 
-    @log_error_decorator(tips="处理【F12】键按下事件,重启hiviewer主程序")
-    def on_f12_pressed(self):
-        """处理【F12】键按下事件
+    @log_error_decorator(tips="重启hiviewer主程序")
+    def restart(self):
+        """处理 重启hiviewer主程序 事件
         函数功能说明: 重启hiviewer主程序
         """
         # 查找hiviewer主程序路径并判断是否存在
-        if os.path.exists(program_path := os.path.join(os.path.dirname(__file__), "hiviewer.exe")):
+        program_path = self.root_path / "hiviewer.exe"
+        if not program_path.exists():
             show_message_box("🚩无法重新启动主程序:【hiviewer.exe】\n🐬程序路径不存在!!!", "提示", 1500)
-            self.logger.warning(f"[on_f12_pressed]-->无法重启hiviewer主程序,程序文件不存在: {program_path}")  
+            self.logger.warning(f"[restart]-->无法重启hiviewer主程序,程序文件不存在: {program_path}")  
             return
-        
+
         # 关闭主程序
         self.close()
 
         # 使用os.startfile启动程序，并等待3秒确保程序启动
         os.startfile(program_path)
         time.sleep(3)  
-        self.logger.info(f"[on_f12_pressed]-->已重新启动主程序:【hiviewer.exe】")
+        self.logger.info(f"[restart]-->已重新启动主程序:【hiviewer.exe】")
 
 
     @log_error_decorator(tips="处理【Alt+Q】键按下事件")
@@ -3638,15 +3622,14 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # 单例模式管理帮助窗口
             if not hasattr(self, 'help_dialog'):
                 # 构建文档路径,使用说明文档+版本更新文档
-                doc_dir = os.path.join(os.path.dirname(__file__), "resource", "docs")
-                User_path = os.path.join(doc_dir, "User_Manual.md")
-                Version_path = os.path.join(doc_dir, "Version_Updates.md")
+                User_path = self.root_path / "resource" / 'docs' / "User_Manual.md"
+                Version_path = self.root_path / "resource" / 'docs' / "Version_Updates.md"
                 # 验证文档文件存在性
-                if not os.path.isfile(User_path) or not os.path.isfile(Version_path):
-                    show_message_box(f"🚩帮助文档未找到:\n{User_path}or{Version_path}", "配置错误", 2000)
+                if not User_path.exists() or not Version_path.exists():
+                    show_message_box(f"🚩帮助文档未找到:\n{User_path.as_posix()}or{Version_path.as_posix}", "配置错误", 2000)
                     return
                 # 初始化对话框
-                self.help_dialog = AboutDialog(User_path,Version_path)
+                self.help_dialog = AboutDialog(User_path, Version_path)
             # 激活现有窗口
             self.help_dialog.show()
             self.help_dialog.raise_()
@@ -3883,7 +3866,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.video_player.setWindowTitle("多视频播放程序")
         self.video_player.setWindowFlags(Qt.Window) 
         # 设置窗口图标
-        icon_path = (self.base_icon_path / "video_icon.ico").as_posix()
+        icon_path = (self.icon_path / "video_icon.ico").as_posix()
         self.video_player.setWindowIcon(QIcon(icon_path))
         self.video_player.closed.connect(self.on_video_player_closed)
         self.video_player.show()
@@ -3916,7 +3899,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.rename_tool.select_folder(current_folder)
         self.rename_tool.setWindowTitle("批量重命名")
         # 设置窗口图标
-        icon_path = (self.base_icon_path / "rename_ico_96x96.ico").as_posix()
+        icon_path = (self.icon_path / "rename_ico_96x96.ico").as_posix()
         self.rename_tool.setWindowIcon(QIcon(icon_path))
         # 链接关闭事件
         self.rename_tool.closed.connect(self.on_rename_tool_closed) 
@@ -3930,7 +3913,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.image_process_window.setWindowTitle("图片调整") 
         self.image_process_window.setWindowFlags(Qt.Window)
         # 设置窗口图标
-        icon_path = (self.base_icon_path / "ps_ico_96x96.ico").as_posix()
+        icon_path = (self.icon_path / "ps_ico_96x96.ico").as_posix()
         self.image_process_window.setWindowIcon(QIcon(icon_path))
         # 链接关闭事件
         self.image_process_window.closed.connect(self.on_image_process_window_closed) 
@@ -3943,7 +3926,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.bat_tool = LogVerboseMaskApp()
         self.bat_tool.setWindowTitle("批量执行命令")
         # 设置窗口图标
-        icon_path = (self.base_icon_path / "cmd_ico_96x96.ico").as_posix()
+        icon_path = (self.icon_path / "cmd_ico_96x96.ico").as_posix()
         self.bat_tool.setWindowIcon(QIcon(icon_path))
         # 链接关闭事件
         self.bat_tool.closed.connect(self.on_bat_tool_closed)
@@ -4047,10 +4030,6 @@ python对象命名规范
 
 if __name__ == '__main__':
     print("[hiviewer主程序启动]:")
-
-    # 初始化日志文件
-    setup_logging() 
-
     # 设置主程序app，启动主界面
     app = QApplication(sys.argv)
     window = HiviewerMainwindow()
