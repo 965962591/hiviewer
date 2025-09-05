@@ -12,11 +12,11 @@ class FastApiDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("设置 FastAPI 服务")
-        self.setFixedSize(400, 200)
+        self.setFixedSize(400, 180)
         self.setStyleSheet("""
             QDialog { background: #23242a; color: #fff; }
-            QLabel { font-size: 15px; }
-            QLineEdit { background: #23242a; color: #00bfff; border: 1px solid #444; border-radius: 4px; padding: 2px 6px; }
+            QLabel { font-size: 18px; }
+            QLineEdit { font-size: 18px; background: #23242a; color: #00bfff; border: 1px solid #444; border-radius: 4px; padding: 2px 6px; }
             QPushButton { background: #23242a; color: #00bfff; border: 1px solid #00bfff; border-radius: 4px; min-width: 80px; min-height: 28px; }
             QPushButton:hover { background: #00bfff; color: #23242a; }
         """)
@@ -41,6 +41,7 @@ class FastApiDialog(QDialog):
         btn_layout = QHBoxLayout()
         self.ok_btn = QPushButton("确定")
         self.cancel_btn = QPushButton("取消")
+        btn_layout.addStretch(1)
         btn_layout.addWidget(self.ok_btn)
         btn_layout.addWidget(self.cancel_btn)
         layout.addLayout(btn_layout)

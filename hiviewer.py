@@ -427,8 +427,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 创建二级菜单-删除选项
         sub_menu = QMenu("删除选项", self.context_menu) 
         sub_menu.setIcon(delete_icon)  
-        sub_menu.addAction(icon_0, "从列表中删除(D)", self.delete_from_list)  
-        sub_menu.addAction(icon_1, "从原文件删除(Ctrl+D)", self.delete_from_file)  
+        sub_menu.addAction(icon_0, "从列表中移除(D)", self.delete_from_list)  
+        sub_menu.addAction(icon_1, "从源文件删除(Ctrl+D)", self.delete_from_file)  
 
         # 创建二级菜单-复制选项
         sub_menu2 = QMenu("复制选项", self.context_menu)  
@@ -1680,14 +1680,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         if self.compress_worker:
             self.compress_worker.cancel()  
         self.progress_dialog.close()  
-
-        # 提示信息
-        show_message_box("🚩已取消压缩, 并清除压缩缓存-v-", "提示", 800)
-
-        # 若是压缩取消，则删除缓存文件中的zip文件
+        
+        # 若是压缩取消，强制删除缓存文件中的zip文件
         if (cache_dir := self.root_path / "cache").exists():
-            # 强制删除缓存文件中的zip文件
             force_delete_folder(cache_dir.as_posix(), '.zip')
+        
+        # 提示信息
+        print(f"-->成功 取消压缩任务 | 删除所有zip缓存文件")
+        self.logger.info(f"-->成功 取消压缩任务 | 删除所有zip缓存文件")
+        
 
     @log_error_decorator(tips="压缩线程-->触发压缩完成信号")
     def on_compress_finished(self, zip_path):
@@ -1699,8 +1700,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         mime_data.setUrls([url])
         QApplication.clipboard().setMimeData(mime_data)
         # 更新状态栏信息显示
-        self.statusbar_label1.setText(f"📢:压缩完成🍃")
-        show_message_box(f"文件已压缩为: {zip_path} 并复制到剪贴板", "提示", 500)
+        self.statusbar_label1.setText(f"📢:文件压缩完成,已复制到剪贴板🍃")
+        self.logger.info(f"[on_compress_finished]-->选中的文件已完成压缩 | 保存路径: {zip_path}")
+        show_message_box(f"🚩文件压缩完成,已复制到剪贴板", "提示", 1000)
 
     @log_error_decorator(tips="压缩线程-->触发压缩错误信号")
     def on_compress_error(self, error_msg):

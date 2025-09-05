@@ -132,7 +132,7 @@ class InputDialog(QDialog):
 
         # 操作区layout,设置标签栏和编辑栏
         opera_layout = QVBoxLayout()
-        self.label = QLabel("请输入压缩包名称(默认zip格式):")
+        self.label = QLabel("请输入压缩包名称(zip格式):")
         self.label.setStyleSheet("color: #fff; font-weight: bold;")
         self.edit = QLineEdit()
         opera_layout.addWidget(self.label)
