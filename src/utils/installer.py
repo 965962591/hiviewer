@@ -2,6 +2,7 @@
 import os
 import time
 import zipfile
+import py7zr  
 import shutil
 import hashlib
 import psutil
@@ -138,12 +139,10 @@ class UpdateInstaller:
             if os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
             os.makedirs(temp_dir)
-            
-            # 解压文件
-            print(f"正在解压压缩包{self.zip_path}......")
-            with zipfile.ZipFile(self.zip_path, 'r') as zip_ref:
-                zip_ref.extractall(temp_dir)
-            
+
+            # 解压文件（支持 .7z 和 .zip）
+            self._extract_archive(self.zip_path, temp_dir)
+
             # 获取解压后的主目录
             extracted_dir = next(Path(temp_dir).iterdir())
             
@@ -219,6 +218,22 @@ class UpdateInstaller:
             dst_path = os.path.join(dst.encode('utf-8').decode('utf-8'), item.encode('utf-8').decode('utf-8'))
             print(f"[04]保留本地文件: {dst_path}")
 
+
+    def _extract_archive(self, archive_path, dest_dir):
+        """解压更新包，支持 .7z 与 .zip"""
+        try:
+            lower_path = archive_path.lower()
+            if lower_path.endswith(".7z"):
+                if py7zr is None:
+                    raise RuntimeError("未安装 py7zr，无法解压 .7z 文件")
+                with py7zr.SevenZipFile(archive_path, mode="r") as archive_ref:
+                    archive_ref.extractall(dest_dir)
+            else:
+                with zipfile.ZipFile(archive_path, "r") as archive_ref:
+                    archive_ref.extractall(dest_dir)
+        except Exception as e:
+            raise RuntimeError(f"解压更新包失败: {e}")
+
     def _cleanup(self, force=False):
         """清理下载的文件和临时目录
         Args:
@@ -280,16 +295,18 @@ def parse_arguments():
     )
     
     parser.add_argument(
-        '-z', '--zip',
-        dest='zip_path',
+        "-z",
+        "--zip",
+        dest="zip_path",
         required=False,  # 可填True强制必需
         type=str,        # 明确指定参数类型
         help='指定更新包路径（必需）'
     )
 
     parser.add_argument(
-        '-c', '--console',
-        dest='cmd_enable',
+        "-c",
+        "--console",
+        dest="cmd_enable",
         type=int,  # 明确指定参数类型为整数
         choices=[0, 1],  # 限制输入值为0或1
         default=0,  # 默认值为0
@@ -308,16 +325,14 @@ def installer(zip_path=None):
             zip_path = args.zip_path
         
         # 安装更新
-        updater = UpdateInstaller(zip_path) # 创建UpdateInstaller实例
+        updater = UpdateInstaller(zip_path)
         install_result = updater.install_update()
 
         if install_result == "PROGRAM_RUNNING":
             print("[00]检测到hiviewer.exe 程序正在运行中,需要手动关闭")
             
         elif install_result:
-
             print("[00]安装包更新成功, 正在启动程序请稍后......")
-            
             # 更新成功后启动程序
             updater.start_program()
             
@@ -346,14 +361,6 @@ def show_info():
 
 if __name__ == "__main__":
     """将该程序打包成exe可执行文件以供主函数调用"""
-
-    # test
-    if False:
-        program_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),"resource","tools","installer.exe")
-        work_path = os.path.dirname(os.path.abspath(__file__))
-        zip_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),"downloads","latest.zip")
-        start_program_subprocess(program_path, work_path, f"-z {zip_path} -c 1")
-
     # 打印初始信息的ASCII艺术字
     show_info()
 
@@ -368,12 +375,18 @@ if __name__ == "__main__":
                 input("按 Enter 键退出...")  # 暂停黑窗口
         else:
             # 什么参数都不传的时候,默认使用当前项目文件下的相对路径安装包
-            zip_path1 = os.path.join(".", "downloads", "latest.zip")
-            zip_path2 = os.path.join("..", "downloads", "latest.zip")
-            if os.path.exists(zip_path1):
-                installer(zip_path1)
-            elif os.path.exists(zip_path2):
-                installer(zip_path2)
+            pkg7z_1 = os.path.join(".", "downloads", "latest.7z")
+            pkg7z_2 = os.path.join("..", "downloads", "latest.7z")
+            pkgzip_1 = os.path.join(".", "downloads", "latest.zip")
+            pkgzip_2 = os.path.join("..", "downloads", "latest.zip")
+            if os.path.exists(pkg7z_1):
+                installer(pkg7z_1)
+            elif os.path.exists(pkg7z_2):
+                installer(pkg7z_2)
+            elif os.path.exists(pkgzip_1):
+                installer(pkgzip_1)
+            elif os.path.exists(pkgzip_2):
+                installer(pkgzip_2)
             else:
                 print("[01]没有可更新的安装包")
             input("按 Enter 键退出...")  # 暂停黑窗口
