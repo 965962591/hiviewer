@@ -1,4 +1,5 @@
 import sys
+from turtle import mode
 from PyQt5.QtWidgets import (
     QApplication,
     QWidget,
@@ -24,12 +25,13 @@ from PyQt5.QtWidgets import (
     QTabWidget,
     QRadioButton,
     QButtonGroup,
+    QSizePolicy,
 )
 from PyQt5.QtWidgets import QScrollArea
 import subprocess
 from PyQt5.QtGui import QIcon
 import threading
-from PyQt5.QtCore import QMetaObject, Qt, pyqtSlot, Q_ARG, QTimer, pyqtSignal, QThread
+from PyQt5.QtCore import QMetaObject, Qt, pyqtSlot, Q_ARG, QTimer, pyqtSignal, QThread, QSize
 import json
 import os
 import wmi
@@ -2310,13 +2312,13 @@ class FileDownloadDialog(QDialog):
         dest_group = QWidget()
         dest_layout = QVBoxLayout(dest_group)
         
-        dest_title = QLabel("目标")
+        dest_title = QLabel("设置本地保存位置:")
         dest_title.setStyleSheet("font-weight: bold; font-size: 14px; color: #2c3e50;")
         dest_layout.addWidget(dest_title)
         
         # 目标位置选择
         dest_location_layout = QHBoxLayout()
-        dest_location_label = QLabel("位置:")
+        dest_location_label = QLabel("根目录:")
         self.dest_location_input = QLineEdit()
         self.dest_location_input.setText(self.load_target_path())
         
@@ -2335,45 +2337,25 @@ class FileDownloadDialog(QDialog):
         
         # 子文件夹创建选项
         subfolder_layout = QHBoxLayout()
-        
-        # 下拉列表和示例
-        subfolder_label = QLabel("子文件夹命名:")
+        subfolder_label = QLabel("└─子文件夹命名:")
         self.subfolder_combo = QComboBox()
+        self.subfolder_combo.setMinimumSize(QSize(220, 30))
         self.subfolder_combo.addItems(["年\\日", "年\\月\\日", "年\\月\\日\\时", "年\\月\\日\\时分", "年\\月\\日\\时分秒"])
-        self.subfolder_combo.setCurrentText("年\\月\\日\\时分秒")
+        # self.subfolder_combo.setCurrentText("年\\月\\日")
+        self.subfolder_combo.setCurrentIndex(1)
         
         # 根据选择的子文件夹格式动态显示示例
-        self.subfolder_example = QLabel()
-        self.subfolder_example.setStyleSheet("color: #7f8c8d; font-size: 12px;")
-        def update_subfolder_example():
-            from datetime import datetime
-            now = datetime.now()
-            fmt = self.subfolder_combo.currentText()
-            if "年\\月\\日\\时分秒" in fmt:
-                example = now.strftime("YYYY-MM-DD-HH-MM-SS")
-            elif "年\\月\\日\\时分" in fmt:
-                example = now.strftime("YYYY-MM-DD-HH-MM")
-            elif "年\\月\\日\\时" in fmt:
-                example = now.strftime("YYYY-MM-DD-HH")
-            elif "年\\月\\日" in fmt:
-                example = now.strftime("YYYY-MM-DD")
-            elif "年\\日" in fmt:
-                example = now.strftime("YYYY-MM-DD")
-            else:
-                example = now.strftime("YYYY-MM-DD")
-            self.subfolder_example.setText(f"示例: {example}")
-        self.subfolder_combo.currentTextChanged.connect(update_subfolder_example)
-        update_subfolder_example()
-        subfolder_example = self.subfolder_example
-        subfolder_example.setStyleSheet("color: #7f8c8d; font-size: 12px;")
+        subfolder_example = QLabel()
+        subfolder_example.setStyleSheet("color: #7f8c8d; font-size: 32px;")
+        subfolder_example.setText("+")
         
         # 自定义输入框
         custom_label = QLabel("自定义名称:")
-        self.custom_subfolder_input = QLineEdit()
-        self.custom_subfolder_input.setPlaceholderText("留空使用日期格式，请输入自定义文件名如:第一轮FT")
-        self.custom_subfolder_input.setToolTip("留空使用日期格式，请输入自定义文件名如:第一轮FT")
-        self.custom_subfolder_input.setMinimumWidth(500)  # 设置最小宽度确保文本显示完整
-        
+        self.custom_subfolder_input = QComboBox()
+        self.custom_subfolder_input.setEditable(True)
+        self.custom_subfolder_input.addItems(["自测", "回归", "IN_小数包", "GL_小数包", "CN_小数包"])
+        self.custom_subfolder_input.setMinimumSize(QSize(400, 30))
+
         # 将所有控件添加到水平布局中
         subfolder_layout.addWidget(subfolder_label)
         subfolder_layout.addWidget(self.subfolder_combo)
@@ -2381,18 +2363,29 @@ class FileDownloadDialog(QDialog):
         subfolder_layout.addWidget(custom_label)
         subfolder_layout.addWidget(self.custom_subfolder_input)
         subfolder_layout.addStretch()
-        
         dest_layout.addLayout(subfolder_layout)
+        # layout.addWidget(dest_group)
         
+        # 子文件夹次一级 模式名称文件夹
+        mode_subfolder_layout = QHBoxLayout()
+        mode_subfolder_label = QLabel("    └─模式命名:")
+        self.mode_subfolder_combo = QComboBox()
+        self.mode_subfolder_combo.setEditable(True)
+        self.mode_subfolder_combo.addItems(["normal", "video", "zomm", "flash", "美颜", "人像", "超夜"])
+        self.mode_subfolder_combo.lineEdit().setPlaceholderText("请输入模式名")  # 设置提示文本
+        self.mode_subfolder_combo.setMinimumSize(QSize(220, 30))
+        mode_subfolder_layout.addWidget(mode_subfolder_label)
+        mode_subfolder_layout.addWidget(self.mode_subfolder_combo)
+        mode_subfolder_layout.addStretch()
+        dest_layout.addLayout(mode_subfolder_layout)
         layout.addWidget(dest_group)
-        
+
         # 进度显示区域
         progress_group = QWidget()
         progress_layout = QVBoxLayout(progress_group)
         progress_layout.setContentsMargins(0, 0, 0, 0)
         
         # 创建滚动区域来容纳多个进度条
-
         self.progress_scroll_area = QScrollArea()
         self.progress_scroll_area.setWidgetResizable(True)
         self.progress_scroll_area.setMaximumHeight(200)  # 限制最大高度
@@ -2410,27 +2403,21 @@ class FileDownloadDialog(QDialog):
         
         # 存储进度条的字典 {device_id:folder_name -> (progress_bar, label)}
         self.progress_bars_dict = {}
-        
         layout.addWidget(progress_group)
         
         # 操作按钮区域（移到最下面）
         button_layout = QHBoxLayout()
-        
         self.download_btn = QPushButton("开始下载")
         self.download_btn.clicked.connect(self.start_download)
         self.download_btn.setEnabled(False)
-        
         refresh_devices_btn = QPushButton("刷新设备")
         refresh_devices_btn.clicked.connect(self.refresh_devices)
-        
         close_btn = QPushButton("关闭")
         close_btn.clicked.connect(self.close)
-        
         button_layout.addStretch()
         button_layout.addWidget(refresh_devices_btn)
         button_layout.addWidget(self.download_btn)
         button_layout.addWidget(close_btn)
-        
         layout.addLayout(button_layout)
 
     def refresh_devices(self):
@@ -2679,8 +2666,6 @@ class FileDownloadDialog(QDialog):
             except Exception:
                 pass
 
-
-
     def update_download_button_state(self):
         """更新下载按钮状态"""
         # 检查是否有选中的设备
@@ -2825,8 +2810,9 @@ class FileDownloadDialog(QDialog):
             device_folder_combinations, 
             dest_path, 
             self.subfolder_combo.currentText(),
-            self.device_name_mapping,  # 传递设备名称映射
-            self.custom_subfolder_input.text().strip()  # 传递自定义子文件夹名称
+            self.device_name_mapping,                  # 传递设备名称映射
+            self.custom_subfolder_input.currentText(), # 传递自定义子文件夹名称中的<自定义名称>(时间戳+自定义名称)，如: 2025-09-09_自测
+            self.mode_subfolder_combo.currentText()    # 传递模式名称，如: normal/video
         )
         self.download_thread.download_finished.connect(self.download_finished)
         self.download_thread.folder_not_found.connect(self.handle_folder_not_found)  # 连接新信号
@@ -3011,13 +2997,14 @@ class DownloadThread(QThread):
     # 新增进度相关信号
     task_progress_updated = pyqtSignal(str, str, int)  # 设备ID, 文件夹名, 进度百分比
     
-    def __init__(self, device_folder_combinations, dest_path, subfolder_format, device_name_mapping=None, custom_subfolder_name=None):
+    def __init__(self, device_folder_combinations, dest_path, subfolder_format, device_name_mapping=None, custom_subfolder_name=None, mode_name=None):
         super().__init__()
         self.device_folder_combinations = device_folder_combinations
         self.dest_path = dest_path
         self.subfolder_format = subfolder_format
         self.device_name_mapping = device_name_mapping or {}
         self.custom_subfolder_name = custom_subfolder_name or ""
+        self.mode_name = mode_name or ""
         
         # 计算总任务数
         self.total_tasks = len(device_folder_combinations)
@@ -3040,10 +3027,11 @@ class DownloadThread(QThread):
             self.folder_not_found.emit(self.dest_path)
             return  # 直接返回，不发送download_finished信号
         
-        # 创建时间戳文件夹
+        # 创建带时间戳自定义子文件+模式名称后的目标文件夹,<dest_path>/<custom_dest_folder>/ 
         timestamp = datetime.datetime.now()
         timestamp_str = self.format_timestamp(timestamp)
         timestamp_folder = os.path.join(self.dest_path, timestamp_str)
+        custom_dest_folder = os.path.join(timestamp_folder, self.mode_name)
         
         # 检查时间戳文件夹是否可以创建
         try:
@@ -3074,10 +3062,10 @@ class DownloadThread(QThread):
                 else:
                     source_path = f"/sdcard/{folder_path}"
                 
-                # 目标目录: <dest>/<timestamp>/<device_display_name>/<custom_name>
+                # 目标目录: <dest>/<custom_dest_folder>/<device_display_name>/
                 # 先按设备分组，再按自定义名称创建子文件夹
-                device_folder = os.path.join(timestamp_folder, device_display_name)
-                custom_folder = os.path.join(device_folder, custom_name)
+                custom_folder = os.path.join(custom_dest_folder, device_display_name)
+
                 try:
                     os.makedirs(custom_folder, exist_ok=True)
                 except Exception as e:
@@ -3113,23 +3101,28 @@ class DownloadThread(QThread):
 
     def format_timestamp(self, timestamp):
         """格式化时间戳"""
+        # 获取时间戳格式，拼接传入的自定义名称
+        timesramp_str = ""
+        if "年\\月\\日\\时分秒" in self.subfolder_format:
+            timesramp_str = timestamp.strftime("%Y-%m-%d-%H-%M-%S")
+        elif "年\\月\\日\\时分" in self.subfolder_format:
+            timesramp_str = timestamp.strftime("%Y-%m-%d-%H-%M")
+        elif "年\\月\\日\\时" in self.subfolder_format:
+            timesramp_str = timestamp.strftime("%Y-%m-%d-%H")
+        elif "年\\月\\日" in self.subfolder_format:
+            timesramp_str = timestamp.strftime("%Y-%m-%d")
+        elif "年\\日" in self.subfolder_format:
+            timesramp_str = timestamp.strftime("%Y-%m-%d")
+        else:
+            timesramp_str = timestamp.strftime("%Y-%m-%d")
+
         # 如果用户输入了自定义名称，直接使用自定义名称
         if self.custom_subfolder_name and self.custom_subfolder_name.strip():
-            return self.custom_subfolder_name.strip()
+            timesramp_str += self.custom_subfolder_name.strip()
+
+        return timesramp_str
         
-        # 否则按照优先级判断，从最具体的开始
-        if "年\\月\\日\\时分秒" in self.subfolder_format:
-            return timestamp.strftime("%Y-%m-%d-%H-%M-%S")
-        elif "年\\月\\日\\时分" in self.subfolder_format:
-            return timestamp.strftime("%Y-%m-%d-%H-%M")
-        elif "年\\月\\日\\时" in self.subfolder_format:
-            return timestamp.strftime("%Y-%m-%d-%H")
-        elif "年\\月\\日" in self.subfolder_format:
-            return timestamp.strftime("%Y-%m-%d")
-        elif "年\\日" in self.subfolder_format:
-            return timestamp.strftime("%Y-%m-%d")
-        else:
-            return timestamp.strftime("%Y-%m-%d")
+
     
     def execute_adb_pull(self, device, source_path, dest_path, folder_name):
         """执行adb pull命令并实时显示进度"""
