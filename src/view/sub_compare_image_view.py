@@ -16,8 +16,9 @@ import gc
 import sys
 import time
 import json
-import pathlib
+
 import threading
+from pathlib import Path 
 from multiprocessing import cpu_count
 from concurrent.futures import ThreadPoolExecutor
 
@@ -1251,7 +1252,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         第三排, self.label_bottom
         """
         # 设置主界面图标以及标题
-        icon_path = os.path.join(BasePath, "resource", "icons", "viewer.ico")
+        icon_path = Path(BasePath, "resource", "icons", "viewer.ico").as_posix()
         self.setWindowIcon(QIcon(icon_path))
         self.setWindowTitle("图片对比界面")
 
@@ -1840,28 +1841,26 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             exif_info = self.get_exif_info(path, img_format) + basic_info
 
             # （高通平台）检测是否存在同图片路径的xml文件  将lux_index、DRCgain写入到exif信息中去
-            hdr_flag, xml_path = False, os.path.join(os.path.dirname(path), os.path.basename(path).split('.')[0] + "_new.xml")
+            hdr_flag, xml_path = False, Path(path).with_suffix("").as_posix() + "_new.xml"
             if os.path.exists(xml_path):
                 # 提取xml中lux_index、cct、drcgain等关键信息，拼接到exif_info
                 exif_info_qpm, hdr_flag = load_xml_data(xml_path)
                 exif_info += exif_info_qpm
                 
             # （MTK平台）检测是否存在同图片路径的xml文件  将lux_index、DRCgain写入到exif信息中去
-            exif_path = os.path.join(path + ".exif")
+            exif_path = path + ".exif"
             if os.path.exists(exif_path):
                 # 提取xml中lux_index、cct、drcgain等关键信息，拼接到exif_info
                 exif_info_mtk, hdr_flag = load_exif_data(exif_path)
                 exif_info += exif_info_mtk
                 
             # （展锐平台）检测是否存在同图片路径的xml文件  将lux_index、DRCgain写入到exif信息中去
-            txt_path = os.path.join(os.path.dirname(path), os.path.basename(path).split('.')[0] + ".txt")
+            txt_path = Path(path).with_suffix("").as_posix() + ".txt"
             if os.path.exists(txt_path):
                 # 提取xml中lux_index、cct、drcgain等关键信息，拼接到exif_info
                 exif_info_unisoc, hdr_flag = load_txt_data(txt_path)
                 exif_info += exif_info_unisoc  
                 
-
-
             # 处理EXIF信息，根据可见性字典更新
             # self.str_exif_info = exif_info
             # exif_info = self.process_exif_info(self.dict_exif_info_visibility, exif_info, hdr_flag)
@@ -3268,7 +3267,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         """
         try:
             # 确保config目录存在
-            config_dir = pathlib.Path("./config")
+            config_dir = Path("./config")
             config_dir.mkdir(parents=True, exist_ok=True)
 
             # 1. 保存颜色配置文件

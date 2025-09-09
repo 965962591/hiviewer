@@ -1951,8 +1951,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             current_directory = self.RT_QComboBox.currentText() # 当前选中的文件夹目录 
             parent_directory = os.path.dirname(current_directory) # 获取父目录
             
-            # 构建所有需要显示的文件夹路径, 并将当前选中的文件夹路径插入到列表的最前面
-            selected_folders_path = [os.path.join(parent_directory, path) for path in selected_folders]
+            # 构建所有需要显示的文件夹路径, 并将当前选中的文件夹路径插入到列表的最前面 
+            selected_folders_path = [Path(parent_directory, path).as_posix() for path in selected_folders]
             selected_folders_path.insert(0, current_directory)
             
             # 添加通过右键菜单添加到表格的文件夹
@@ -2011,44 +2011,48 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def filter_files(self, folder):
         """根据选项过滤文件"""
         files_and_dirs_with_mtime = [] 
-        selected_option = self.RT_QComboBox0.currentText()
+        opt = self.RT_QComboBox0.currentText()
         sort_option = self.RT_QComboBox2.currentText()
         try:
-            # 使用 os.scandir() 获取文件夹中的条目
             with os.scandir(folder) as entries:
-                # 使用列表推导式和 DirEntry 对象的 stat() 方法获取文件元组，比os.listdir()更高效,性能更高
                 for entry in entries:
-                    if entry.is_file():
-                        if selected_option == "显示图片文件":
-                            if entry.name.lower().endswith(self.IMAGE_FORMATS):
-                                # 非极简模式下通过PIL获取图片的宽度、高度、曝光时间、ISO
-                                if not self.simple_mode: 
-                                    with ImageProcessor(entry.path) as img:
-                                        width, height, exposure_time, iso = img.width, img.height, img.exposure_time, img.iso
-                                # 获取图片的分辨率，极简模式下不获取图片的宽度、高度、曝光时间、ISO
-                                else:   
-                                    width, height, exposure_time, iso = None, None, None, None
-                                # 文件名称、创建时间、修改时间、文件大小、分辨率、曝光时间、ISO、文件路径
-                                files_and_dirs_with_mtime.append((entry.name, entry.stat().st_ctime, entry.stat().st_mtime, entry.stat().st_size,
-                                                            (width, height), exposure_time, iso, entry.path))
-                        elif selected_option == "显示视频文件":
-                            if entry.name.lower().endswith(self.VIDEO_FORMATS):     
-                                # 文件名称、创建时间、修改时间、文件大小、分辨率、曝光时间、ISO、文件路径
-                                files_and_dirs_with_mtime.append((entry.name, entry.stat().st_ctime, entry.stat().st_mtime, entry.stat().st_size,
-                                                            (None, None), None, None, entry.path))
-                        elif selected_option == "显示所有文件":
-                                # 文件名称、创建时间、修改时间、文件大小、分辨率、曝光时间、ISO、文件路径
-                                files_and_dirs_with_mtime.append((entry.name, entry.stat().st_ctime, entry.stat().st_mtime, entry.stat().st_size,
-                                                            (None, None), None, None, entry.path))
-                        else: # 没有选择任何选项就跳过
-                            print("filter_files函数:selected_option没有选择任何选项,跳过")
-                            continue
+                    # 使用follow_symlinks=False避免跟随软链接带来的 IO
+                    if not entry.is_file(follow_symlinks=False):
+                        continue
+
+                    # 统一转换为小写后判断
+                    name_lower = entry.name.lower()
+                    if opt == "显示图片文件" and not name_lower.endswith(self.IMAGE_FORMATS):
+                        continue
+                    if opt == "显示视频文件" and not name_lower.endswith(self.VIDEO_FORMATS):
+                        continue
+                    if opt not in ("显示图片文件", "显示视频文件", "显示所有文件"):
+                        continue
+                    
+                    # 收集所需信息
+                    st = entry.stat()
+                    width = height = exposure_time = iso = None
+                    if opt == "显示图片文件" and not self.simple_mode:
+                        try:
+                            with ImageProcessor(entry.path) as img:
+                                width, height = img.width, img.height
+                                exposure_time, iso = img.exposure_time, img.iso
+                        except Exception as e:
+                            self.logger.error(f"类【ImageProcessor】-->获取图片exif信息 | 报错：{e}")
+                            print(f"类[ImageProcessor]-->获取图片exif信息 | 报错：{e}")
+                    # 使用pathlib替代.replace('\\', '/')方式, 确保文件路径都用正斜杠 / 表示
+                    norm_path = Path(entry.path).as_posix()
+                    # 拼接根据opt筛选后的文件信息列表
+                    files_and_dirs_with_mtime.append((entry.name, st.st_ctime, st.st_mtime, st.st_size,
+                        (width, height), exposure_time, iso, 
+                        norm_path
+                    ))
+
             # 使用sort_by_custom函数进行排序
-            files_and_dirs_with_mtime = sort_by_custom(sort_option, files_and_dirs_with_mtime, self.simple_mode, selected_option)
+            files_and_dirs_with_mtime = sort_by_custom(sort_option, files_and_dirs_with_mtime, self.simple_mode, opt)
 
             # 返回提取的带exif信息的列表和文件路径列表
             return files_and_dirs_with_mtime
-
         except Exception as e:
             print(f"[filter_files]-->error--根据选项过滤文件 | 报错：{e}")
             self.logger.error(f"【filter_files】-->根据选项过滤文件 | 报错：{e}")
