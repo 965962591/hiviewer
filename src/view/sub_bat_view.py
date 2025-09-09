@@ -1,5 +1,5 @@
-import sys
-from turtle import mode
+#!/usr/bin/env python
+# -*- encoding: utf-8 -*-
 from PyQt5.QtWidgets import (
     QApplication,
     QWidget,
@@ -34,6 +34,7 @@ import threading
 from PyQt5.QtCore import QMetaObject, Qt, pyqtSlot, Q_ARG, QTimer, pyqtSignal, QThread, QSize
 import json
 import os
+import sys
 import wmi
 import pythoncom
 import configparser
@@ -41,7 +42,7 @@ from datetime import datetime
 
 
 # 全局变量定义缓存目录
-APP_CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "cache")
+APP_CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "config")
 
 class USBDeviceMonitor:
     """USB设备实时监控类（Windows平台专用）"""
@@ -121,6 +122,15 @@ class LogVerboseMaskApp(QMainWindow):
         self.tab_widget = None
         self.tab_checkboxes = {}  # 存储每个标签页的复选框 {tab_name: [checkboxes]}
         self.tab_script_checkboxes = {}  # 存储高通脚本复选框 {tab_name: [checkboxes]}
+        
+        # 初始化scrcpy进程变量 - 支持多设备同时投屏
+        self.scrcpy_processes = {}  # 存储每个设备的投屏进程 {device_id: process}
+        
+        # 初始化重命名工具窗口变量
+        self.file_organizer = None
+        
+        # 初始化下载对话框变量
+        self.download_dialog = None
         
         self.initUI()
         self.setup_logging()
@@ -760,8 +770,8 @@ class LogVerboseMaskApp(QMainWindow):
     def initUI(self):
         self.setWindowTitle("Bat脚本管理器")
         self.resize(1200, 900)
-        icon_path = os.path.join(os.path.dirname(__file__), "icon", "bat.ico")
-        self.setWindowIcon(QIcon(icon_path))
+        # icon_path = os.path.join(os.path.dirname(__file__), "icon", "bat.ico")
+        # self.setWindowIcon(QIcon(icon_path))
         self.mask_value = 0x00000000
 
         # 创建菜单栏
@@ -779,6 +789,10 @@ class LogVerboseMaskApp(QMainWindow):
         device_label = QLabel("选择设备:")
         device_label.setToolTip("选择设备需要执行的设备")
         self.device_combo = QComboBox()
+        self.device_combo.setMinimumWidth(150)  # 设置最小宽度
+        self.device_combo.setMinimumHeight(33)
+        self.device_combo.setStyleSheet("QComboBox QAbstractItemView { min-height: 33px; }")
+        self.device_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)  # 设置大小策略
         refresh_button = QPushButton("刷新")
         refresh_button.setToolTip("刷新设备列表")
         refresh_button.clicked.connect(self.refresh_devices)
@@ -787,6 +801,11 @@ class LogVerboseMaskApp(QMainWindow):
         edit_device_button = QPushButton("编辑名称")
         edit_device_button.setToolTip("自定义设备名称")
         edit_device_button.clicked.connect(self.edit_current_device_name)
+
+        # 添加投屏按钮
+        adb_interface_button = QPushButton("投屏")
+        adb_interface_button.setToolTip("打开adb投屏窗口")
+        adb_interface_button.clicked.connect(self.open_adb_interface)
         
         # 快捷功能（拍照、截屏）已移至菜单栏
         # 批量拍摄控件：数量、间隔、拍摄、暂停/继续
@@ -813,6 +832,7 @@ class LogVerboseMaskApp(QMainWindow):
         device_layout.addWidget(self.device_combo)
         device_layout.addWidget(refresh_button)
         device_layout.addWidget(edit_device_button)
+        device_layout.addWidget(adb_interface_button)
         device_layout.addWidget(capture_count_label)
         device_layout.addWidget(self.capture_count_spin)
         device_layout.addWidget(capture_interval_label)
@@ -1800,6 +1820,53 @@ class LogVerboseMaskApp(QMainWindow):
         self.download_dialog = FileDownloadDialog(self)
         self.download_dialog.show()
 
+    def open_adb_interface(self):
+        """调用 adb.py 中的接口 - 支持多设备同时投屏"""
+        try:
+            # 获取选中的设备
+            selected_device = self.get_selected_device()
+            if not selected_device:
+                QMessageBox.warning(self, "设备错误", "请先选择有效的ADB设备！")
+                return
+            
+            scrcpy_path = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "resource", "scrcpy", "scrcpy.exe")
+            if not os.path.exists(scrcpy_path):
+                print(f"错误: 找不到 scrcpy.exe 路径: {scrcpy_path}")
+                return
+            
+            # 检查当前设备是否已有投屏进程在运行
+            if (selected_device in self.scrcpy_processes and 
+                self.scrcpy_processes[selected_device] is not None and 
+                self.scrcpy_processes[selected_device].poll() is None):
+                print(f"设备 {selected_device} 的投屏已在运行中。")
+                return
+            
+            # 构建scrcpy命令参数
+            scrcpy_args = [
+                scrcpy_path,
+                "-s", selected_device
+            ]
+            
+            # 启动新设备的投屏进程
+            process = subprocess.Popen(
+                scrcpy_args, 
+                creationflags=subprocess.CREATE_NO_WINDOW,
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.PIPE
+            )
+            
+            # 记录该设备的投屏进程
+            self.scrcpy_processes[selected_device] = process
+            print(f"已启动 adb 投屏 - 设备: {selected_device}")
+            
+            # 显示当前运行的投屏设备数量
+            running_count = sum(1 for p in self.scrcpy_processes.values() 
+                              if p is not None and p.poll() is None)
+            print(f"当前共有 {running_count} 个设备正在投屏")
+            
+        except Exception as e:
+            print(f"启动 adb 投屏失败: {str(e)}")
+
     def closeEvent(self, event):
         """窗口关闭事件处理"""
         # 停止USB监控
@@ -1809,7 +1876,26 @@ class LogVerboseMaskApp(QMainWindow):
         # 停止定时器
         if hasattr(self, 'refresh_timer'):
             self.refresh_timer.stop()
-
+        
+        # 关闭重命名工具窗口
+        if hasattr(self, 'file_organizer') and self.file_organizer is not None:
+            self.file_organizer.close()
+        
+        # 关闭下载对话框
+        if hasattr(self, 'download_dialog') and self.download_dialog is not None:
+            self.download_dialog.close()
+        
+        # 停止所有投屏进程
+        if hasattr(self, 'scrcpy_processes'):
+            for device_id, process in self.scrcpy_processes.items():
+                if process is not None and process.poll() is None:
+                    print(f"正在停止设备 {device_id} 的投屏...")
+                    process.terminate()
+                    try:
+                        process.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+        
         # 发送关闭信号
         self.closed.emit()
         event.accept()
@@ -1957,6 +2043,9 @@ class FileDownloadDialog(QDialog):
         self.previously_selected_devices = set()  # 之前选中的设备
         self.previously_selected_folders = {}  # 之前选中的文件夹 {device_id: {folder_path: True}}
         
+        # 初始化重命名工具窗口变量
+        self.file_organizer = None
+        
         # 创建界面
         self.initUI()
         
@@ -2095,8 +2184,15 @@ class FileDownloadDialog(QDialog):
             # 保存到INI文件
             self.save_device_names()
             
-            # 刷新设备显示
-            self.refresh_devices()
+            # 同步到主界面的设备名称映射
+            if hasattr(self.parent, 'device_name_mapping'):
+                self.parent.device_name_mapping.update(self.device_name_mapping)
+                # 刷新主界面的设备列表
+                if hasattr(self.parent, 'refresh_devices'):
+                    self.parent.refresh_devices()
+            
+            # 刷新下载界面的设备显示
+            self.update_device_checkboxes()
 
     def load_fixed_source_paths(self):
         """读取固定路径与配置文件。优先从 [source] 节读取。
@@ -2312,13 +2408,13 @@ class FileDownloadDialog(QDialog):
         dest_group = QWidget()
         dest_layout = QVBoxLayout(dest_group)
         
-        dest_title = QLabel("设置本地保存位置:")
+        dest_title = QLabel("目标")
         dest_title.setStyleSheet("font-weight: bold; font-size: 14px; color: #2c3e50;")
         dest_layout.addWidget(dest_title)
         
         # 目标位置选择
         dest_location_layout = QHBoxLayout()
-        dest_location_label = QLabel("根目录:")
+        dest_location_label = QLabel("位置:")
         self.dest_location_input = QLineEdit()
         self.dest_location_input.setText(self.load_target_path())
         
@@ -2337,25 +2433,59 @@ class FileDownloadDialog(QDialog):
         
         # 子文件夹创建选项
         subfolder_layout = QHBoxLayout()
-        subfolder_label = QLabel("└─子文件夹命名:")
+        
+        # 下拉列表和示例
+        subfolder_label = QLabel("子文件夹命名:")
         self.subfolder_combo = QComboBox()
-        self.subfolder_combo.setMinimumSize(QSize(220, 30))
         self.subfolder_combo.addItems(["年\\日", "年\\月\\日", "年\\月\\日\\时", "年\\月\\日\\时分", "年\\月\\日\\时分秒"])
-        # self.subfolder_combo.setCurrentText("年\\月\\日")
+        # self.subfolder_combo.setCurrentText("年\\月\\日\\时分秒")
         self.subfolder_combo.setCurrentIndex(1)
         
         # 根据选择的子文件夹格式动态显示示例
-        subfolder_example = QLabel()
-        subfolder_example.setStyleSheet("color: #7f8c8d; font-size: 32px;")
-        subfolder_example.setText("+")
+        self.subfolder_example = QLabel()
+        self.subfolder_example.setStyleSheet("color: #7f8c8d; font-size: 12px;")
+        def update_subfolder_example():
+            from datetime import datetime
+            now = datetime.now()
+            fmt = self.subfolder_combo.currentText()
+            if "年\\月\\日\\时分秒" in fmt:
+                example = now.strftime("YYYY-MM-DD-HH-MM-SS")
+            elif "年\\月\\日\\时分" in fmt:
+                example = now.strftime("YYYY-MM-DD-HH-MM")
+            elif "年\\月\\日\\时" in fmt:
+                example = now.strftime("YYYY-MM-DD-HH")
+            elif "年\\月\\日" in fmt:
+                example = now.strftime("YYYY-MM-DD")
+            elif "年\\日" in fmt:
+                example = now.strftime("YYYY-MM-DD")
+            else:
+                example = now.strftime("YYYY-MM-DD")
+            self.subfolder_example.setText(f"示例: {example}")
+        self.subfolder_combo.currentTextChanged.connect(update_subfolder_example)
+        update_subfolder_example()
+        subfolder_example = self.subfolder_example
+        subfolder_example.setStyleSheet("color: #7f8c8d; font-size: 12px;")
         
-        # 自定义输入框
+        # 自定义输入框（改为可编辑下拉列表）
         custom_label = QLabel("自定义名称:")
         self.custom_subfolder_input = QComboBox()
-        self.custom_subfolder_input.setEditable(True)
-        self.custom_subfolder_input.addItems(["自测", "回归", "IN_小数包", "GL_小数包", "CN_小数包"])
-        self.custom_subfolder_input.setMinimumSize(QSize(400, 30))
-
+        self.custom_subfolder_input.setEditable(True)  # 允许用户输入
+        self.custom_subfolder_input.setPlaceholderText("留空使用日期格式，请输入自定义文件名如:第一轮FT")
+        self.custom_subfolder_input.setToolTip("留空使用日期格式，请输入自定义文件名如:第一轮FT")
+        self.custom_subfolder_input.setMinimumWidth(500)  # 设置最小宽度确保文本显示完整
+        
+        # 添加默认选项
+        default_options = [
+            "自测",
+            "回归", 
+            "FT1",
+            "FT2",
+            "小数包",
+            "整数包"
+        ]
+        self.custom_subfolder_input.addItems(default_options)
+        self.custom_subfolder_input.setCurrentIndex(1)
+        
         # 将所有控件添加到水平布局中
         subfolder_layout.addWidget(subfolder_label)
         subfolder_layout.addWidget(self.subfolder_combo)
@@ -2363,29 +2493,18 @@ class FileDownloadDialog(QDialog):
         subfolder_layout.addWidget(custom_label)
         subfolder_layout.addWidget(self.custom_subfolder_input)
         subfolder_layout.addStretch()
-        dest_layout.addLayout(subfolder_layout)
-        # layout.addWidget(dest_group)
         
-        # 子文件夹次一级 模式名称文件夹
-        mode_subfolder_layout = QHBoxLayout()
-        mode_subfolder_label = QLabel("    └─模式命名:")
-        self.mode_subfolder_combo = QComboBox()
-        self.mode_subfolder_combo.setEditable(True)
-        self.mode_subfolder_combo.addItems(["normal", "video", "zomm", "flash", "美颜", "人像", "超夜"])
-        self.mode_subfolder_combo.lineEdit().setPlaceholderText("请输入模式名")  # 设置提示文本
-        self.mode_subfolder_combo.setMinimumSize(QSize(220, 30))
-        mode_subfolder_layout.addWidget(mode_subfolder_label)
-        mode_subfolder_layout.addWidget(self.mode_subfolder_combo)
-        mode_subfolder_layout.addStretch()
-        dest_layout.addLayout(mode_subfolder_layout)
+        dest_layout.addLayout(subfolder_layout)
+        
         layout.addWidget(dest_group)
-
+        
         # 进度显示区域
         progress_group = QWidget()
         progress_layout = QVBoxLayout(progress_group)
         progress_layout.setContentsMargins(0, 0, 0, 0)
         
         # 创建滚动区域来容纳多个进度条
+
         self.progress_scroll_area = QScrollArea()
         self.progress_scroll_area.setWidgetResizable(True)
         self.progress_scroll_area.setMaximumHeight(200)  # 限制最大高度
@@ -2403,21 +2522,28 @@ class FileDownloadDialog(QDialog):
         
         # 存储进度条的字典 {device_id:folder_name -> (progress_bar, label)}
         self.progress_bars_dict = {}
+        
         layout.addWidget(progress_group)
         
         # 操作按钮区域（移到最下面）
         button_layout = QHBoxLayout()
+        
         self.download_btn = QPushButton("开始下载")
         self.download_btn.clicked.connect(self.start_download)
         self.download_btn.setEnabled(False)
+        
         refresh_devices_btn = QPushButton("刷新设备")
         refresh_devices_btn.clicked.connect(self.refresh_devices)
+        
+        
         close_btn = QPushButton("关闭")
         close_btn.clicked.connect(self.close)
+        
         button_layout.addStretch()
         button_layout.addWidget(refresh_devices_btn)
         button_layout.addWidget(self.download_btn)
         button_layout.addWidget(close_btn)
+        
         layout.addLayout(button_layout)
 
     def refresh_devices(self):
@@ -2666,6 +2792,8 @@ class FileDownloadDialog(QDialog):
             except Exception:
                 pass
 
+
+
     def update_download_button_state(self):
         """更新下载按钮状态"""
         # 检查是否有选中的设备
@@ -2810,9 +2938,8 @@ class FileDownloadDialog(QDialog):
             device_folder_combinations, 
             dest_path, 
             self.subfolder_combo.currentText(),
-            self.device_name_mapping,                  # 传递设备名称映射
-            self.custom_subfolder_input.currentText(), # 传递自定义子文件夹名称中的<自定义名称>(时间戳+自定义名称)，如: 2025-09-09_自测
-            self.mode_subfolder_combo.currentText()    # 传递模式名称，如: normal/video
+            self.device_name_mapping,  # 传递设备名称映射
+            self.custom_subfolder_input.currentText().strip()  # 传递自定义子文件夹名称
         )
         self.download_thread.download_finished.connect(self.download_finished)
         self.download_thread.folder_not_found.connect(self.handle_folder_not_found)  # 连接新信号
@@ -2977,6 +3104,7 @@ class FileDownloadDialog(QDialog):
             # 更新下载按钮状态
             self.update_download_button_state()
 
+
     def closeEvent(self, event):
         """窗口关闭事件"""
         if hasattr(self, 'refresh_timer'):
@@ -2984,6 +3112,11 @@ class FileDownloadDialog(QDialog):
         if hasattr(self, 'download_thread') and self.download_thread.isRunning():
             self.download_thread.terminate()
             self.download_thread.wait()
+        
+        # 关闭重命名工具窗口
+        if hasattr(self, 'file_organizer') and self.file_organizer is not None:
+            self.file_organizer.close()
+        
         event.accept()
 
 
@@ -2997,14 +3130,13 @@ class DownloadThread(QThread):
     # 新增进度相关信号
     task_progress_updated = pyqtSignal(str, str, int)  # 设备ID, 文件夹名, 进度百分比
     
-    def __init__(self, device_folder_combinations, dest_path, subfolder_format, device_name_mapping=None, custom_subfolder_name=None, mode_name=None):
+    def __init__(self, device_folder_combinations, dest_path, subfolder_format, device_name_mapping=None, custom_subfolder_name=None):
         super().__init__()
         self.device_folder_combinations = device_folder_combinations
         self.dest_path = dest_path
         self.subfolder_format = subfolder_format
         self.device_name_mapping = device_name_mapping or {}
         self.custom_subfolder_name = custom_subfolder_name or ""
-        self.mode_name = mode_name or ""
         
         # 计算总任务数
         self.total_tasks = len(device_folder_combinations)
@@ -3027,11 +3159,10 @@ class DownloadThread(QThread):
             self.folder_not_found.emit(self.dest_path)
             return  # 直接返回，不发送download_finished信号
         
-        # 创建带时间戳自定义子文件+模式名称后的目标文件夹,<dest_path>/<custom_dest_folder>/ 
+        # 创建时间戳文件夹
         timestamp = datetime.datetime.now()
         timestamp_str = self.format_timestamp(timestamp)
         timestamp_folder = os.path.join(self.dest_path, timestamp_str)
-        custom_dest_folder = os.path.join(timestamp_folder, self.mode_name)
         
         # 检查时间戳文件夹是否可以创建
         try:
@@ -3062,10 +3193,10 @@ class DownloadThread(QThread):
                 else:
                     source_path = f"/sdcard/{folder_path}"
                 
-                # 目标目录: <dest>/<custom_dest_folder>/<device_display_name>/
+                # 目标目录: <dest>/<timestamp>/<device_display_name>/<custom_name>
                 # 先按设备分组，再按自定义名称创建子文件夹
-                custom_folder = os.path.join(custom_dest_folder, device_display_name)
-
+                device_folder = os.path.join(timestamp_folder, custom_name)
+                custom_folder = os.path.join(device_folder, device_display_name)
                 try:
                     os.makedirs(custom_folder, exist_ok=True)
                 except Exception as e:

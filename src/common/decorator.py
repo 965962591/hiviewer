@@ -191,8 +191,9 @@ def CC_TimeDec(tips="success", show_time=True, show_args=False):
                 
                 return result
             except Exception as e:
-                print(f"[{func.__name__}] 执行失败 - {str(e)}")
-                raise e
+                logging.error(f"【{func.__name__}】-->执行失败!!! | 报错: {str(e)}", exc_info=True)
+                print(f"[{func.__name__}]-->error--执行失败 | 报错：{str(e)}")
+
         return wrapper
     return decorator
 
@@ -229,7 +230,6 @@ def log_error_decorator(tips="程序异常! "):
             except Exception as e:
                 print(f"[{func.__name__}]-->error--{tips} | 报错: {str(e)}")
                 logging.error(f"【{func.__name__}】-->{tips} | 报错: {str(e)}", exc_info=True)
-                raise e
         return wrapper
     return decorator
 
@@ -271,7 +271,7 @@ def log_performance_decorator(tips=None, log_args=True, log_result=True):
                 end_time = time.time()
                 duration = end_time - start_time
                 logging.error(f"【{func.__name__}】--执行失败!!! | 耗时: {duration:.3f}s | 错误: {str(e)}", exc_info=True)
-                raise e
+                print(f"[{func.__name__}]-->>error--执行失败!!! | 耗时: {duration:.3f}s | 错误: {str(e)}", exc_info=True)
                 
         return wrapper
     return decorator
