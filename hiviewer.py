@@ -1076,23 +1076,27 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         try:
             # 如果选中多个文件或者文件夹，只取列表中的第一个
             if isinstance(path, list):
-                if len(path) == 1:
-                    path = path[0]
-                else:
-                    show_message_box(f"🚩仅支持对单个文件/文件夹进行重命名", "提示", 1500)
+                if len(path) != 1:
+                    # show_message_box(f"🚩仅支持对单个文件/文件夹进行重命名", "提示", 1500)
+                    self.open_rename_tool(path)
                     return
 
-            # 打开重命名会话窗口
+            # 默认从列表中取字符串，打开重命名会话窗口
+            path = path[0]
             dialog = SingleFileRenameDialog(path, self)
             dialog.setWindowTitle("重命名文件/文件夹")
             if dialog.exec_() == QDialog.Accepted:
                 if (new_path := dialog.get_new_file_path()):
-                    # 执行重命名事件
-                    os.rename(path, new_path)
-
-                    # 更新文件系统模型
-                    self.file_system_model.setRootPath('')
-                    self.Left_QTreeView.viewport().update()
+                    # 更新文件系统模型以及地址栏和表格显示
+                    if (index := self.file_system_model.index(new_path)).isValid():
+                        # 设置当前索引,展开该目录,滚动到该项，确保垂直方向居中,水平滚动条置0
+                        self.Left_QTreeView.setCurrentIndex(index)    
+                        self.Left_QTreeView.setExpanded(index, True)  
+                        self.Left_QTreeView.scrollTo(index, QAbstractItemView.PositionAtCenter)
+                        self.Left_QTreeView.horizontalScrollBar().setValue(0)
+                        self.update_combobox(index)
+                    # self.file_system_model.setRootPath('')
+                    # self.Left_QTreeView.viewport().update()
         except Exception as e:
             print(f"[rename_file]-->error--执行重命名事件时 | 报错: {e}")
             self.logger.error(f"【rename_file】-->执行重命名事件时 | 报错: {e}")
@@ -1946,10 +1950,12 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 初始化文件名列表,文件路径列表，文件夹名列表
         file_infos, file_paths, dir_name_list = [], [], []     
         try:
-            # 获取复选框中选择的文件夹路径列表
-            selected_folders = self.model.getCheckedItems()  # 获取选中的文件夹
-            current_directory = self.RT_QComboBox.currentText() # 当前选中的文件夹目录 
-            parent_directory = os.path.dirname(current_directory) # 获取父目录
+            # 获取同级文件夹复选框中选择的文件夹路径列表
+            selected_folders = self.model.getCheckedItems()
+            # 读取地址栏当前显示的文件夹路径, 兼容路径最后一位字符为"/"的情况，获取父文件夹
+            current_directory = self.RT_QComboBox.currentText() 
+            current_directory = current_directory[:-1] if current_directory[-1] == "/" else current_directory 
+            parent_directory = os.path.dirname(current_directory)
             
             # 构建所有需要显示的文件夹路径, 并将当前选中的文件夹路径插入到列表的最前面 
             selected_folders_path = [Path(parent_directory, path).as_posix() for path in selected_folders]
@@ -1961,8 +1967,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 selected_folders_path = self.additional_folders_for_table
                 # 更新地址栏上的显示信息
                 display_str = (
-                "--右键单选添加到表格,单击左侧文件浏览区的文件夹可恢复--" if len(self.additional_folders_for_table) == 1 else 
-                "--右键多选添加到表格,单击左侧文件浏览区的文件夹可恢复--")
+                "---右键单选添加到table模式,同级下拉框不可用,单击左侧文件夹可恢复---" 
+                if len(self.additional_folders_for_table) == 1 else 
+                "---右键多选添加到table模式,同级下拉框不可用,单击左侧文件夹可恢复---")
                 self.RT_QComboBox.setCurrentText(display_str)
 
             # 检测当前文件夹路径是否包含文件，没有则剔除该文件夹，修复多级空文件夹显示错乱的bug
@@ -2205,7 +2212,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
     def getSiblingFolders(self, folder_path):
         """获取指定文件夹的同级文件夹列表。"""
-        try:# 获取父文件夹路径,然后过滤出同级文件夹，不包括当前选择的文件夹
+        try:
+            # 获取父文件夹路径（兼容地址栏最后一位为"/"的情况）, 然后过滤出同级文件夹，不包括当前选择的文件夹
+            folder_path = folder_path[:-1] if folder_path[-1] == "/" else folder_path
             parent_folder = os.path.dirname(folder_path)   
             sibling_folders = [
                 name for name in os.listdir(parent_folder) 
@@ -3351,8 +3360,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 获取当前选中的文件夹上一级文件夹路径current_folder
         if not (current_folder := os.path.dirname(self.RT_QComboBox.currentText())):
             show_message_box("当前没有选中的文件夹", "提示", 500)
-        # 打开多文件夹重命名工具    
-        self.open_rename_tool(current_folder)
+        # 将单个文件夹路径封装成列表传入，打开多文件夹重命名工具
+        self.open_rename_tool([current_folder])
  
 
     @log_error_decorator(tips="处理F4键按下事件")
@@ -3909,8 +3918,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     @log_error_decorator(tips="打开批量重命名功能子界面")
     def open_rename_tool(self, current_folder):
         """创建批量重命名的统一方法"""
-        self.rename_tool = FileOrganizer()
-        self.rename_tool.select_folder(current_folder)
+        self.rename_tool = FileOrganizer(dir_list=current_folder)
         self.rename_tool.setWindowTitle("批量重命名")
         # 设置窗口图标
         icon_path = (self.icon_path / "rename_ico_96x96.ico").as_posix()

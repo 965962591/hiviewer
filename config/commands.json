@@ -1,0 +1,62 @@
+{
+    "高通": {},
+    "MTK": {},
+    "Unisoc": {
+        "3a": [
+            "adb root",
+            "adb remount",
+            "adb shell \"setprop persist.vendor.camera.mi.debuggable 1\""
+        ],
+        "ae_log": [
+            "adb root",
+            "adb remount",
+            "color 0e",
+            "adb shell setprop debug.isp.xtm.log 5",
+            "adb shell setprop persist.vendor.isp.aec.log 5",
+            "adb shell setprop persist.vendor.isp.ae.logv 5                ",
+            "adb shell setprop persist.vendor.cam.isp.ae.logv 5",
+            "adb shell setprop persist.vendor.cam.isp.aec.log 5               ",
+            "adb shell setprop persist.vendor.cam.isp.log 5",
+            "adb shell setprop persist.vendor.cam.debug.ae 1",
+            "adb shell setprop debug.isp.xtm.log 5",
+            "adb shell setprop persist.vendor.cam.mlog.loglevel 004000",
+            "adb shell pkill -f camera",
+            "adb shell setprop persist.vendor.cam.mlog.loglevel 444444",
+            "pause"
+        ]
+    },
+    "Others": {
+        "HDR": [
+            "adb shell setenforce 0",
+            "adb shell \"mkdir /data/local/tmp/morpho/image_refiner/dump -p\"",
+            "adb shell \"chmod 777 /data/local/tmp/morpho/image_refiner/dump\"",
+            "adb shell setprop debug.morpho.image_refiner.enable 1",
+            "adb shell setprop debug.morpho.image_refiner.dump 3",
+            "adb shell setprop debug.morpho.image_refiner.dump_path /data/local/tmp/morpho/image_refiner/dump",
+            "adb shell setprop debug.morpho.image_refiner.enable 1",
+            "adb shell setprop debug.morpho.image_refiner.draw_logo 1"
+        ],
+        "超夜": [
+            "adb shell setprop persist.vendor.camera.siq.dump 1",
+            "adb shell setprop vendor.camera.siq.dump_input_output 1"
+        ],
+        "Kill": [
+            "adb shell input keyevent 3",
+            "adb shell \"for pid in $(ps -A | grep vendor.qti.camera.provider@2.7-service_64 | awk '{print $2}'); do kill $pid; done\"",
+            "adb shell \"for pid in $(ps -A | grep android.hardware.camera.provider@2.4-service_64 | awk '{print $2}'); do kill $pid; done\"",
+            "adb shell \"for pid in $(ps -A | grep cameraserver | awk '{print $2}'); do kill $pid; done\"",
+            "adb shell \"for pid in $(ps -A | grep com.android.camera | awk '{print $2}'); do kill $pid; done\"",
+            "adb shell \"kill $(pidof camerahalserver)\"",
+            "adb shell \"kill $(pidof cameraserver)\"",
+            "adb shell pkill camera*"
+        ],
+        "离线log": [
+            "adb shell \"echo enableAsciiLogging=1 >> /vendor/etc/camera/camxoverridesettings.txt\"",
+            "adb shell \"echo logWarningMask=0x10080  >> /vendor/etc/camera/camxoverridesettings.txt\"",
+            "adb shell \"echo logVerboseMask=0x10080  >> /vendor/etc/camera/camxoverridesettings.txt\"",
+            "adb shell \"echo logInfoMask=0x10080  >> /vendor/etc/camera/camxoverridesettings.txt\"",
+            "adb shell \"echo logConfigMask=0x10080  >> /vendor/etc/camera/camxoverridesettings.txt\"",
+            "adb shell \"echo logEntryExitMask=0x10080  >> /vendor/etc/camera/camxoverridesettings.txt\""
+        ]
+    }
+}
