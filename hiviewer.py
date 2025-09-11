@@ -3924,7 +3924,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         icon_path = (self.icon_path / "rename_ico_96x96.ico").as_posix()
         self.rename_tool.setWindowIcon(QIcon(icon_path))
         # 链接关闭事件
-        self.rename_tool.closed.connect(self.on_rename_tool_closed) 
+        self.rename_tool.imagesRenamed.connect(self.on_rename_tool_closed) 
         self.rename_tool.show()
         self.hide()
 
