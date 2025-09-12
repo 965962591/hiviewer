@@ -1027,241 +1027,203 @@ class FileOrganizer(QWidget):
 
     def __init__(self,dir_list=None):
         super().__init__()
-
+        # 变量初始化
+        self.dir = dir_list
         self.settings = QSettings("MyApp", "FileOrganizer")
-        self.initUI()
+        self.cnt = 30 # 控制右侧展开文件数量阈值
 
-        # 设置图标路径
+        # UI初始化,以及图标设置
+        self.initUI()
         icon_path = os.path.join(BasePath, "resource", "icons", "rename_ico_96x96.ico")
         self.setWindowIcon(QIcon(icon_path))
 
-        # 设置传入路径处理函数
-        if dir_list:
-            self.set_folder_list(dir_list)
-            ...
+        # 处理传入文件/文件夹路径
+        if self.dir:
+            self.set_folder_list(self.dir)
 
     def initUI(self):
-        # 设置窗口初始大小
-        self.resize(1800, 1200)
-
-        # 主布局
-        main_layout = QVBoxLayout()
-
-        # 文件夹选择布局
-        folder_layout = QHBoxLayout()
-
-        # 左侧布局
-        left_layout = QVBoxLayout()
-        # self.folder_count_label = QLabel("文件夹数量: 0", self)
-        
-        # 使用QTreeView和QFileSystemModel实现文件预览
-        self.left_tree = QTreeView(self)
-        self.left_model = QFileSystemModel()
-        self.left_model.setRootPath("")
-        self.left_model.setFilter(QDir.Dirs | QDir.Files | QDir.NoDotAndDotDot)
-        self.left_tree.setModel(self.left_model)
-        self.left_tree.setSelectionMode(QTreeView.ExtendedSelection)
-        self.left_tree.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.left_tree.customContextMenuRequested.connect(self.open_context_menu)
-        self.left_tree.setAlternatingRowColors(True)
-        self.left_tree.setRootIsDecorated(True)
-
-        # 监听目录加载完成，确保可以在异步加载后滚动定位
         try:
+            # 设置窗口初始大小
+            self.resize(1800, 1200)
+
+            # 主布局,文件夹选择布局，
+            main_layout = QVBoxLayout()
+            folder_layout = QHBoxLayout()
+
+            # 左侧布局
+            left_layout = QVBoxLayout()
+            # 使用QTreeView和QFileSystemModel实现文件预览
+            self.left_tree = QTreeView(self)
+            self.left_model = QFileSystemModel()
+            self.left_model.setRootPath("")
+            self.left_model.setFilter(QDir.Dirs | QDir.Files | QDir.NoDotAndDotDot)
+            self.left_tree.setModel(self.left_model)
+            self.left_tree.setSelectionMode(QTreeView.ExtendedSelection)
+            self.left_tree.setContextMenuPolicy(Qt.CustomContextMenu)
+            self.left_tree.customContextMenuRequested.connect(self.open_context_menu)
+            self.left_tree.setAlternatingRowColors(True)
+            self.left_tree.setRootIsDecorated(True)
+            # 监听目录加载完成，确保可以在异步加载后滚动定位
             self._pending_scroll_path = None
             self.left_model.directoryLoaded.connect(self._on_left_dir_loaded)
-        except Exception:
-            pass
-        
-        # 只显示名称列，隐藏其他列
-        self.left_tree.hideColumn(1)  # 大小
-        self.left_tree.hideColumn(2)  # 类型
-        self.left_tree.hideColumn(3)  # 修改日期
-        
-        # 隐藏列标题
-        self.left_tree.header().hide()
-        
-        # 连接选择变化信号
-        self.left_tree.selectionModel().selectionChanged.connect(self.on_left_tree_selection_changed)
-        
-        # left_layout.addWidget(self.folder_count_label)
-        left_layout.addWidget(self.left_tree)
+            # 只显示名称列，隐藏其他列，
+            self.left_tree.hideColumn(1)  # 大小
+            self.left_tree.hideColumn(2)  # 类型
+            self.left_tree.hideColumn(3)  # 修改日期
+            self.left_tree.header().hide() # 隐藏列标题
+            # 连接选择变化信号
+            self.left_tree.selectionModel().selectionChanged.connect(self.on_left_tree_selection_changed)
+            left_layout.addWidget(self.left_tree)
 
-        # 右侧布局
-        right_layout = QVBoxLayout()
-        # self.file_count_label = QLabel("文件总数: 0", self)
-        
-        # 右侧使用QTreeView和QFileSystemModel来显示选中的文件
-        self.right_tree = QTreeView(self)
-        self.right_model = QFileSystemModel()
-        self.right_model.setRootPath("")
-        self.right_model.setFilter(QDir.Dirs | QDir.Files | QDir.NoDotAndDotDot)
-        # 右侧使用过滤代理模型，以支持移除选中（隐藏选中项）
-        self.right_proxy = ExcludeFilterProxyModel(self)
-        self.right_proxy.setSourceModel(self.right_model)
-        self.right_tree.setModel(self.right_proxy)
-        # 右侧支持拖放添加文件/文件夹
-        try:
+            # 右侧布局
+            right_layout = QVBoxLayout()
+            # 右侧使用QTreeView和QFileSystemModel来显示选中的文件
+            self.right_tree = QTreeView(self)
+            self.right_model = QFileSystemModel()
+            self.right_model.setRootPath("")
+            self.right_model.setFilter(QDir.Dirs | QDir.Files | QDir.NoDotAndDotDot)
+            # 右侧使用过滤代理模型，以支持移除选中（隐藏选中项）
+            self.right_proxy = ExcludeFilterProxyModel(self)
+            self.right_proxy.setSourceModel(self.right_model)
+            self.right_tree.setModel(self.right_proxy)
+            # 右侧支持拖放添加文件/文件夹
             self.right_tree.setAcceptDrops(True)
             self.right_tree.viewport().setAcceptDrops(True)
             self.right_tree.installEventFilter(self)
             self.right_tree.viewport().installEventFilter(self)
-        except Exception:
-            pass
-        # 用于显示空视图的临时目录
-        self._empty_dir = None
-        # 启动时设置为空目录，避免显示盘符
-        try:
-            import tempfile as _tmp
-            self._empty_dir = _tmp.mkdtemp(prefix="rename_empty_")
-            empty_index = self.right_proxy.mapFromSource(self.right_model.index(self._empty_dir))
-            self.right_tree.setRootIndex(empty_index)
-        except Exception:
-            self.right_tree.setRootIndex(QModelIndex())
-        self.right_tree.setSelectionMode(QTreeView.ExtendedSelection)
-        self.right_tree.setContextMenuPolicy(Qt.CustomContextMenu)
-        # self.right_tree.customContextMenuRequested.connect(self.open_context_menu_right)
-        self.right_tree.setAlternatingRowColors(True)
-        self.right_tree.setRootIsDecorated(True)
-        
-        # 只显示名称列，隐藏其他列
-        self.right_tree.hideColumn(1)  # 大小
-        self.right_tree.hideColumn(2)  # 类型
-        self.right_tree.hideColumn(3)  # 修改日期
-        
-        # 隐藏列标题
-        self.right_tree.header().hide()
+            # 用于显示空视图的临时目录
+            self._empty_dir = None
+            try:# 启动时设置为空目录，避免显示盘符
+                import tempfile as _tmp
+                self._empty_dir = _tmp.mkdtemp(prefix="rename_empty_")
+                empty_index = self.right_proxy.mapFromSource(self.right_model.index(self._empty_dir))
+                self.right_tree.setRootIndex(empty_index)
+            except Exception:
+                self.right_tree.setRootIndex(QModelIndex())
+            self.right_tree.setSelectionMode(QTreeView.ExtendedSelection)
+            self.right_tree.setContextMenuPolicy(Qt.CustomContextMenu)
+            self.right_tree.setAlternatingRowColors(True)
+            self.right_tree.setRootIsDecorated(True)
+            # 只显示名称列，隐藏其他列
+            self.right_tree.hideColumn(1)   # 大小
+            self.right_tree.hideColumn(2)   # 类型
+            self.right_tree.hideColumn(3)   # 修改日期
+            self.right_tree.header().hide() # 隐藏列标题
+            right_layout.addWidget(self.right_tree)
 
-        right_layout.addWidget(self.right_tree)
+            # 右侧下方布局（已不再直接显示在右侧，而是移到状态栏）
+            right_bottom_layout = QHBoxLayout()
+            # 输入框
+            self.line_edit = QComboBox(self)
+            self.line_edit.setEditable(True)
+            self.line_edit.addItem("$p_*")
+            self.line_edit.addItem("$$p_*")
+            self.line_edit.addItem("#_*")
+            self.line_edit.addItem("$yyyy$mm$dd_*")
+            self.line_edit.addItem("$yyyy-$mm-$dd_#=1_*")
+            self.line_edit.setFixedWidth(320)
+            # 开始按钮
+            self.start_button = QPushButton("开始", self)
+            self.start_button.clicked.connect(self.rename_files)
+            # 预览按钮
+            self.preview_button = QPushButton("预览", self)
+            self.preview_button.clicked.connect(self.preview_rename)
+            # 新增帮助按钮
+            self.help_button = QPushButton("帮助", self)
+            self.help_button.clicked.connect(self.show_help)
+            # 新增PowerRename按钮
+            self.power_rename_button = QPushButton("PowerRename", self)
+            self.power_rename_button.clicked.connect(self.open_power_rename)
+            self.power_rename_button.setFixedWidth(200)
+            # 这些控件将被添加到状态栏右侧
+            right_bottom_layout.addWidget(self.line_edit)
+            right_bottom_layout.addWidget(self.start_button)
+            right_bottom_layout.addWidget(self.preview_button)
+            right_bottom_layout.addWidget(self.power_rename_button)
+            right_bottom_layout.addWidget(self.help_button)
 
-        # 右侧下方布局（已不再直接显示在右侧，而是移到状态栏）
-        right_bottom_layout = QHBoxLayout()
+            # 中间按钮组件布局
+            middle_button_layout = QVBoxLayout()
+            self.add_button = QPushButton("增加", self)
+            self.add_button.clicked.connect(self.add_to_right)
+            self.remove_button = QPushButton("移除", self)
+            self.remove_button.clicked.connect(self.remove_from_right)
+            middle_button_layout.addWidget(self.add_button)
+            middle_button_layout.addWidget(self.remove_button)
 
-        # 输入框
-        self.line_edit = QComboBox(self)
-        self.line_edit.setEditable(True)  # 设置 QComboBox 为可编辑状态
-        self.line_edit.addItem("$p_*")
-        self.line_edit.addItem("$$p_*")
-        self.line_edit.addItem("#_*")
-        self.line_edit.addItem("$yyyy$mm$dd_*")
-        self.line_edit.addItem("$yyyy-$mm-$dd_#=1_*")
-        self.line_edit.setFixedWidth(300)  # 设置宽度
+            # 将左侧(含中间按钮)与右侧分别打包为两个容器，使用分隔条可调整大小
+            left_container = QFrame()
+            left_container.setFrameStyle(QFrame.NoFrame)
+            left_container_layout = QHBoxLayout()
+            left_container_layout.setContentsMargins(0, 0, 0, 0)
+            left_container_layout.setSpacing(0)
+            left_container_layout.addLayout(left_layout)
+            left_container_layout.addLayout(middle_button_layout)
+            left_container.setLayout(left_container_layout)
 
-        # 开始按钮
-        self.start_button = QPushButton("开始", self)
-        self.start_button.clicked.connect(self.rename_files)
-        # 预览按钮
-        self.preview_button = QPushButton("预览", self)
-        self.preview_button.clicked.connect(self.preview_rename)
+            # 右侧
+            right_container = QFrame()
+            right_container.setFrameStyle(QFrame.NoFrame)
+            right_container_layout = QVBoxLayout()
+            right_container_layout.setContentsMargins(0, 0, 0, 0)
+            right_container_layout.setSpacing(0)
+            right_container_layout.addLayout(right_layout)
+            right_container.setLayout(right_container_layout)
 
-        # 新增帮助按钮
-        self.help_button = QPushButton("帮助", self)
-        self.help_button.clicked.connect(self.show_help)
-        
-        # 新增PowerRename按钮
-        self.power_rename_button = QPushButton("PowerRename", self)
-        self.power_rename_button.clicked.connect(self.open_power_rename)
-        self.power_rename_button.setFixedWidth(200)  # 设置宽度
+            # 分隔器
+            splitter = QSplitter(Qt.Horizontal)
+            splitter.addWidget(left_container)
+            splitter.addWidget(right_container)
+            splitter.setChildrenCollapsible(False)
+            splitter.setHandleWidth(6)
+            # 设置伸缩因子为 1:1
+            splitter.setStretchFactor(0, 1)
+            splitter.setStretchFactor(1, 1)
+            try:# 按当前窗口宽度初始化尺寸为 1:1
+                total_w = max(self.width(), 1)
+                left_w = int(total_w * 1 / 2)
+                right_w = max(total_w - left_w, 1)
+                splitter.setSizes([left_w, right_w])
+            except Exception:
+                splitter.setSizes([400, 600])
 
-        # 这些控件将被添加到状态栏右侧
-        right_bottom_layout.addWidget(self.line_edit)
-        # right_bottom_layout.addWidget(self.replace_line_edit)
-        right_bottom_layout.addWidget(self.start_button)
-        right_bottom_layout.addWidget(self.preview_button)
-        right_bottom_layout.addWidget(self.power_rename_button)
-        right_bottom_layout.addWidget(self.help_button)
+            # 整个界面主体布局设置，添加文件夹选择布局、列表布局，上下分布
+            main_layout.addLayout(folder_layout)
+            main_layout.addWidget(splitter)
 
-        # 移除文件类型复选框（jpg/txt/xml），不再做扩展名筛选
+            # 添加状态栏并将控件右对齐显示
+            self.status_bar = QStatusBar(self)
+            self.status_bar.setSizeGripEnabled(False)
+            # 固定状态栏高度
+            self.status_bar.setFixedHeight(40)
+            # 将控件作为永久部件添加（自动靠右对齐）
+            self.status_bar.addPermanentWidget(self.line_edit)
+            self.status_bar.addPermanentWidget(self.start_button)
+            self.status_bar.addPermanentWidget(self.preview_button)
+            self.status_bar.addPermanentWidget(self.power_rename_button)
+            self.status_bar.addPermanentWidget(self.help_button)
+            main_layout.addWidget(self.status_bar)
 
-        # 不再将底部布局添加到右侧布局，改为使用状态栏承载
+            self.setLayout(main_layout)
+            self.setWindowTitle("重命名")
 
-        # 中间按钮组件布局
-        middle_button_layout = QVBoxLayout()
-        self.add_button = QPushButton("增加", self)
-        self.add_button.clicked.connect(self.add_to_right)
-        # self.add_all_button = QPushButton("增加全部", self)
-        # self.add_all_button.clicked.connect(self.add_all_to_right)
-        self.remove_button = QPushButton("移除", self)
-        self.remove_button.clicked.connect(self.remove_from_right)
+            # 加载上次打开的文件夹; 默认关闭，不传入文件/文件夹列表时启动
+            if last_folder := self.settings.value("lastFolder", "") and not self.dir:
+                if os.path.isdir(last_folder):
+                    # 不再限制根路径，显示完整的文件系统结构
+                    self.expand_to_path(last_folder)
 
-        # # 新增"移除全部"按钮
-        # self.remove_all_button = QPushButton("移除全部", self)
-        # self.remove_all_button.clicked.connect(self.remove_all_from_right)
+            # 添加ESC键退出快捷键
+            self.shortcut_esc = QShortcut(QKeySequence(Qt.Key_Escape), self)
+            self.shortcut_esc.activated.connect(self.close)
+            
+            # 添加Ctrl+D快捷键用于清空右侧视图
+            self.shortcut_remove_all = QShortcut(QKeySequence("Ctrl+D"), self)
+            self.shortcut_remove_all.activated.connect(self.remove_all_from_right)
 
-        middle_button_layout.addWidget(self.add_button)
-        # middle_button_layout.addWidget(self.add_all_button)
-        middle_button_layout.addWidget(self.remove_button)
-        # middle_button_layout.addWidget(self.remove_all_button)  # 添加"移除全部"按钮
-
-        # 将左侧(含中间按钮)与右侧分别打包为两个容器，使用分隔条可调整大小
-        left_container = QFrame()
-        left_container.setFrameStyle(QFrame.NoFrame)
-        left_container_layout = QHBoxLayout()
-        left_container_layout.setContentsMargins(0, 0, 0, 0)
-        left_container_layout.setSpacing(0)
-        left_container_layout.addLayout(left_layout)
-        left_container_layout.addLayout(middle_button_layout)
-        left_container.setLayout(left_container_layout)
-
-        right_container = QFrame()
-        right_container.setFrameStyle(QFrame.NoFrame)
-        right_container_layout = QVBoxLayout()
-        right_container_layout.setContentsMargins(0, 0, 0, 0)
-        right_container_layout.setSpacing(0)
-        right_container_layout.addLayout(right_layout)
-        right_container.setLayout(right_container_layout)
-
-        splitter = QSplitter(Qt.Horizontal)
-        splitter.addWidget(left_container)
-        splitter.addWidget(right_container)
-        splitter.setChildrenCollapsible(False)
-        splitter.setHandleWidth(6)
-        # 设置伸缩因子为 1:1
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 1)
-        # 按当前窗口宽度初始化尺寸为 1:1
-        try:
-            total_w = max(self.width(), 1)
-            left_w = int(total_w * 1 / 2)
-            right_w = max(total_w - left_w, 1)
-            splitter.setSizes([left_w, right_w])
-        except Exception:
-            splitter.setSizes([400, 600])
-
-        # 整个界面主体布局设置，添加文件夹选择布局、列表布局，上下分布
-        main_layout.addLayout(folder_layout)
-        main_layout.addWidget(splitter)
-
-        # 添加状态栏并将控件右对齐显示
-        self.status_bar = QStatusBar(self)
-        self.status_bar.setSizeGripEnabled(False)
-        # 固定状态栏高度
-        self.status_bar.setFixedHeight(40)
-        # 将控件作为永久部件添加（自动靠右对齐）
-        self.status_bar.addPermanentWidget(self.line_edit)
-        # self.status_bar.addPermanentWidget(self.replace_line_edit)
-        self.status_bar.addPermanentWidget(self.start_button)
-        self.status_bar.addPermanentWidget(self.preview_button)
-        self.status_bar.addPermanentWidget(self.power_rename_button)
-        self.status_bar.addPermanentWidget(self.help_button)
-        main_layout.addWidget(self.status_bar)
-
-        self.setLayout(main_layout)
-        self.setWindowTitle("重命名")
-
-        # 加载上次打开的文件夹
-        if last_folder := self.settings.value("lastFolder", ""):
-            self.set_folder_path(last_folder)
-
-        # 添加ESC键退出快捷键
-        self.shortcut_esc = QShortcut(QKeySequence(Qt.Key_Escape), self)
-        self.shortcut_esc.activated.connect(self.close)
-        
-        # 添加Ctrl+D快捷键用于清空右侧视图
-        self.shortcut_remove_all = QShortcut(QKeySequence("Ctrl+D"), self)
-        self.shortcut_remove_all.activated.connect(self.remove_all_from_right)
-
-        self.show()
+            self.show()
+        except Exception as e:
+            print(f"[initUI]-->error--初始化UI发生错误:{e}")
 
     def eventFilter(self, obj, event):
         """拦截右侧视图的拖拽事件，支持拖入文件/文件夹。"""
@@ -1401,7 +1363,7 @@ class FileOrganizer(QWidget):
     def _safe_expand_to_path(self, target_dir):
         """安全地展开到路径"""
         try:
-            if target_dir and Path(target_dir).is_dir():
+            if target_dir and os.path.isdir(target_dir):
                 self.expand_to_path(target_dir)
         except Exception as e:
             print(f"安全展开路径失败: {e}")
@@ -2140,69 +2102,43 @@ class FileOrganizer(QWidget):
         menu.exec_(self.left_tree.viewport().mapToGlobal(position))
 
     def open_folder_in_explorer(self):
-        selected_indexes = self.left_tree.selectedIndexes()
-        if selected_indexes:
-            index = selected_indexes[0]
-            file_path = self.left_model.filePath(index)
-            if os.path.isdir(file_path):
-                os.startfile(file_path)
-            else:
-                # 如果不是文件夹，打开文件所在的文件夹
-                os.startfile(os.path.dirname(file_path))
+        """在文件资源管理器中打开指定路径"""
+        if selected_indexes := self.left_tree.selectedIndexes():
+            file_path = self.left_model.filePath(selected_indexes[0])
+            # 判断选中的是否为文件夹，如果不是文件夹，打开文件所在的文件夹
+            path_ = file_path if os.path.isdir(file_path) else os.path.dirname(file_path)
+            os.startfile(path_)
 
     def expand_to_path(self, folder_path):
-        """自动展开文件树到指定路径"""
-        folder_path_obj = Path(folder_path)
-        if not folder_path_obj.is_dir():
-            return
-            
-        # 获取路径的索引
-        path_index = self.left_model.index(str(folder_path_obj))
-        if not path_index.isValid():
-            return
-            
-        # 展开路径上的所有父级目录
-        current_path = folder_path_obj
-        while current_path and current_path != current_path.parent:
-            parent_index = self.left_model.index(str(current_path))
-            if parent_index.isValid():
-                self.left_tree.expand(parent_index)
-            current_path = current_path.parent
-
-        # 记录待滚动路径，并在加载完成后滚动
+        """自动展开并滚动文件树到指定路径"""
         try:
-            self._request_scroll_to_path(folder_path)
-        except Exception:
-            pass
+            # 展开并选中指定路径
+            if (idx := self.left_model.index(folder_path)).isValid():
+                self.left_tree.setExpanded(idx, True)
+                self.left_tree.setCurrentIndex(idx)  
 
-        # 立即尝试一次，再用定时器兜底
-        try:
+            # 记录待滚动路径，规范化格式，并在加载完成后滚动
+            self._pending_scroll_path = os.path.normcase(os.path.normpath(folder_path))
+
+            # 立即尝试一次滚动，再用定时器兜底
             self._try_scroll_to(folder_path)
             QTimer.singleShot(60, lambda: self._try_scroll_to(folder_path))
             QTimer.singleShot(200, lambda: self._try_scroll_to(folder_path))
-        except Exception:
+        except Exception as e:
+            print(f"[expand_to_path]-->error--自动定位展开滚动指定路径报错:{e}")
             pass
-
-    def _request_scroll_to_path(self, folder_path):
-        """注册一个待滚动路径，等待目录加载完成后执行滚动。"""
-        try:
-            self._pending_scroll_path = os.path.normcase(os.path.normpath(folder_path))
-        except Exception:
-            self._pending_scroll_path = folder_path
 
     def _on_left_dir_loaded(self, loaded_path):
         """当 QFileSystemModel 异步加载目录后回调，执行滚动到目标路径。"""
         try:
+            # 检测是否有待滚动路径
             if not self._pending_scroll_path:
                 return
-            try:
-                loaded_norm = os.path.normcase(os.path.normpath(loaded_path))
-            except Exception:
-                loaded_norm = loaded_path
-            if self._pending_scroll_path == loaded_norm:
-                # 目标目录加载完成，执行滚动
+            # 路径格式规范化
+            loaded_norm = os.path.normcase(os.path.normpath(loaded_path)) if loaded_norm else loaded_norm
+            # 目标目录加载完成，执行滚动；清除待滚动路径
+            if self._pending_scroll_path == loaded_norm: 
                 self._try_scroll_to(self._pending_scroll_path)
-                # 清除待滚动
                 self._pending_scroll_path = None
         except Exception:
             pass
@@ -2210,128 +2146,47 @@ class FileOrganizer(QWidget):
     def _try_scroll_to(self, path):
         """尝试滚动并选中路径，前提是索引有效。"""
         try:
-            # 确保路径是字符串格式
-            path_str = str(Path(path))
-            idx = self.left_model.index(path_str)
-            if not idx.isValid():
+            # 确保路径索引有效
+            if not (idx := self.left_model.index(path)).isValid():
                 return
-            # 确保已展开到该节点
+            # 确保已展开到该节点，滚动并选中
             self.left_tree.expand(idx)
-            # 滚动并选中
             self.left_tree.scrollTo(idx, QTreeView.PositionAtCenter)
             self.left_tree.setCurrentIndex(idx)
         except Exception:
             pass
 
-        
-    def set_folder_path(self, folder_path):
-        """设置文件夹路径到文件模型"""
-        if os.path.isdir(folder_path):
-            # 不再限制根路径，显示完整的文件系统结构
-            # 自动展开到指定路径
-            self.expand_to_path(folder_path)
-            # 不自动更新右侧，由“增加/增加全部”按钮控制
-            # 计算指定文件夹内的文件夹数量
-            folder_count = 0
-            try:
-                for item in os.listdir(folder_path):
-                    item_path = os.path.join(folder_path, item)
-                    if os.path.isdir(item_path):
-                        folder_count += 1
-            except PermissionError:
-                folder_count = "无权限访问"
-
-
-    def set_folder_list(self, file_list):
-        """设置文件/文件夹列表：左侧定位，右侧打开（兼容入口）。"""
+    def set_folder_list(self, dir_list):
+        """设置文件/文件夹列表：左侧定位滚动到共同父目录，右侧打开（兼容入口）。"""
         try:
-            self.set_paths(file_list)
+            # 判断出入的文件/文件夹路径列表是否符合要求
+            if not isinstance(dir_list, list) or not isinstance(dir_list[0], str):
+                return
+            # 左侧：定位并展开；右侧：打开并建立白名单
+            target_dir = os.path.commonpath(dir_list)     # 计算共同父目录 
+            if target_dir and os.path.isdir(target_dir):
+                self.expand_to_path(target_dir)           # 左侧
+                self._set_right_view_with_paths(dir_list) # 右侧
         except Exception as e:
             print(f"set_folder_list 调用失败: {e}")
-
-    def set_paths(self, paths):
-        """接收文件/文件夹路径列表：
-        - 左侧：定位并展开到共同父目录；
-        - 右侧：以这些路径为白名单并设置根目录，直接进行重命名。
-        """
-        if not paths:
-            return
-            
-        # 使用Path对象归一化并区分文件/目录
-        unique_paths = list(dict.fromkeys(paths))
-        files = []
-        dirs = []
-        
-        for p in unique_paths:
-            path_obj = Path(p)
-            if path_obj.is_file():
-                files.append(str(path_obj))
-            elif path_obj.is_dir():
-                dirs.append(str(path_obj))
-
-        # 计算共同父目录
-        candidate_dirs = list(dirs)
-        candidate_dirs.extend([str(Path(f).parent) for f in files])
-        
-        target_dir = None
-        if candidate_dirs:
-            try:
-                target_dir = os.path.commonpath(candidate_dirs)
-            except ValueError:
-                target_dir = candidate_dirs[0] if candidate_dirs else None
-
-        # 左侧：定位并展开
-        if target_dir and Path(target_dir).is_dir():
-            try:
-                self.expand_to_path(target_dir)
-                # 选中共同父目录，便于用户感知当前位置
-                idx = self.left_model.index(target_dir)
-                if idx.isValid():
-                    self.left_tree.setCurrentIndex(idx)
-            except Exception:
-                pass
-
-        # 右侧：打开并建立白名单
-        try:
-            self._set_right_view_with_paths(unique_paths)
-        except Exception as e:
-            print(f"设置右侧视图失败: {e}")
-
+    
     def on_left_tree_selection_changed(self, selected, deselected):
-        """处理左侧文件树选择变化"""
-        indexes = selected.indexes()
-        if indexes:
-            index = indexes[0]
-            file_path = Path(self.left_model.filePath(index))
-            
-            if file_path.is_dir():
-                # 更新文件夹输入框，仅更新统计，不自动添加到右侧
-                self.update_folder_count_for_path(str(file_path))
-            else:
-                # 如果选择的是文件，仅更新输入框为其父目录
-                parent_dir = file_path.parent
-                if parent_dir.is_dir():
-                    self.update_folder_count_for_path(str(parent_dir))
-
-    def update_folder_count_for_path(self, folder_path):
-        """更新指定路径的文件夹数量统计"""
-        folder_path_obj = Path(folder_path)
-        if not folder_path_obj.is_dir():
-            return
-            
-        try:
-            folder_count = sum(1 for item in folder_path_obj.iterdir() if item.is_dir())
-        except PermissionError:
-            folder_count = "无权限访问"
-
+        """处理左侧文件树选择变化,暂时禁用"""
+        ...
 
     def closeEvent(self, event):
         """窗口关闭事件"""
         self.imagesRenamed.emit()
         super().closeEvent(event)
 
-
 if __name__ == "__main__":
+
+    dir_list = [
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.25-O19-IN-二供-小数包/normal/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.25-O19-IN-二供-小数包/人像/vivo"
+    ]
+
     app = QApplication(sys.argv)
-    ex = FileOrganizer()
+    ex = FileOrganizer(dir_list=dir_list)
+    # ex = FileOrganizer()
     sys.exit(app.exec_())

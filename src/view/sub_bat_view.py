@@ -150,7 +150,7 @@ class LogVerboseMaskApp(QMainWindow):
         # 设置定时器定期刷新设备列表（作为备用方案）
         self.refresh_timer = QTimer()
         self.refresh_timer.timeout.connect(self.refresh_devices)
-        self.refresh_timer.start(5000)  # 每5秒刷新一次
+        self.refresh_timer.start(1000)  # 每5秒刷新一次
 
     def load_commands(self):
         """从文件加载命令"""
@@ -366,10 +366,10 @@ class LogVerboseMaskApp(QMainWindow):
         if ok and new_name.strip():
             new_name = new_name.strip()
             
-            # 检查名称是否已被其他设备使用
-            if new_name in self.device_name_mapping.values() and new_name != current_name:
-                QMessageBox.warning(self, "错误", "该名称已被其他设备使用，请选择其他名称。")
-                return
+            # 若其他设备已使用相同名称，则覆盖：移除其他设备上的该名称
+            for other_device_id, other_name in list(self.device_name_mapping.items()):
+                if other_device_id != device_id and other_name == new_name:
+                    self.device_name_mapping.pop(other_device_id, None)
             
             # 更新映射
             if new_name == device_id:
@@ -618,6 +618,112 @@ class LogVerboseMaskApp(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "错误", f"执行拍照命令时出错: {str(e)}")
 
+
+    def reboot_device(self):
+        """重启设备"""
+        selected_device = self.get_selected_device()
+        if not selected_device:
+            QMessageBox.warning(self, "设备错误", "请先选择有效的ADB设备！")
+            return
+
+        try:
+            command = f"adb -s {selected_device} shell reboot -p"
+
+            startupinfo = None
+            if hasattr(subprocess, 'STARTUPINFO'):
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = subprocess.SW_HIDE
+
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                startupinfo=startupinfo,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+
+            if result.returncode == 0:
+                # QMessageBox.information(self, "成功", "已发送拍照按键事件")
+                print(f"已发送关机按键事件: {command}")
+            else:
+                error_msg = result.stderr.strip() if result.stderr else "未知错误"
+                QMessageBox.warning(self, "执行失败", f"发送关机事件失败: {error_msg}")
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"执行关机命令时出错: {str(e)}")
+            
+    def restart_device(self):
+        """重启设备"""
+        selected_device = self.get_selected_device()
+        if not selected_device:
+            QMessageBox.warning(self, "设备错误", "请先选择有效的ADB设备！")
+            return
+
+        try:
+            command = f"adb -s {selected_device} shell reboot"
+
+            startupinfo = None
+            if hasattr(subprocess, 'STARTUPINFO'):
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = subprocess.SW_HIDE
+
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                startupinfo=startupinfo,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+
+            if result.returncode == 0:
+                # QMessageBox.information(self, "成功", "已发送拍照按键事件")
+                print(f"已发送重启按键事件: {command}")
+            else:
+                error_msg = result.stderr.strip() if result.stderr else "未知错误"
+                QMessageBox.warning(self, "执行失败", f"发送重启事件失败: {error_msg}")
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"执行重启命令时出错: {str(e)}")
+
+    def lightscreen(self):
+        """亮屏"""
+        selected_device = self.get_selected_device()
+        if not selected_device:
+            QMessageBox.warning(self, "设备错误", "请先选择有效的ADB设备！")
+            return
+
+        try:
+            command = f"adb -s {selected_device} shell input keyevent 26"
+
+            startupinfo = None
+            if hasattr(subprocess, 'STARTUPINFO'):
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = subprocess.SW_HIDE
+
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                startupinfo=startupinfo,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+
+            if result.returncode == 0:
+                # QMessageBox.information(self, "成功", "已发送拍照按键事件")
+                print(f"已发送亮屏按键事件: {command}")
+            else:
+                error_msg = result.stderr.strip() if result.stderr else "未知错误"
+                QMessageBox.warning(self, "执行失败", f"发送亮屏事件失败: {error_msg}")
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"执行亮屏命令时出错: {str(e)}")
+
     def create_menu_bar(self):
         """创建菜单栏"""
         menubar = self.menuBar()
@@ -650,6 +756,236 @@ class LogVerboseMaskApp(QMainWindow):
         # 创建快捷功能菜单
         quick_menu = menubar.addMenu('快捷功能')
         self.create_quick_functions_menu(quick_menu)
+
+        #安装APK菜单
+        install_apk_menu = menubar.addMenu('安装APK')
+        install_apk_menu.setToolTip('选择文件夹，批量安装文件夹内apk文件')
+        self.create_install_apk_menu(install_apk_menu)
+
+        #连接wifi
+        connect_wifi_menu = menubar.addMenu('连接WiFi')
+        connect_wifi_menu.setToolTip('选择WiFi，连接指定WiFi,请在配置文件中提前配置WiFi信息')
+        self.create_connect_wifi_menu(connect_wifi_menu)
+
+    def create_connect_wifi_menu(self, connect_wifi_menu):
+        """创建连接WiFi菜单（动态加载SSID）"""
+        # 先清空原有菜单项（若有）
+        connect_wifi_menu.clear()
+
+        # 读取WiFi配置
+        wifi_map = self.load_wifi_configs()
+        if not wifi_map:
+            noitem = QAction('未配置WiFi (编辑 app_cache/bat_filepath.ini [WIFI])', self)
+            noitem.setEnabled(False)
+            connect_wifi_menu.addAction(noitem)
+            return
+
+        # 为每个SSID添加菜单项
+        for ssid, pwd in wifi_map.items():
+            action = QAction(ssid, self)
+            masked = '*' * len(pwd) if pwd else ''
+            action.setToolTip(f'SSID: {ssid}  密码: {masked}')
+            action.triggered.connect(lambda checked, s=ssid, p=pwd: self.connect_wifi_with(s, p))
+            connect_wifi_menu.addAction(action)
+
+    def connect_wifi_enable(self):
+        """开启WiFi (svc wifi enable)"""
+        selected_device = self.get_selected_device()
+        if not selected_device:
+            QMessageBox.warning(self, "设备错误", "请先选择有效的ADB设备！")
+            return
+        try:
+            startupinfo = None
+            if hasattr(subprocess, 'STARTUPINFO'):
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = subprocess.SW_HIDE
+            cmd = f"adb -s {selected_device} shell svc wifi enable"
+            result = subprocess.run(
+                cmd,
+                shell=True,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                startupinfo=startupinfo
+            )
+            if result.returncode == 0:
+                QMessageBox.information(self, "成功", "已开启WiFi。")
+            else:
+                QMessageBox.warning(self, "失败", f"开启WiFi失败：\n{(result.stderr or result.stdout or '').strip()}")
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"执行失败：\n{str(e)}")
+
+    def connect_wifi_with(self, ssid, password):
+        """连接指定WiFi: cmd wifi connect-network "SSID" wpa2 "PASSWORD""" 
+        selected_device = self.get_selected_device()
+        if not selected_device:
+            QMessageBox.warning(self, "设备错误", "请先选择有效的ADB设备！")
+            return
+        if not ssid:
+            QMessageBox.warning(self, "配置错误", "SSID 不能为空！")
+            return
+        try:
+            startupinfo = None
+            if hasattr(subprocess, 'STARTUPINFO'):
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = subprocess.SW_HIDE
+
+            # 先尝试开启WiFi（不打断流程，即使失败也继续尝试连接）
+            try:
+                enable_cmd = f"adb -s {selected_device} shell svc wifi enable"
+                subprocess.run(
+                    enable_cmd,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    encoding='utf-8',
+                    startupinfo=startupinfo
+                )
+            except Exception:
+                pass
+
+            # 按需求使用 wpa2
+            ssid_escaped = ssid.replace('"', '\\"')
+            pwd_escaped = (password or '').replace('"', '\\"')
+            cmd = f"adb -s {selected_device} shell cmd wifi connect-network \"{ssid_escaped}\" wpa2 \"{pwd_escaped}\""
+            result = subprocess.run(
+                cmd,
+                shell=True,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                startupinfo=startupinfo
+            )
+            if result.returncode == 0 and ('Success' in (result.stdout or '') or not result.stderr):
+                QMessageBox.information(self, "成功", f"已连接到 WiFi：{ssid}")
+            else:
+                err = (result.stderr or result.stdout or '').strip()
+                QMessageBox.warning(self, "失败", f"连接 WiFi 失败：\n{err}")
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"执行失败：\n{str(e)}")
+
+    def load_wifi_configs(self):
+        """从INI文件加载 [WIFI] 配置，返回 {ssid: password}"""
+        ini_path = os.path.join(APP_CACHE_DIR, "bat_filepath.ini")
+        wifi_map = {}
+        try:
+            if os.path.exists(ini_path):
+                with open(ini_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                import re
+                pattern = r'\[WIFI\](.*?)(?=\[|$)'
+                match = re.search(pattern, content, re.DOTALL)
+                if match:
+                    wifi_content = match.group(1)
+                    for line in wifi_content.split('\n'):
+                        line = line.strip()
+                        if not line or line.startswith('#'):
+                            continue
+                        if '=' in line:
+                            ssid, pwd = line.split('=', 1)
+                            ssid = ssid.strip()
+                            pwd = pwd.strip()
+                            if ssid:
+                                wifi_map[ssid] = pwd
+        except Exception as e:
+            print(f"加载WIFI配置时出错: {e}")
+        return wifi_map
+
+    def create_install_apk_menu(self, install_apk_menu):
+        """创建安装APK菜单"""
+        install_apk_action = QAction('批量安装APK', self)
+        install_apk_action.setToolTip('批量安装APK')
+        install_apk_action.triggered.connect(self.install_apk)
+        install_apk_menu.addAction(install_apk_action)
+
+    def install_apk(self):
+        """安装APK"""
+        selected_device = self.get_selected_device()
+        if not selected_device:
+            QMessageBox.warning(self, "设备错误", "请先选择有效的ADB设备！")
+            return
+        try:
+            from PyQt5.QtWidgets import QFileDialog, QProgressDialog
+            folder = QFileDialog.getExistingDirectory(self, "选择包含APK的文件夹")
+            if not folder:
+                return
+
+            # 收集该目录下的所有apk文件（不递归）
+            try:
+                entries = os.listdir(folder)
+            except Exception as e:
+                QMessageBox.critical(self, "错误", f"无法读取文件夹：\n{str(e)}")
+                return
+
+            apk_files = []
+            for name in entries:
+                path = os.path.join(folder, name)
+                if os.path.isfile(path) and name.lower().endswith('.apk'):
+                    apk_files.append(path)
+
+            if not apk_files:
+                QMessageBox.information(self, "提示", "该文件夹下未找到APK文件。")
+                return
+
+            total = len(apk_files)
+
+            # 进度对话框
+            progress = QProgressDialog("准备安装...", "取消", 0, total, self)
+            progress.setWindowTitle("批量安装APK")
+            progress.setWindowModality(Qt.WindowModal)
+            progress.setAutoClose(False)
+            progress.setAutoReset(False)
+            progress.setMinimumDuration(0)
+            progress.setValue(0)
+
+            # 启动后台线程
+            self.install_thread = InstallApkThread(selected_device, apk_files)
+
+            def on_progress_changed(index, total_count, filename):
+                base = os.path.basename(filename) if filename else ""
+                progress.setLabelText(f"正在安装: {base}  ({index}/{total_count})")
+                progress.setMaximum(total_count)
+                progress.setValue(index)
+
+            def on_finished(success_list, failed_list, cancelled):
+                progress.close()
+                if cancelled:
+                    QMessageBox.information(self, "已取消", "用户取消了批量安装。")
+                else:
+                    success_count = len(success_list)
+                    failed_count = len(failed_list)
+                    summary = [
+                        f"共发现APK：{total}",
+                        f"安装成功：{success_count}",
+                        f"安装失败：{failed_count}"
+                    ]
+                    if failed_list:
+                        summary.append("\n失败明细：")
+                        preview = failed_list[:20]
+                        summary.extend(preview)
+                        if failed_count > 20:
+                            summary.append(f"... 以及另外 {failed_count - 20} 条失败")
+                    QMessageBox.information(self, "批量安装结果", "\n".join(summary))
+                # 清理线程对象
+                try:
+                    self.install_thread.deleteLater()
+                except Exception:
+                    pass
+
+            def on_canceled():
+                if hasattr(self, 'install_thread') and self.install_thread is not None:
+                    self.install_thread.request_cancel()
+
+            self.install_thread.progress_changed.connect(on_progress_changed)
+            self.install_thread.install_finished.connect(on_finished)
+            progress.canceled.connect(on_canceled)
+            self.install_thread.start()
+            progress.show()
+
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"批量安装过程中发生异常：\n{str(e)}")
 
     def load_secret_codes(self):
         """从INI文件加载暗码配置"""
@@ -766,6 +1102,26 @@ class LogVerboseMaskApp(QMainWindow):
         screenshot_action.setToolTip('截图路径/sdcard/Pictures/Screenshots/')
         screenshot_action.triggered.connect(self.take_screenshot)
         quick_menu.addAction(screenshot_action)
+        
+        # 关机功能
+        reboot_action = QAction('关机', self)
+        reboot_action.setToolTip('关机')
+        reboot_action.triggered.connect(self.reboot_device)
+        quick_menu.addAction(reboot_action)
+
+        # 重启功能
+        restart_action = QAction('重启', self)
+        restart_action.setToolTip('重启')
+        restart_action.triggered.connect(self.restart_device)
+        quick_menu.addAction(restart_action)
+        
+        # 亮屏功能
+        lightscreen_action = QAction('亮屏', self)
+        lightscreen_action.setToolTip('亮屏')
+        lightscreen_action.triggered.connect(self.lightscreen)
+        quick_menu.addAction(lightscreen_action)
+        
+
 
     def initUI(self):
         self.setWindowTitle("Bat脚本管理器")
@@ -823,11 +1179,13 @@ class LogVerboseMaskApp(QMainWindow):
         self.capture_start_btn.setToolTip("按数量与间隔进行批量拍摄")
         self.capture_pause_btn = QPushButton("暂停/继续")
         self.capture_pause_btn.setEnabled(False)
-
+        #保存
+        save_image_button = QPushButton("保存")
+        save_image_button.setToolTip("保存指定数量图片到本地")
         # 连接按钮信号
         self.capture_start_btn.clicked.connect(self.start_batch_capture)
         self.capture_pause_btn.clicked.connect(self.toggle_capture_pause)
-        
+        save_image_button.clicked.connect(self.save_image_to_local)
         device_layout.addWidget(device_label)
         device_layout.addWidget(self.device_combo)
         device_layout.addWidget(refresh_button)
@@ -839,6 +1197,7 @@ class LogVerboseMaskApp(QMainWindow):
         device_layout.addWidget(self.capture_interval_spin)
         device_layout.addWidget(self.capture_start_btn)
         device_layout.addWidget(self.capture_pause_btn)
+        device_layout.addWidget(save_image_button)
         device_layout.addStretch()  # 添加弹性空间
         
         main_layout.addLayout(device_layout)
@@ -1111,6 +1470,211 @@ class LogVerboseMaskApp(QMainWindow):
         else:
             self.capture_pause_event.set()
 
+    def save_image_to_local(self):
+        """
+        保存图片到本地
+        1、获取到拍摄的张数
+        2、从/sdcard/scim/camera/ 中下载最新的图片（只下载拍摄的张数的图）
+        3、保存到本地，本地路径是~/Pictures/年_月_日_时_分_秒/  如果~/Pictures/ 不存在，则创建
+        
+        """
+        selected_device = self.get_selected_device()
+        if not selected_device:
+            QMessageBox.warning(self, "设备错误", "请先选择有效的ADB设备！")
+            return
+        
+        try:
+            # 获取拍摄的张数
+            shot_count = self.capture_count_spin.value()
+            if shot_count <= 0:
+                QMessageBox.warning(self, "参数错误", "拍摄张数必须大于0！")
+                return
+                
+            # 创建本地保存路径
+            import datetime
+            timestamp = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+            pictures_dir = os.path.expanduser("~/Pictures")
+            save_dir = os.path.join(pictures_dir, timestamp)
+            
+            # 确保目录存在
+            os.makedirs(save_dir, exist_ok=True)
+            
+            # 获取远程文件列表
+            remote_dir = "/sdcard/scim/camera/"
+            startupinfo = None
+            if hasattr(subprocess, 'STARTUPINFO'):
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = subprocess.SW_HIDE
+            
+            # 检查远程目录是否存在
+            check_cmd = f"adb -s {selected_device} shell ls -la {remote_dir}"
+            result = subprocess.run(
+                check_cmd,
+                shell=True,
+                capture_output=True,
+                text=True,
+                encoding='gbk' if sys.platform == "win32" else 'utf-8',  # Windows使用GBK编码
+                errors='replace',  # 处理编码错误
+                startupinfo=startupinfo,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            
+            if "No such file or directory" in result.stderr or result.returncode != 0:
+                # 尝试其他可能的相机目录
+                alternative_dirs = ["/sdcard/DCIM/Camera/"]
+                found_dir = False
+                
+                for alt_dir in alternative_dirs:
+                    check_cmd = f"adb -s {selected_device} shell ls -la {alt_dir}"
+                    result = subprocess.run(
+                        check_cmd,
+                        shell=True,
+                        capture_output=True,
+                        text=True,
+                        encoding='gbk' if sys.platform == "win32" else 'utf-8',  # Windows使用GBK编码
+                        errors='replace',  # 处理编码错误
+                        startupinfo=startupinfo,
+                        creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                    )
+                    
+                    if result.returncode == 0 and "No such file or directory" not in result.stderr:
+                        remote_dir = alt_dir
+                        found_dir = True
+                        break
+                
+                if not found_dir:
+                    # 如果找不到预设目录，尝试创建一个目录
+                    try:
+                        fallback_dir = "/sdcard/DCIM/Camera/"
+                        mkdir_cmd = f"adb -s {selected_device} shell mkdir -p {fallback_dir}"
+                        subprocess.run(
+                            mkdir_cmd,
+                            shell=True,
+                            capture_output=True,
+                            text=True,
+                            encoding='gbk' if sys.platform == "win32" else 'utf-8',
+                            errors='replace',
+                            startupinfo=startupinfo,
+                            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                        )
+                        remote_dir = fallback_dir
+                        print(f"创建并使用备用目录: {fallback_dir}")
+                    except Exception as e:
+                        print(f"创建备用目录失败: {e}")
+                        QMessageBox.warning(self, "路径错误", "无法找到设备上的相机图片目录！")
+                        return
+            
+            # 列出远程文件，不使用grep命令
+            list_cmd = f"adb -s {selected_device} shell ls -la {remote_dir}"
+            result = subprocess.run(
+                list_cmd,
+                shell=True,
+                capture_output=True,
+                text=True,
+                encoding='gbk' if sys.platform == "win32" else 'utf-8',  # Windows使用GBK编码
+                errors='replace',  # 处理编码错误
+                startupinfo=startupinfo,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            
+            if result.returncode != 0:
+                QMessageBox.warning(self, "命令执行失败", f"获取图片列表失败：{result.stderr}")
+                return
+            
+            # 解析文件列表，获取最新的N张图片
+            files = []
+            for line in result.stdout.splitlines():
+                try:
+                    # 跳过目录项和非文件行
+                    if "d" in line[:10] or line.startswith("total ") or not line.strip():
+                        continue
+                        
+                    parts = line.split()
+                    if len(parts) >= 7:  # 至少需要7个部分（权限、链接数、用户、组、大小、日期、文件名）
+                        # 获取文件名（可能在最后一个位置或之后的位置）
+                        filename = parts[-1]
+                        
+                        # 检查是否是图片文件
+                        if filename and (filename.lower().endswith('.jpg') or 
+                                         filename.lower().endswith('.jpeg') or 
+                                         filename.lower().endswith('.png')):
+                            print(f"找到图片: {filename}")
+                            files.append(filename)
+                except Exception as e:
+                    print(f"解析文件行出错: {line} - {e}")
+                    continue
+                    
+            # 按文件名排序（通常包含时间戳）
+            files.sort()
+            
+            # 取最新的shot_count张图片（文件列表已按时间排序，最新的在最后）
+            files = files[-shot_count:] if len(files) >= shot_count else files
+            
+            if not files:
+                QMessageBox.warning(self, "未找到图片", "设备上未找到任何图片文件！")
+                return
+            
+            # 创建进度对话框
+            from PyQt5.QtWidgets import QProgressDialog
+            progress = QProgressDialog("正在下载图片...", "取消", 0, len(files), self)
+            progress.setWindowTitle("保存图片")
+            progress.setWindowModality(Qt.WindowModal)
+            progress.setMinimumDuration(0)
+            progress.show()
+            
+            # 下载文件
+            success_count = 0
+            for i, filename in enumerate(files):
+                if progress.wasCanceled():
+                    break
+                    
+                progress.setValue(i)
+                progress.setLabelText(f"正在下载 {i+1}/{len(files)}: {filename}")
+                
+                remote_path = f"{remote_dir}{filename}"
+                local_path = os.path.join(save_dir, filename)
+                
+                pull_cmd = f"adb -s {selected_device} pull \"{remote_path}\" \"{local_path}\""
+                result = subprocess.run(
+                    pull_cmd,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    encoding='gbk' if sys.platform == "win32" else 'utf-8',  # Windows使用GBK编码
+                    errors='replace',  # 处理编码错误
+                    startupinfo=startupinfo,
+                    creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                )
+                
+                if result.returncode == 0:
+                    success_count += 1
+                else:
+                    print(f"下载失败: {filename} - {result.stderr}")
+            
+            progress.setValue(len(files))
+            
+            # 显示结果
+            if success_count > 0:
+                QMessageBox.information(self, "下载完成", 
+                                     f"成功下载 {success_count}/{len(files)} 张图片到:\n{save_dir}")
+                
+                # 尝试打开保存目录
+                try:
+                    if sys.platform == "win32":
+                        os.startfile(save_dir)
+                    elif sys.platform == "darwin":  # macOS
+                        subprocess.run(["open", save_dir])
+                    else:  # Linux
+                        subprocess.run(["xdg-open", save_dir])
+                except Exception as e:
+                    print(f"打开目录失败: {e}")
+            else:
+                QMessageBox.warning(self, "下载失败", "未能成功下载任何图片！")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"保存图片时出错: {str(e)}")
+        
     def update_script_mask(self):
         """更新高通脚本复选框"""
         self.mask_value = 0x00000000
@@ -2168,10 +2732,10 @@ class FileDownloadDialog(QDialog):
         if ok and new_name.strip():
             new_name = new_name.strip()
             
-            # 检查名称是否已被其他设备使用
-            if new_name in self.device_name_mapping.values() and new_name != current_name:
-                QMessageBox.warning(self, "错误", "该名称已被其他设备使用，请选择其他名称。")
-                return
+            # 若其他设备已使用相同名称，则覆盖：移除其他设备上的该名称
+            for other_device_id, other_name in list(self.device_name_mapping.items()):
+                if other_device_id != device_id and other_name == new_name:
+                    self.device_name_mapping.pop(other_device_id, None)
             
             # 更新映射
             if new_name == device_id:
@@ -2507,14 +3071,27 @@ class FileDownloadDialog(QDialog):
 
         self.progress_scroll_area = QScrollArea()
         self.progress_scroll_area.setWidgetResizable(True)
-        self.progress_scroll_area.setMaximumHeight(200)  # 限制最大高度
-        self.progress_scroll_area.setMinimumHeight(100)  # 设置最小高度
+        # 自适应窗口大小：不限制高度，并设置扩展的尺寸策略
+        self.progress_scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        # 让内容贴顶贴左，避免顶部空白
+        self.progress_scroll_area.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        # 移除边框和额外边距，减少视觉空白
+        self.progress_scroll_area.setFrameStyle(0)
+        self.progress_scroll_area.setContentsMargins(0, 0, 0, 0)
+        # 仅在需要时显示垂直滚动条，禁用水平滚动条
+        self.progress_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.progress_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         
-        # 创建容器widget来放置进度条
+        # 创建容器widget来放置进度条（两列网格布局）
         self.progress_container = QWidget()
-        self.progress_bars_layout = QVBoxLayout(self.progress_container)
+        from PyQt5.QtWidgets import QGridLayout
+        self.progress_bars_layout = QGridLayout(self.progress_container)
         self.progress_bars_layout.setContentsMargins(0, 0, 0, 0)
-        self.progress_bars_layout.setSpacing(5)
+        self.progress_bars_layout.setHorizontalSpacing(10)
+        self.progress_bars_layout.setVerticalSpacing(5)
+        self.progress_bars_layout.setColumnStretch(0, 1)
+        self.progress_bars_layout.setColumnStretch(1, 1)
+        self.progress_bars_layout.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         
         # 设置滚动区域的widget
         self.progress_scroll_area.setWidget(self.progress_container)
@@ -2959,8 +3536,8 @@ class FileDownloadDialog(QDialog):
         # 清除现有的进度条
         self.clear_progress_bars()
         
-        # 为每个设备-文件夹组合创建进度条
-        for combination in device_folder_combinations:
+        # 为每个设备-文件夹组合创建进度条（两列显示）
+        for idx, combination in enumerate(device_folder_combinations):
             device_id = combination['device_id']
             device_display_name = combination['device_display_name']
             folder_path = combination['folder_path']
@@ -2971,6 +3548,8 @@ class FileDownloadDialog(QDialog):
             progress_layout = QHBoxLayout(progress_container)
             progress_layout.setContentsMargins(0, 0, 0, 0)
             progress_layout.setSpacing(5)
+            # 让容器在水平方向尽量填满
+            progress_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             
             # 创建标签，显示自定义名称
             label = QLabel(f"{device_display_name} - {custom_name}")
@@ -2985,20 +3564,25 @@ class FileDownloadDialog(QDialog):
             progress_bar.setValue(0)
             progress_bar.setFormat("")  # 不显示内置百分比
             progress_bar.setMinimumWidth(100)
+            progress_bar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             
             # 创建百分比标签
             percentage_label = QLabel("0%")
             percentage_label.setStyleSheet("color: #2c3e50; font-weight: bold; min-width: 40px;")
             percentage_label.setAlignment(Qt.AlignCenter)
             
-            # 添加到布局
+            # 添加到布局（设置伸展因子，使进度条占据剩余空间）
             progress_layout.addWidget(label)
             progress_layout.addWidget(progress_bar)
             progress_layout.addWidget(percentage_label)
-            progress_layout.addStretch()
+            progress_layout.setStretch(0, 0)  # label
+            progress_layout.setStretch(1, 1)  # progress bar
+            progress_layout.setStretch(2, 0)  # percent label
             
-            # 添加到主布局
-            self.progress_bars_layout.addWidget(progress_container)
+            # 添加到网格布局（两列）
+            row = idx // 2
+            col = idx % 2
+            self.progress_bars_layout.addWidget(progress_container, row, col)
             
             # 存储引用，使用路径作为键（因为task_progress_updated信号使用路径）
             key = f"{device_id}:{folder_path}"
@@ -3008,7 +3592,8 @@ class FileDownloadDialog(QDialog):
         if not self.progress_bars_dict:
             no_tasks_label = QLabel("没有选中的下载任务")
             no_tasks_label.setStyleSheet("color: #7f8c8d; font-style: italic; text-align: center;")
-            self.progress_bars_layout.addWidget(no_tasks_label)
+            # 跨两列显示
+            self.progress_bars_layout.addWidget(no_tasks_label, 0, 0, 1, 2)
 
     def clear_progress_bars(self):
         """清除所有进度条"""
@@ -3267,7 +3852,7 @@ class DownloadThread(QThread):
             # 首先获取源文件夹中的文件数量，用于计算进度
             remote_file_count = self.get_file_count(device, source_path)
             if remote_file_count == 0:
-                self.progress_updated.emit(f"警告: 源路径 {source_path} 中没有文件")
+                self.progress_updated.emit(f"源路径 {source_path} 中没有文件，下载已完成")
                 # 设置当前任务进度为100%（因为没有文件需要下载）
                 self.task_progress_updated.emit(device, folder_name, 100)
                 return True
@@ -3332,12 +3917,12 @@ class DownloadThread(QThread):
                             else:
                                 print(f"[调试] 定时器进度无变化: 本地 {local_file_count}/{remote_file_count} 文件 ({progress}%)")
                         else:
-                            # 如果远程文件数为0，显示0%进度
-                            if last_progress != 0:
-                                self.task_progress_updated.emit(device, folder_name, 0)
-                                last_progress = 0
-                                self.progress_updated.emit("下载进度: 0/0 文件 (0%)")
-                                print(f"[调试] 定时器: 远程文件数为0，设置进度为0%")
+                            # 如果远程文件数为0，显示100%进度（因为没有文件需要下载就意味着已完成）
+                            if last_progress != 100:
+                                self.task_progress_updated.emit(device, folder_name, 100)
+                                last_progress = 100
+                                self.progress_updated.emit("下载进度: 0/0 文件 (100%)")
+                                print(f"[调试] 定时器: 远程文件数为0，设置进度为100%")
                     except Exception as e:
                         print(f"[调试] 定时器检查文件数量时出错: {e}")
                     
@@ -3350,14 +3935,19 @@ class DownloadThread(QThread):
                     final_local_count = self.get_local_file_count(local_download_path)
                     print(f"[调试] 最终本地文件数量: {final_local_count}")
                     
+                    # 如果远程文件数为0，则直接显示100%完成
+                    if remote_file_count == 0:
+                        self.task_progress_updated.emit(device, folder_name, 100)
+                        self.progress_updated.emit(f"下载完成: 源文件夹中没有文件 (100%)")
+                        print(f"[调试] 定时器: 源文件夹中没有文件，显示100%进度")
                     # 如果文件数量达到或接近目标，显示100%
-                    if remote_file_count > 0 and final_local_count >= remote_file_count * 0.95:  # 95%以上认为完成
+                    elif remote_file_count > 0 and final_local_count >= remote_file_count * 0.95:  # 95%以上认为完成
                         self.task_progress_updated.emit(device, folder_name, 100)
                         self.progress_updated.emit(f"下载完成: {final_local_count}/{remote_file_count} 文件 (100%)")
                         print(f"[调试] 定时器: 下载完成，显示100%进度")
                     else:
                         # 否则显示实际进度
-                        final_progress = min(99, int((final_local_count / remote_file_count) * 100))
+                        final_progress = min(99, int((final_local_count / remote_file_count) * 100)) if remote_file_count > 0 else 100
                         self.task_progress_updated.emit(device, folder_name, final_progress)
                         self.progress_updated.emit(f"下载进度: {final_local_count}/{remote_file_count} 文件 ({final_progress}%)")
                         print(f"[调试] 定时器: 最终进度 {final_progress}%")
@@ -3482,8 +4072,13 @@ class DownloadThread(QThread):
             print(f"[调试] 主线程最终检查，本地文件数量: {final_local_count}")
             
             if return_code == 0:
+                # 如果远程文件数为0，则直接返回成功
+                if remote_file_count == 0:
+                    self.task_progress_updated.emit(device, folder_name, 100)
+                    self.progress_updated.emit(f"✓ 下载完成，源文件夹中没有文件")
+                    return True
                 # 检查是否真的有文件被下载
-                if final_local_count > 0:
+                elif final_local_count > 0:
                     # 只有在定时器没有设置100%的情况下才设置
                     if final_local_count >= remote_file_count * 0.95:  # 95%以上认为完成
                         self.task_progress_updated.emit(device, folder_name, 100)
@@ -3586,6 +4181,61 @@ class DownloadThread(QThread):
             print(f"[调试] 统计本地文件数量时出错: {e}")
             return 0
     
+
+class InstallApkThread(QThread):
+    """后台安装APK线程，支持进度与取消"""
+    progress_changed = pyqtSignal(int, int, str)  # 当前序号, 总数, 当前文件
+    install_finished = pyqtSignal(list, list, bool)  # 成功列表, 失败列表, 是否取消
+
+    def __init__(self, device_id, apk_files):
+        super().__init__()
+        self.device_id = device_id
+        self.apk_files = list(apk_files)
+        self._cancel_requested = False
+
+    def request_cancel(self):
+        self._cancel_requested = True
+
+    def run(self):
+        success_list = []
+        failed_list = []
+        total = len(self.apk_files)
+
+        startupinfo = None
+        if hasattr(subprocess, 'STARTUPINFO'):
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
+
+        for idx, apk_path in enumerate(self.apk_files, start=1):
+            if self._cancel_requested:
+                self.install_finished.emit(success_list, failed_list, True)
+                return
+
+            # 更新进度（开始安装当前APK前）
+            self.progress_changed.emit(idx - 1, total, apk_path)
+            command = f"adb -s {self.device_id} install -r \"{apk_path}\""
+            try:
+                result = subprocess.run(
+                    command,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    encoding='utf-8',
+                    startupinfo=startupinfo
+                )
+                if result.returncode == 0 and ("Success" in (result.stdout or "") or not result.stderr):
+                    success_list.append(os.path.basename(apk_path))
+                else:
+                    reason = (result.stderr or result.stdout or '').strip()
+                    failed_list.append(f"{os.path.basename(apk_path)} -> {reason[:160]}")
+            except Exception as e:
+                failed_list.append(f"{os.path.basename(apk_path)} -> {str(e)}")
+
+        # 进度设置为完成
+        self.progress_changed.emit(total, total, "")
+        self.install_finished.emit(success_list, failed_list, False)
+
 
 
 if __name__ == "__main__":
