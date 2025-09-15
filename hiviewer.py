@@ -13,8 +13,6 @@
 
 """记录程序启动时间"""
 import time
-
-from matplotlib.pyplot import show
 flag_start = time.time()
 
 """导入python内置模块"""
@@ -4030,10 +4028,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 记录最终清理完成
         print("[_final_cleanup]-->最终清理完成")
         self.logger.info("[_final_cleanup]-->最终清理完成")
-
-
-      
-
 
 """
 python对象命名规范
