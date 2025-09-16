@@ -46,6 +46,7 @@ from src.view.sub_rename_view import FileOrganizer                          # �
 from src.view.sub_image_process_view import SubCompare                      # 确保导入 SubCompare 类
 from src.view.sub_bat_view import LogVerboseMaskApp                         # 导入批量执行命令的类
 from src.view.sub_search_view import SearchOverlay                          # 导入图片搜索工具类(ctrl+f)
+from src.view.sub_image_skinny_view import PicZipMainWindow                 # 导入图片瘦身子界面
 from src.components.ui_main import Ui_MainWindow                            # 假设你的主窗口类名为Ui_MainWindow
 from src.components.custom_qMbox_showinfo import show_message_box           # 导入消息框类
 from src.components.custom_qdialog_about import AboutDialog                 # 导入关于对话框类,显示帮助信息
@@ -473,7 +474,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 设置右键菜单槽函数
         self.context_menu.addAction(zip_icon, "压缩文件(Z)", self.compress_selected_files)
         self.context_menu.addAction(theme_icon, "切换主题(P)", self.on_p_pressed)
-        self.context_menu.addAction(image_size_reduce_icon, "图片瘦身(X)", self.jpgc_tool) 
+        self.context_menu.addAction(image_size_reduce_icon, "图片瘦身(X)", self.on_x_pressed) 
         self.context_menu.addAction(ps_icon, "图片调整(L)", self.on_l_pressed)
         self.context_menu.addAction(tcp_icon, "截图功能(T)", self.screen_shot_tool)
         self.context_menu.addAction(command_icon, "批量执行命令工具(M)", self.open_bat_tool)
@@ -740,7 +741,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.z_shortcut.activated.connect(self.screen_shot_tool)
         # 添加快捷键 X 打开图片体积压缩工具
         self.z_shortcut = QShortcut(QKeySequence('x'), self)
-        self.z_shortcut.activated.connect(self.jpgc_tool) 
+        self.z_shortcut.activated.connect(self.on_x_pressed) 
         # 添加快捷键 W 打开资源管理器
         self.z_shortcut = QShortcut(QKeySequence('w'), self)
         self.z_shortcut.activated.connect(self.reveal_in_explorer) 
@@ -1449,7 +1450,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                         file_full_path_list.append(full_path) 
                     else: # 常规拼接构建完整路径的办法，效率较低
                         if(full_path := self.get_single_full_path(row, col)): 
-                            file_full_path_list.append(full_path) 
+                            file_full_path_list.append(full_path)
+
                 return file_full_path_list
             except Exception as e:
                 print(f"[get_selected_file_path]-->error: 获取文件路径失败: {e}")
@@ -1637,23 +1639,23 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """截图功能"""
         WScreenshot.run()
 
-    def jpgc_tool(self):
-        """打开图片体积压缩工具_升级版"""
+    def on_x_pressed(self):
+        """打开图片瘦身工具"""
         try:
-            # 检查图片体积压缩工具是否存在
-            tcp_path = self.root_path / "resource" / "tools" / "JPGC.exe"
-            if not tcp_path.exists():
-                show_message_box(f"未找到JPGC工具: {tcp_path}", "错误", 1500)
+            # 获取选中的项文件路径列表
+            if not(file_paths := self.get_selected_file_path()):
+                show_message_box(f"🚩无法获取选中项的文件路径列表, 请确保选中了单元格", "提示", 2000)
                 return
-                
-            # 使用startfile保持窗口可见（适用于GUI程序）
-            # 该方法只适用于window系统，其余系统（mac,linux）需要通过subprocess实现
-            os.startfile(tcp_path)
-            
+
+            # 打开图片瘦身子界面
+            self.image_skinny_window = PicZipMainWindow()
+            self.image_skinny_window.set_image_list(file_paths)
+            self.image_skinny_window.setWindowIcon(QIcon((self.icon_path/"image_skinny.ico").as_posix()))  
+            self.image_skinny_window.show()
         except Exception as e:
-            show_message_box(f"启动JPGC工具失败: {str(e)}", "错误", 2000)
-            print(f"[jpgc_tool]-->error--打开图片体积压缩工具_升级版时 | 报错: {e}")
-            self.logger.error(f"【jpgc_tool】-->打开图片体积压缩工具_升级版时 | 报错: {e}")
+            show_message_box(f"启动图片瘦身工具失败: {str(e)}", "错误", 2000)
+            print(f"[on_x_pressed]-->error--启动图片瘦身工具时 | 报错: {e}")
+            self.logger.error(f"on_x_pressed-->启动图片瘦身工具时 | 报错: {e}")
             show_message_box("🚩打开图片体积压缩工具发生错误!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
 
     def reveal_in_explorer(self):

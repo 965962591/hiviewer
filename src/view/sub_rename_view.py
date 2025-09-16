@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
+from ntpath import isfile
 import sys
 import os
 import tempfile
@@ -1239,13 +1240,16 @@ class FileOrganizer(QWidget):
         """将右侧视图设置为显示指定路径（支持文件/文件夹），并建立白名单。"""
         try:
             # 计算共同父目录; 并左侧同步定位到拖拽的文件夹位置（异步执行，避免阻塞）
-            target_dir = os.path.commonpath(paths) if paths else ""     
+            target_dir = os.path.commonpath(paths) if paths else ""
+            # 若只选择了单个文件，commonpath 可能返回文件本身，需转为父目录
+            if paths and len(paths)==1 and os.path.isfile(paths[0]):
+                target_dir = os.path.dirname(paths[0])
             QTimer.singleShot(50, lambda: self._safe_expand_to_path(target_dir))
 
             # 重置右侧过滤状态; 获取files和dirs路径列表; 设置白名单：优先文件，否则目录
             self.remove_all_from_right()
-            files = [Path(p).as_posix() for p in dict.fromkeys(paths) if Path(p).is_file()]
-            dirs = [Path(p).as_posix() for p in dict.fromkeys(paths) if Path(p).is_dir()]
+            files = [Path(p).as_posix() for p in dict.fromkeys(paths) if os.path.isfile(p)]
+            dirs = [Path(p).as_posix() for p in dict.fromkeys(paths) if os.path.isdir(p)]
             _set = set(files) if files else (set(dirs) if dirs else None)
             self.right_proxy.set_included(_set) if _set else self.right_proxy.clear_included()
 
@@ -1299,17 +1303,17 @@ class FileOrganizer(QWidget):
         try:
             # 情况1：通过set_path函数传入文件，基于传入的文件数量判断
             if input_file_count is not None:
-                mess = f"传入文件数量为 {input_file_count}, 超过{self.cnt}个，不展开文件夹"
+                mess = f"传入文件数量为 {input_file_count}, 超过{self.cnt}个, 不展开文件夹"
                 if input_file_count < self.cnt:
                     self._expand_folders_recursive(parent_index, max_depth=3)
-                    mess = f"传入文件数量为 {input_file_count}, 少于{self.cnt}个，自动展开文件夹"
+                    mess = f"传入文件数量为 {input_file_count}, 少于{self.cnt}个, 自动展开文件夹"
             # 情况2：拖入文件夹，统计文件夹内的总文件数量
             else:
                 total_file_count = self._count_total_files_in_tree(parent_index)
-                mess = f"文件夹内总文件数量为 {total_file_count}, 超过{self.cnt}个，不展开文件夹"
+                mess = f"文件夹内总文件数量为 {total_file_count}, 超过{self.cnt}个, 不展开文件夹"
                 if total_file_count < self.cnt:
                     self._expand_folders_recursive(parent_index, max_depth=3)
-                    mess = f"文件夹内总文件数量为 {total_file_count}, 少于{self.cnt}个，自动展开文件夹"
+                    mess = f"文件夹内总文件数量为 {total_file_count}, 少于{self.cnt}个, 自动展开文件夹"
                 
             # 在状态栏显示操作反馈
             if hasattr(self, 'status_bar'):
