@@ -20,11 +20,12 @@ import gc
 import os
 import sys
 import json
+import stat
+import shutil
 import subprocess
 from pathlib import Path
+from collections import Counter
 from itertools import zip_longest
-import shutil
-import stat
 
 """导入python第三方模块"""
 from PyQt5.QtGui import (
@@ -104,6 +105,23 @@ def get_app_dir():
             pass
     return base
 
+def make_unique_dir_names(folder_paths):
+    """
+    输入: 文件夹路径列表（str 或 Path）
+    返回: 与输入顺序对应的唯一化目录名列表
+    """
+    ps = [Path(p).resolve() for p in folder_paths]
+    cnt = Counter(p.name for p in ps)
+
+    # 第一轮：只用 parent/name
+    names = [f"{p.parent.name}/{p.name}" if cnt[p.name] > 1 else p.name for p in ps]
+
+    # 如果仍全同名，再往上加一层，一般也就加到这一层就可以保证唯一
+    if len(set(names)) == 1:
+        names = [f"{p.parent.parent.name}/{p.parent.name}/{p.name}" if cnt[p.name] > 1 else p.name for p in ps]
+
+    return names
+
 """
 设置主界面类区域开始线
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -112,7 +130,6 @@ def get_app_dir():
 class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def __init__(self, parent=None):
         super(HiviewerMainwindow, self).__init__(parent)
-
         # 记录程序启动时间；设置图标路径；读取本地版本信息，并初始化新版本信息
         self.start_time = flag_start
 
@@ -169,6 +186,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 初始化属性
         self.files_list = []                    # 文件名及基本信息列表
         self.paths_list = []                    # 文件路径列表
+        self.paths_index = {}                   # 文件路径索引字典
         self.dirnames_list = []                 # 选中的同级文件夹列表
         self.image_index_max = []               # 存储当前选中及复选框选中的，所有图片列有效行最大值
         self.preloading_file_name_paths = []    # 预加载图标前的文件路径列表
@@ -404,7 +422,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         paste_icon = QIcon((self.icon_path / "paste_ico_96x96.ico").as_posix()) 
         refresh_icon = QIcon((self.icon_path / "update_ico_96x96.ico").as_posix()) 
         theme_icon = QIcon((self.icon_path / "theme_ico_96x96.ico").as_posix()) 
-        image_size_reduce_icon = QIcon((self.icon_path / "image_size_reduce_ico_96x96.ico").as_posix())
+        image_size_reduce_icon = QIcon((self.icon_path / "image_skinny.ico").as_posix())
         ps_icon = QIcon((self.icon_path / "ps_ico_96x96.ico").as_posix()) 
         command_icon = QIcon((self.icon_path / "cmd_ico_96x96.ico").as_posix())
         exif_icon = QIcon((self.icon_path / "exif_ico_96x96.ico").as_posix())
@@ -1856,13 +1874,14 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.RB_QTableWidget0.setRowCount(0)
             self.RB_QTableWidget0.setColumnCount(0)
             
-            # 收集文件名基本信息以及文件路径，并将相关信息初始化为类中全局变量
-            file_infos_list, file_paths, dir_name_list = self.collect_file_paths()
+            # 收集文件名基本信息以及文件路径，文件索引字典，同级文件夹列表，并将相关信息初始化为类中全局变量
+            file_infos_list, file_paths, path_indexs, dir_name_list = self.collect_file_paths()
             self.files_list = file_infos_list      # 初始化文件名及基本信息列表
             self.paths_list = file_paths           # 初始化文件路径列表
             self.dirnames_list = dir_name_list     # 初始化选中的同级文件夹列表
+            self.paths_index = path_indexs         # 初始化文件路径索引字典
 
-            # 先初始化表格结构和内容，不加载图标,并获取图片列有效行最大值；重绘表格,更新显示
+            # 先初始化表格结构和内容，不加载图标, 并获取图片列有效行最大值；重绘表格,更新显示    
             self.image_index_max = self.init_table_structure(file_infos_list, dir_name_list)    
             self.RB_QTableWidget0.repaint()
 
@@ -1944,17 +1963,16 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.logger.error(f"【init_table_structure】-->初始化表格结构和内容失败: {e}")
             return []
 
-        
     def collect_file_paths(self):
         """收集需要显示的文件路径"""
         # 初始化文件名列表,文件路径列表，文件夹名列表
-        file_infos, file_paths, dir_name_list = [], [], []     
+        file_infos, file_paths, paths_index, dir_name_list = [], [], [], []     
         try:
             # 获取同级文件夹复选框中选择的文件夹路径列表
             selected_folders = self.model.getCheckedItems()
             # 读取地址栏当前显示的文件夹路径, 兼容路径最后一位字符为"/"的情况，获取父文件夹
-            current_directory = self.RT_QComboBox.currentText() 
-            current_directory = current_directory[:-1] if current_directory[-1] == "/" else current_directory 
+            if current_directory := self.RT_QComboBox.currentText(): 
+                current_directory = current_directory[:-1] if current_directory[-1] == "/" else current_directory 
             parent_directory = os.path.dirname(current_directory)
             
             # 构建所有需要显示的文件夹路径, 并将当前选中的文件夹路径插入到列表的最前面 
@@ -1989,7 +2007,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             elif selected_option == "显示所有文件":
                 selected_folders_path = [folder for folder in selected_folders_path 
                                     if os.path.exists(folder) and any(os.scandir(folder))]
-            else: # 显示所有文件
+            else: # 默认显示所有文件
                 selected_folders_path = [folder for folder in selected_folders_path 
                                     if os.path.exists(folder) and any(os.scandir(folder))]
 
@@ -1998,22 +2016,25 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 if not os.path.exists(folder):
                     continue
                 # 根据选项过滤文件列表，提取文件信息列表和文件路径列表
-                if file_name_list := self.filter_files(folder):
+                if file_info_list := self.filter_files(folder):
                     # 文件信息列表，获取带EXIF信息的文件信息列表
-                    file_infos.append(file_name_list) 
+                    file_infos.append(file_info_list) 
                     # 文件路径列表，获取文件信息列表file_name_list的最后一列
-                    if file_path_list := [item[-1] for item in file_name_list]:
-                        file_paths.append(file_path_list)
-                
-            # 获取文件夹名列表
-            dir_name_list = [os.path.basename(dir_name) for dir_name in selected_folders_path]
+                    file_paths.append([item[-1] for item in file_info_list])
+            
+            # 根据文件路径列表获取文件路径索引映射字典
+            paths_index = {value: (i, j) for i, row in enumerate(file_paths) for j, value in enumerate(row)}
+
+            # 获取文件夹名列表，保证名称唯一
+            # dir_name_list = [os.path.basename(dir_name) for dir_name in selected_folders_path]
+            dir_name_list = make_unique_dir_names(selected_folders_path)
 
             # 返回提取的结果,文件信息列表,文件路径列表，文件夹名列表
-            return file_infos, file_paths, dir_name_list
+            return file_infos, file_paths, paths_index, dir_name_list
         except Exception as e:
             print(f"【collect_file_paths】-->error--收集需要显示的文件路径 | 报错：{e}")
             self.logger.error(f"【collect_file_paths】-->收集需要显示的文件路径 | 报错：{e}")
-            return [], [], []
+            return [], [], [], []
         
     def filter_files(self, folder):
         """根据选项过滤文件"""
@@ -2036,8 +2057,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     if opt not in ("显示图片文件", "显示视频文件", "显示所有文件"):
                         continue
                     
-                    # 收集所需信息
-                    st = entry.stat()
+                    # 收集(宽、高、曝光时间、ISO)等信息
                     width = height = exposure_time = iso = None
                     if opt == "显示图片文件" and not self.simple_mode:
                         try:
@@ -2047,14 +2067,14 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                         except Exception as e:
                             self.logger.error(f"类【ImageProcessor】-->获取图片exif信息 | 报错：{e}")
                             print(f"类[ImageProcessor]-->获取图片exif信息 | 报错：{e}")
-                    # 使用pathlib替代.replace('\\', '/')方式, 确保文件路径都用正斜杠 / 表示
-                    norm_path = Path(entry.path).as_posix()
-                    # 拼接根据opt筛选后的文件信息列表
-                    files_and_dirs_with_mtime.append((entry.name, st.st_ctime, st.st_mtime, st.st_size,
-                        (width, height), exposure_time, iso, 
-                        norm_path
-                    ))
 
+                    # 使用pathlib确保文件路径都用正斜杠 / 表示；拼接根据opt筛选后的文件信息列表
+                    norm_path = Path(entry.path).as_posix()
+                    st = entry.stat()
+                    files_and_dirs_with_mtime.append((
+                    entry.name, st.st_ctime, st.st_mtime, st.st_size,
+                    (width, height), exposure_time, iso, norm_path))
+                        
             # 使用sort_by_custom函数进行排序
             files_and_dirs_with_mtime = sort_by_custom(sort_option, files_and_dirs_with_mtime, self.simple_mode, opt)
 
@@ -2082,9 +2102,10 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # 设置预加载状态以及时间
             self.preloading = True
             self.start_time_image_preloading = time.time()
-
+        
             # 创建新的预加载器
-            self.current_preloader = ImagePreloader(file_paths)
+            batch = len(self.paths_list) if self.paths_list else 10
+            self.current_preloader = ImagePreloader(file_paths, batch)
             self.current_preloader.signals.progress.connect(self.update_preload_progress)
             self.current_preloader.signals.batch_loaded.connect(self.on_batch_loaded)
             self.current_preloader.signals.finished.connect(self.on_preload_finished)
@@ -2111,32 +2132,33 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def on_batch_loaded(self, batch):
         """处理批量加载完成的图标"""
         try:
+            # 更新表格中对应的图标
             for path, icon in batch:
-                # 更新表格中对应的图标
                 self.update_table_icon(path, icon)
         except Exception as e:
             print(f"[on_batch_loaded]-->error--处理批量加载完成的图标任务 | 报错：{e}")
             self.logger.error(f"【on_batch_loaded】-->处理批量加载完成的图标任务 | 报错：{e}")
 
-
     def update_table_icon(self, file_path, icon):
-        """更新表格中的指定图标
-        通过先查找行来优化图标更新效率
-        """
-        filename = os.path.basename(file_path)
-        folder = os.path.basename(os.path.dirname(file_path))
-        # 先在每一行中查找文件名
-        for row in range(self.RB_QTableWidget0.rowCount()):
-            # 遍历每一列查找匹配的文件夹
-            for col in range(self.RB_QTableWidget0.columnCount()):
-                header = self.RB_QTableWidget0.horizontalHeaderItem(col)
-                item = self.RB_QTableWidget0.item(row, col)
-                
-                if (header and header.text() == folder and 
-                    item and item.text().split('\n')[0] == filename):
-                    if bool(icon):
-                        item.setIcon(icon)
-                    return  # 找到并更新后直接返回
+        """更新表格中的指定图标"""
+        # 使用字典self.paths_index快速查找索引
+        if file_path and file_path in self.paths_index:
+            col, row = self.paths_index[file_path]
+            if (item := self.RB_QTableWidget0.item(row, col)) and icon:
+                item.setIcon(icon)
+        if False: # 原来双循环方案，效率较低，移除
+            filename = os.path.basename(file_path)
+            folder = os.path.basename(os.path.dirname(file_path))
+            # 先在每一行中查找文件名
+            for row in range(self.RB_QTableWidget0.rowCount()):
+                # 遍历每一列查找匹配的文件夹
+                for col in range(self.RB_QTableWidget0.columnCount()):
+                    header = self.RB_QTableWidget0.horizontalHeaderItem(col)
+                    item = self.RB_QTableWidget0.item(row, col)
+                    if (header and header.text().split('/')[-1] == folder and item and item.text().split('\n')[0] == filename):
+                        if bool(icon):
+                            item.setIcon(icon)
+                        return  # 找到并更新后直接返回
 
     def update_preload_progress(self, current, total):
         """处理预加载进度"""
@@ -2160,10 +2182,11 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # 写入日志信息
             print("[RT_QComboBox1_init]-->开始添加地址栏文件夹的同级文件夹到下拉复选框中")
             self.logger.info(f"[RT_QComboBox1_init]-->开始添加地址栏文件夹的同级文件夹到下拉复选框中")
-            # 获取地址栏显示，没有路径也会返回空字符串""，此时调用相当于初始化同级下拉框
-            current_directory = self.RT_QComboBox.currentText()
-            # 获取父目录中的文件夹列表,始化模型，绑定模型到 QComboBox,设置自定义委托，禁用右键菜单
-            sibling_folders = self.getSiblingFolders(current_directory)    
+            # 获取同级文件夹列表
+            sibling_folders = []
+            if current_directory := self.RT_QComboBox.currentText():
+                sibling_folders = self.getSiblingFolders(current_directory)    
+            # 初始化模型，绑定模型到 QComboBox, 设置自定义委托，禁用右键菜单
             self.model = CheckBoxListModel(sibling_folders)  
             self.RT_QComboBox1.setModel(self.model)  
             self.RT_QComboBox1.setItemDelegate(CheckBoxDelegate())  
@@ -2215,14 +2238,16 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         try:
             # 获取父文件夹路径（兼容地址栏最后一位为"/"的情况）, 然后过滤出同级文件夹，不包括当前选择的文件夹
             folder_path = folder_path[:-1] if folder_path[-1] == "/" else folder_path
+            
+            # 获取folder_path父文件夹内的同级文件夹列表
             parent_folder = os.path.dirname(folder_path)   
             sibling_folders = [
                 name for name in os.listdir(parent_folder) 
                 if os.path.isdir(os.path.join(parent_folder, name)) and name != os.path.basename(folder_path)  
                 ]
-            # 打印提示信息
+            
+            # 打印提示信息，并返回同级文件夹列表
             print(f"[getSiblingFolders]-->获取【{folder_path}】的同级文件夹列表: \n-->{sibling_folders}")
-            # 返回同级文件夹列表
             return sibling_folders
         except Exception as e:
             print(f"[getSiblingFolders]-->error--获取同级文件夹列表失败: {e}")
@@ -2979,6 +3004,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # 11. 清理列表数据
             self.files_list = []
             self.paths_list = []
+            self.paths_index = {}  
             self.dirnames_list = []
             self.preloading_file_name_paths = []
             self.additional_folders_for_table = []
@@ -3334,7 +3360,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         print(f"[on_f3_pressed]-->使用系统记事本打开日志文件成功 | 路径: {log_path} ")
         self.logger.info(f"[on_f3_pressed]-->使用系统记事本打开日志文件成功 | 路径: {log_path} ")
 
-
     """键盘按下事件处理""" 
     @log_error_decorator(tips="处理F2键按下事件")
     def on_f2_pressed(self):
@@ -3347,6 +3372,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         if not (current_folder := [self.paths_list[item.column()][item.row()] for item in selected_items]):
             show_message_box("无法获取选中的文件路径列表！", "提示", 500)
             return
+
         # 若选中的单元格数量为1，打开对应的文件重命名交互界面
         if len(selected_items) == 1: 
             self.open_sigle_file_rename_tool(current_folder[0], selected_items[0])
@@ -3357,13 +3383,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     @log_error_decorator(tips="处理F4键按下事件")
     def on_f4_pressed(self):
         """处理F4键按下事件"""
-        # 获取当前选中的文件夹上一级文件夹路径current_folder
-        if not (current_folder := os.path.dirname(self.RT_QComboBox.currentText())):
+        # 获取当前选中的文件路径列表
+        if not (current_folder := self.get_selected_file_path()):
             show_message_box("当前没有选中的文件夹", "提示", 500)
-        # 将单个文件夹路径封装成列表传入，打开多文件夹重命名工具
-        self.open_rename_tool([current_folder])
- 
+            return
 
+        # 将单个文件夹路径封装成列表传入，打开多文件夹重命名工具
+        dir_path_list = [Path(_s).parent.parent.as_posix()] if (_s := current_folder[0]) else []
+        self.open_rename_tool(dir_path_list)
+ 
     @log_error_decorator(tips="处理F4键按下事件")
     def on_f5_pressed(self):
         """处理F5键按下事件

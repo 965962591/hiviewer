@@ -1,37 +1,19 @@
 {
     "combobox_history": [
-        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.26-O19-IN-二供-小数包/2025.8.26-O19-IN-二供-小数包/normal/O19-1st",
-        "D:/Tuning/Somalia-A(M953)/03_pic/20250806_15.06.51",
-        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.26-O19-IN-二供-小数包/2025.8.26-O19-IN-二供-小数包/normal/N19",
-        "D:/Tuning/M197_B/一供/前摄一供/升级后",
-        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.26-O19-IN-二供-小数包/2025.8.26-O19-IN-二供-小数包/",
-        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.26-O19-IN-二供-小数包/2025.8.26-O19-IN-二供-小数包/normal",
-        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.26-O19-IN-二供-小数包/2025.8.26-O19-IN-二供-小数包/video",
-        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.26-O19-IN-二供-小数包/2025.8.26-O19-IN-二供-小数包/补光灯/N19",
-        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.26-O19-IN-二供-小数包/2025.8.26-O19-IN-二供-小数包/补光灯/vivo",
-        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.26-O19-IN-二供-小数包/2025.8.26-O19-IN-二供-小数包/超夜",
-        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.26-O19-IN-二供-小数包/2025.8.26-O19-IN-二供-小数包/美颜",
-        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.26-O19-IN-二供-小数包/2025.8.26-O19-IN-二供-小数包/人像",
-        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.26-O19-IN-二供-小数包/2025.8.26-O19-IN-二供-小数包/补光灯",
-        "D:/Tuning/O19/0_pic/02_IN_pic/北京实验室/印度目标图 第二轮",
-        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.25-O19-IN-二供-小数包/normal",
-        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.25-O19-IN-二供-小数包/normal/O19-2nd",
-        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.6自测",
-        "D:/Tuning/O19/0_pic/02_IN_pic/北京实验室/O19",
-        "D:/Tuning/O19/0_pic/02_IN_pic/逆光对比度低,发蒙问题澄清/N19",
-        "D:/Tuning/O19/0_pic/02_IN_pic/逆光对比度低,发蒙问题澄清/O19改后",
-        "D:/Tuning/O19/0_pic/02_IN_pic/逆光对比度低,发蒙问题澄清/O19改前"
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.25-O19-IN-二供-小数包/normal/O19-1st",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.25-O19-IN-二供-小数包/normal/N19"
     ],
-    "current_directory": "D:/Tuning/O19/0_pic/02_IN_pic/逆光对比度低,发蒙问题澄清/O19改前",
-    "file_type_option": "显示所有文件",
-    "combobox1_checked_items": [],
+    "current_directory": "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.25-O19-IN-二供-小数包/normal/N19",
+    "file_type_option": "显示图片文件",
+    "combobox1_checked_items": [
+        "O19-1st",
+        "O19-2nd",
+        "vivo"
+    ],
     "combobox1_all_items": [
-        "0625",
-        "0630",
-        "0701",
-        "N19",
-        "O19改后",
-        "V50"
+        "O19-1st",
+        "O19-2nd",
+        "vivo"
     ],
     "sort_option": "按修改时间排序",
     "theme_option": "默认主题",

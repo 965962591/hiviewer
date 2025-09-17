@@ -11,7 +11,6 @@ from pathlib import Path
 from functools import lru_cache
 from typing import Optional, Tuple
 
-
 # 三方库
 from PIL import Image
 from PyQt5 import QtGui, QtCore
@@ -23,7 +22,6 @@ from src.utils.delete import force_delete_file
 from src.utils.heic import extract_jpg_from_heic
 from src.utils.video import extract_first_frame_from_video
 from src.view.sub_compare_image_view import pil_to_pixmap
-
 
 
 """设置本项目的入口路径,全局变量BASEICONPATH"""
@@ -45,9 +43,10 @@ class WorkerSignals(QObject):
 
 class ImagePreloader(QRunnable):
     """改进的图片预加载工作线程"""
-    def __init__(self, file_paths):
+    def __init__(self, file_paths, batch):
         super().__init__()
         self.file_paths = file_paths
+        self.batch = batch
         self.signals = WorkerSignals()
         self._pause = False
         self._stop = False
@@ -66,32 +65,27 @@ class ImagePreloader(QRunnable):
         
     def run(self):
         try:
-            total = len(self.file_paths)
             batch = []
-            batch_size = 10
-            
+            batch_size = self.batch
+            total = len(self.file_paths)
             for i, file_path in enumerate(self.file_paths):
                 if self._stop:
                     break
-                    
                 # 使用 Event 来实现暂停
                 self._pause_condition.wait()
-                    
                 if file_path:
-                    icon = IconCache.get_icon(file_path)  # 使用缓存系统获取图标
+                    # 使用缓存系统获取图标
+                    icon = IconCache.get_icon(file_path)  
                     batch.append((file_path, icon))
-                    
+                    # 按照batch_size按批次发送
                     if len(batch) >= batch_size:
                         self.signals.batch_loaded.emit(batch)
                         batch = []
-                        
                     self.signals.progress.emit(i + 1, total)
-                    
-            if batch:  # 发送最后的批次
+            # 发送最后的批次
+            if batch:  
                 self.signals.batch_loaded.emit(batch)
-                
             self.signals.finished.emit()
-            
         except Exception as e:
             self.signals.error.emit(str(e))
 

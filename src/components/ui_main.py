@@ -356,7 +356,7 @@ class Ui_MainWindow(object):
         self.Right_Top_QGroupBox.setTitle(_translate("MainWindow", "控制界面"))
         self.RT_QPushButton3.setText(_translate("MainWindow", "清除"))
         self.RT_QPushButton5.setText(_translate("MainWindow", "对比"))
-        # self.Right_Bottom_QGroupBox.setTitle(_translate("MainWindow", "显示界面")) # 移除组显示文字
+        # self.Right_Bottom_QGroupBox.setTitle(_translate("MainWindow", "显示界面"))
 
 
     
