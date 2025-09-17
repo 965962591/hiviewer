@@ -1,19 +1,18 @@
 # -*- coding: utf-8 -*-
-from lxml import etree as ET
+
 import os
-import xml.sax.saxutils as saxutils
-import concurrent.futures
-import copy
-from functools import lru_cache
-import time
-from io import BytesIO
 import gc
+import copy
+import time
+import argparse
 import configparser
-
-
-# 设置SA.ini文件路径
+import concurrent.futures
+import xml.sax.saxutils as saxutils
+from io import BytesIO
 from pathlib import Path
-SA_CONFIG_FILE = Path(__file__).parent.parent.parent / "resource" / "tools" / "SA.ini"
+from lxml import etree as ET
+from functools import lru_cache
+
 
 # 预编译XPath表达式
 XPATHS = {
@@ -86,16 +85,19 @@ OPERATOR_TEMPLATE = ET.fromstring("""
 
 
 # 新增：用于 save_results_to_xml 的配置字典
-SINGLE_VALUE_CONFIG = [
+DEFAULT_VALUE_CONFIG = [
     ("awb_cct", "CCT"),
+    ("short_gain", "short_gain"),
+    ("safe_gain", "safe_gain"),
+    ("aec_settled", "aec_settled"),
+]
+
+FULL_PARSE_VALUE_CONFIG = [
     ("r_g_ratio", "R_G_Ratio"),
     ("b_g_ratio", "B_G_Ratio"),
-    ("short_gain", "short_gain"),
     ("long_gain", "long_gain"),
-    ("safe_gain", "safe_gain"),
     ("r_gain", "r_gain"),
     ("b_gain", "b_gain"),
-    ("aec_settled", "aec_settled"),
     ("triangle_index", "triangle_index"),
 ]
 
@@ -148,30 +150,29 @@ def get_sa_template():
 
 def parse_xml(file_path):
     """
-    解析XML文件，处理可能的命名空间问题
-    
+    使用优化的解析器解析XML文件。
+
     Args:
         file_path: XML文件路径
-        
+
     Returns:
         lxml.etree._Element: 解析后的XML根节点
     """
     try:
-        # 创建自定义的解析器
-        parser = ET.XMLParser(recover=True, remove_blank_text=True, remove_comments=True)
+        # 配置一个高性能、安全的解析器
+        parser = ET.XMLParser(
+            recover=True, 
+            remove_blank_text=True, 
+            remove_comments=True, 
+            ns_clean=True,  # 替代手动字符串替换来处理命名空间
+            no_network=True # 禁用网络访问
+        )
         
-        # 读取文件内容
-        with open(file_path, 'rb') as f:
-            content = f.read()
-            
-        # 尝试移除所有命名空间声明
-        content = content.replace(b'xmlns:', b'ignore_')
-        content = content.replace(b'xmlns=', b'ignore=')
-            
-        # 使用修改后的内容和自定义解析器解析XML
-        tree = ET.fromstring(content, parser=parser)
+        # ET.parse() is highly optimized and reads the file incrementally,
+        # avoiding issues with mmap and fromstring.
+        tree = ET.parse(file_path, parser=parser)
         
-        return tree
+        return tree.getroot()
     except Exception as e:
         print(f"Error parsing XML file {file_path}: {str(e)}")
         raise
@@ -180,21 +181,6 @@ def parse_xml(file_path):
 def extract_values(root, path):
     element = root.find(path)
     return [child.text for child in element]
-
-
-def extract_lux_values(root):
-    lux = XPATHS["current_frame"](root)[0]
-    lux_index = XPATHS["lux_index"](lux)[0].text
-    ava_luma = XPATHS["average_luma"](lux)[0].text
-    fps = XPATHS["fps"](lux)[0].text
-    return lux_index, ava_luma, fps
-
-
-def extract_sat_values(root):
-    sat = XPATHS["aecx_metering"](root)[0]
-    sat_ratio = XPATHS["sat_ratio"](sat)[0].text
-    dark_ratio = XPATHS["dark_ratio"](sat)[0].text
-    return sat_ratio, dark_ratio
 
 
 def extract_SA_values(sa_nodes_map, sa_name):
@@ -287,6 +273,7 @@ def calculate_safe_exp_values(
     root,
     file_name_without_ext,
     file_path,
+    full_parse,  # 确保 full_parse 在 **kwargs 之前
     **kwargs
 ):
     # 从配置文件加载SA配置
@@ -398,9 +385,24 @@ def calculate_safe_exp_values(
     adrc_gain_str = f"{safe} / {short} = {adrc_gain}"
     framesa_adjratio_str = f"{Frame_adjratio_start} * {Frame_confidence} = {framesa_adjratio}"
 
-    # Extract lux and sat values using the passed root
-    lux_values = extract_lux_values(root)
-    sat_values = extract_sat_values(root)
+    # 合并lux和sat值的提取逻辑，减少函数调用
+    lux_node = XPATHS["current_frame"](root)[0]
+    lux_values = (
+        XPATHS["lux_index"](lux_node)[0].text,
+        XPATHS["average_luma"](lux_node)[0].text,
+        XPATHS["fps"](lux_node)[0].text
+    )
+    
+    sat_values = (None, None)
+    if full_parse:
+        try:
+            sat_node = XPATHS["aecx_metering"](root)[0]
+            sat_values = (
+                XPATHS["sat_ratio"](sat_node)[0].text,
+                XPATHS["dark_ratio"](sat_node)[0].text
+            )
+        except (IndexError, AttributeError):
+            pass # It is okay if these are not found, sat_values will remain (None, None)
 
     # 创建包含所有必需和有效可选SA的列表用于保存结果
     final_sa_values_for_xml = []
@@ -423,6 +425,7 @@ def calculate_safe_exp_values(
         file_path,
         short,
         safe,
+        full_parse,
     )
 
 
@@ -438,6 +441,7 @@ def save_results_to_xml(
     file_path,
     short,
     safe,
+    full_parse, # 接收 full_parse
 ):
     try:
         lux_index, ava_luma, fps = lux_values
@@ -455,14 +459,27 @@ def save_results_to_xml(
         add_element(output_root, "lux_index", lux_index)
         add_element(output_root, "ava_luma", ava_luma)
         add_element(output_root, "fps", fps)
-        add_element(output_root, "sat_ratio", sat_ratio)
-        add_element(output_root, "dark_ratio", dark_ratio)
+        
+        # 根据 full_parse 控制 sat_ratio 和 dark_ratio 的添加
+        if full_parse:
+            if sat_ratio is not None:
+                add_element(output_root, "sat_ratio", sat_ratio)
+            if dark_ratio is not None:
+                add_element(output_root, "dark_ratio", dark_ratio)
 
-        # 统一处理所有单值元素的提取和添加
-        for xpath_key, tag_name in SINGLE_VALUE_CONFIG:
+        # 始终提取默认字段
+        for xpath_key, tag_name in DEFAULT_VALUE_CONFIG:
             elements = XPATHS[xpath_key](root)
             if elements and len(elements) > 0 and elements[0].text:
                 add_element(output_root, tag_name, elements[0].text)
+        
+        # 如果是 full_parse，则提取额外的字段
+        if full_parse:
+            for xpath_key, tag_name in FULL_PARSE_VALUE_CONFIG:
+                elements = XPATHS[xpath_key](root)
+                if elements and len(elements) > 0 and elements[0].text:
+                    add_element(output_root, tag_name, elements[0].text)
+
 
         # 从配置文件加载SA顺序
         _, _, sa_order, agg_sas = load_sa_config()
@@ -539,35 +556,46 @@ def save_results_to_xml(
         safe_elem = ET.SubElement(output_root, "Safe") # Append to the new root
         safe_elem.text = saxutils.escape(str(safe))
 
-        # 从parsed_root中提取AWB SA描述并添加到输出XML - Use the passed root
-        awb_descriptions = extract_awb_sa_descriptions(root)
-        if awb_descriptions:
-            awb_sa_elem = ET.SubElement(output_root, "awb_sa") # Append to the new root
+        # [INLINE] 合并 extract_awb_sa_descriptions 逻辑
+        if full_parse:
+            awb_descriptions = [
+                desc.text.strip()
+                for desc in XPATHS["awb_descriptions_direct"](root)
+                if desc.text and desc.text.strip()
+            ]
+            if awb_descriptions:
+                print(f"找到 {len(awb_descriptions)} 个AWB SA Descriptions: {', '.join(awb_descriptions)}")
+                awb_sa_elem = ET.SubElement(output_root, "awb_sa") # Append to the new root
+                # 检查Face Assist数据
+                face_assist_data = XPATHS["assist_data"](root)
+                if face_assist_data and face_assist_data[0].text:
+                    try:
+                        if float(face_assist_data[0].text) != 0:
+                            awb_descriptions.append("FACE Assist")
+                    except (ValueError, TypeError):
+                        pass
+                awb_sa_elem.text = saxutils.escape(",".join(awb_descriptions))
+            else:
+                 print("未找到非空的SA_Description")
 
-            # 检查Face Assist数据 - Use the passed root
-            face_assist_data = XPATHS["assist_data"](root)
-            if (
-                face_assist_data
-                and len(face_assist_data) > 0
-                and face_assist_data[0].text
-            ):
-                try:
-                    face_assist_value = float(face_assist_data[0].text)
-                    if face_assist_value != 0:
-                        # 如果Face Assist数值不为零，添加FACE Assist到awb_sa中
-                        awb_descriptions.append("FACE Assist")
-                except (ValueError, TypeError):
-                    pass  # 如果转换失败，则不添加FACE Assist
 
-            awb_sa_elem.text = saxutils.escape(",".join(awb_descriptions))
-
-        # 修改channel数据的写入方式 - Use the passed root
-        channel_values = extract_channel_values(root)
-        if channel_values:
-            for channel_key, values in channel_values.items():
-                channel_elem = ET.SubElement(output_root, channel_key) # Append to the new root
-                # 将所有值转换为字符串并用逗号连接
-                channel_elem.text = ",".join(map(str, values))
+        # [INLINE] 合并 extract_channel_values 逻辑,并根据full_parse判断
+        if full_parse:
+            channel_configs = {
+                "0": ("channel_0_gridRGratio", 256),
+                "1": ("channel_1_gridBGratio", 255),
+            }
+            all_lists = XPATHS["all_channels_lists"](root)
+            for node in all_lists:
+                index = node.get("Index")
+                if index in channel_configs:
+                    name, limit = channel_configs[index]
+                    channel_data_node = XPATHS["channel_data"](node)
+                    if channel_data_node:
+                        value_grids = XPATHS["value_grid"](channel_data_node[0])
+                        values = [float(grid.text) for grid in value_grids[:limit]]
+                        channel_elem = ET.SubElement(output_root, name)
+                        channel_elem.text = ",".join(map(str, values))
 
         # 使用内存写入优化写入速度
         buffer = BytesIO()
@@ -588,9 +616,40 @@ def save_results_to_xml(
         raise
 
 
+def get_process_counts():
+    # 获取配置文件
+    if (config_path := Path(__file__).parent.parent.parent / "config" / "parse.ini").exists():
+        print(f"已存在config_path: {config_path}")
+    config_dir = config_path.parent
+    config_dir.mkdir(parents=True, exist_ok=True)
+    config = configparser.ConfigParser()
+    if not config_path.exists():
+        # Defaults, 默认不进行完整解析
+        parse_processes = 8
+        batch_size = 50
+        full_parse = False
+        config["settings"] = {
+            "parse_processes": str(parse_processes),
+            "batch_size": str(batch_size),
+            "full_parse": str(full_parse)
+        }
+        with open(config_path, "w", encoding="utf-8") as f:
+            config.write(f)
+
+    config.read(config_path, encoding="utf-8")
+    parse_processes = config.getint("settings", "parse_processes", fallback=8)
+    batch_size = config.getint("settings", "batch_size", fallback=50)
+    full_parse = config.getboolean("settings", "full_parse", fallback=False)
+
+    return parse_processes, batch_size, full_parse
+
+
 def parse_main(folder_path, log_callback=None):
     start_time = time.time()
     processed_files = 0
+
+    parse_processes, batch_size, full_parse = get_process_counts()
+    print(f"初始配置 - parse_processes: {parse_processes}, batch_size: {batch_size}, full_parse: {full_parse}")
 
     # 从配置文件加载SA配置
     required_sas, optional_sas, sa_order, agg_sas = load_sa_config()
@@ -613,25 +672,31 @@ def parse_main(folder_path, log_callback=None):
     
     total_files = len(file_list)
     
+    # 如果图片数量小于配置的进程数，则使用图片数量作为进程数
+    if total_files > 0 and total_files < parse_processes:
+        parse_processes = total_files
+        print(f"调整进程数：图片数量({total_files}) < 配置进程数，使用图片数量作为进程数")
+    
     # 打印调试信息
-    print(f"找到 {total_files} 个需要处理的XML文件")
+    print(f"找到 {total_files} 个需要处理的XML文件，将使用 {parse_processes} 个进程处理")
     if total_files == 0:
         print("警告: 没有找到需要处理的XML文件，请检查文件夹路径和文件名格式")
 
-    # 分批处理文件，减少内存占用
-    batch_size = 100  # 根据系统性能调整批处理大小
 
     for batch_start in range(0, len(file_list), batch_size):
         batch_end = min(batch_start + batch_size, len(file_list))
         batch = file_list[batch_start:batch_end]
 
         # 使用进程池替代线程池来绕过GIL，并设置8个工作进程
-        with concurrent.futures.ProcessPoolExecutor(max_workers=8) as executor:
+        with concurrent.futures.ProcessPoolExecutor(
+            max_workers=parse_processes
+        ) as executor:
             futures = {
                 executor.submit(
                     process_file,
                     os.path.join(folder_path, filename),
                     folder_path,
+                    full_parse,  # 传递 full_parse 参数
                 ): filename
                 for filename in batch
             }
@@ -700,7 +765,8 @@ def parse_single_main(image_path, log_callback=None):
         return
     
     try:
-        result, messages = process_file(xml_file_path, folder_path)
+        _, _, full_parse = get_process_counts() # 获取 full_parse 配置
+        result, messages = process_file(xml_file_path, folder_path, full_parse)
         if log_callback:
             for msg in messages:
                 log_callback(msg)
@@ -726,7 +792,7 @@ def parse_single_main(image_path, log_callback=None):
         log_callback(f"总耗时: {total_time:.2f}秒 | 平均速度: {speed:.2f} 文件/秒")
 
 
-def process_file(filename, folder_path):
+def process_file(filename, folder_path, full_parse=False):
     messages = []
     if os.path.isdir(filename):
         return False, messages
@@ -764,26 +830,41 @@ def process_file(filename, folder_path):
         missing_required_sa = False
 
         # --- 处理 FrameSA 或 EVFrameSA 的备选逻辑 ---
-        frame_sa_data = extract_SA_values(sa_nodes_map, "FrameSA")
+        frame_sa_name_to_use = None
+        found_frame_sa_source_name = None
+
+        # 1. 寻找以 "FrameSA" 开头的 SA
+        for sa_name in sa_nodes_map.keys():
+            if sa_name.startswith("FrameSA"):
+                frame_sa_name_to_use = sa_name
+                break
+        
+        frame_sa_data = None
+        if frame_sa_name_to_use:
+            frame_sa_data = extract_SA_values(sa_nodes_map, frame_sa_name_to_use)
+            if frame_sa_data:
+                found_frame_sa_source_name = frame_sa_name_to_use
+        
+        # 2. 如果找不到以 "FrameSA" 开头的，则尝试 "EVFrameSA"
+        if not frame_sa_data:
+            evframe_sa_data = extract_SA_values(sa_nodes_map, "EVFrameSA")
+            if evframe_sa_data:
+                frame_sa_data = evframe_sa_data
+                found_frame_sa_source_name = "EVFrameSA"
+
         if frame_sa_data:
+            # 强制将名称设置为 "FrameSA" 以便后续处理能统一找到它
+            frame_sa_data["name"] = "FrameSA"
             sa_values["FrameSA"] = frame_sa_data
-            message = f"找到 FrameSA"
+            message = f"找到 {found_frame_sa_source_name}，作为 FrameSA 处理"
             print(message)
             messages.append(message)
         else:
-            # 如果 FrameSA 未找到，尝试查找 EVFrameSA
-            evframe_sa_data = extract_SA_values(sa_nodes_map, "EVFrameSA")
-            if evframe_sa_data:
-                sa_values["FrameSA"] = evframe_sa_data
-                message = f"未找到 FrameSA，使用 EVFrameSA 作为替代"
-                print(message)
-                messages.append(message)
-            else:
-                # 如果 FrameSA 和 EVFrameSA 都未找到
-                message = f"Error: 必需的 SA FrameSA 或 EVFrameSA 未找到"
-                print(message)
-                missing_required_sa = True
-                messages.append(message)
+            # 如果 FrameSA, 以其开头的, 和 EVFrameSA 都未找到
+            message = f"Error: 必需的 SA 'FrameSA' (或以其开头的变体) 或 'EVFrameSA' 未找到"
+            print(message)
+            missing_required_sa = True
+            messages.append(message)
 
         if missing_required_sa:
             root = None
@@ -822,19 +903,15 @@ def process_file(filename, folder_path):
             try:
                 # 创建参数字典
                 sa_args = {
-                    "root": root, # Pass the root element
+                    "root": root,
                     "file_name_without_ext": file_name_without_ext,
                     "file_path": filename,
+                    "full_parse": full_parse, # 直接将 full_parse 添加到字典中
                 }
 
                 # 添加所有SA参数
                 for sa_name in required_sas + optional_sas:
                     sa_args[f"{sa_name}_values"] = sa_values.get(sa_name)
-
-                # 检查必要参数是否齐全
-                missing_args = [arg for arg in ["root", "file_name_without_ext", "file_path"] if arg not in sa_args]
-                if missing_args:
-                    raise ValueError(f"缺少必要参数: {', '.join(missing_args)}")
 
                 # 调用函数
                 calculate_safe_exp_values(**sa_args)
@@ -871,76 +948,22 @@ def process_file(filename, folder_path):
         return False, messages
 
 
-def extract_channel_values(root):
-    """提取Index为0和1的Channels_List中Channel_Data的Value_Grid值"""
-    try:
-        channel_data = {}
-        # 配置信息：索引 -> (新名称, 数量限制)
-        channel_configs = {
-            "0": ("channel_0_gridRGratio", 256),
-            "1": ("channel_1_gridBGratio", 255),
-        }
-
-        # 一次性找到所有Channels_List节点
-        all_lists = XPATHS["all_channels_lists"](root)
-
-        for node in all_lists:
-            index = node.get("Index")
-            if index in channel_configs:
-                name, limit = channel_configs[index]
-                
-                channel_data_node = XPATHS["channel_data"](node)
-                if channel_data_node:
-                    value_grids = XPATHS["value_grid"](channel_data_node[0])
-                    # 使用列表推导式和切片来高效地提取数据
-                    values = [float(grid.text) for grid in value_grids[:limit]]
-                    channel_data[name] = values
-        
-        return channel_data
-
-    except Exception as e:
-        print(f"Error extracting channel values: {str(e)}")
-        return None
-
-
-def extract_awb_sa_descriptions(root):
-    """
-    遍历AWB_SAGen1Data中所有SA_Description节点，打印非空的text值
-
-    Args:
-        root: XML根节点
-
-    Returns:
-        包含所有非空SA_Description的列表
-    """
-    # 使用一个更直接的XPath来获取所有描述节点
-    descriptions = [
-        desc.text.strip()
-        for desc in XPATHS["awb_descriptions_direct"](root)
-        if desc.text and desc.text.strip()
-    ]
-    
-    if descriptions:
-        print(f"找到 {len(descriptions)} 个AWB SA Descriptions: {', '.join(descriptions)}")
-    else:
-        print("未找到非空的SA_Description")
-        
-    return descriptions
-
-
-def load_sa_config(config_file=SA_CONFIG_FILE):
+def load_sa_config(config_file='SA.ini'):
     """
     从配置文件中读取SA相关的配置
     
     Args:
-        config_file: 配置文件路径，默认为SA_CONFIG_FILE
+        config_file: 配置文件路径，默认为'SA.ini'
         
     Returns:
         tuple: (required_sas, optional_sas, sa_order, agg_sas)
     """
-    config = configparser.ConfigParser()
     try:
+        if config_file == 'SA.ini':
+            config_file = (Path(__file__).parent.parent.parent / "config" / "SA.ini").as_posix()
+
         # 显式指定使用UTF-8编码读取配置文件
+        config = configparser.ConfigParser()
         with open(config_file, 'r', encoding='utf-8') as f:
             config.read_file(f)
         
@@ -966,5 +989,15 @@ def load_sa_config(config_file=SA_CONFIG_FILE):
 
 
 if __name__ == "__main__":
-    file_path = r"D:\Tuning\O19\0_pic\02_IN_pic\2025.6.18自测图\O19_改后"
-    parse_main(file_path)
+    parser = argparse.ArgumentParser(description="处理指定文件夹或单个文件对应的XML数据。")
+    parser.add_argument("path", help="要处理的文件夹路径或单个文件的路径。")
+    args = parser.parse_args()
+
+    input_path = args.path
+
+    if os.path.isdir(input_path):
+        parse_main(input_path)
+    elif os.path.isfile(input_path):
+        parse_single_main(input_path)
+    else:
+        print(f"错误：提供的路径 '{input_path}' 不是一个有效的文件夹或文件。")
