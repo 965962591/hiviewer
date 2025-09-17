@@ -16,17 +16,22 @@
         "D:/Tuning/O19/0_pic/02_IN_pic/北京实验室/印度目标图 第二轮",
         "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.25-O19-IN-二供-小数包/normal",
         "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.25-O19-IN-二供-小数包/normal/O19-2nd",
-        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.6自测"
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.6自测",
+        "D:/Tuning/O19/0_pic/02_IN_pic/北京实验室/O19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/逆光对比度低,发蒙问题澄清/N19",
+        "D:/Tuning/O19/0_pic/02_IN_pic/逆光对比度低,发蒙问题澄清/O19改后",
+        "D:/Tuning/O19/0_pic/02_IN_pic/逆光对比度低,发蒙问题澄清/O19改前"
     ],
-    "current_directory": "D:/Tuning/O19/0_pic/02_IN_pic/北京实验室/印度目标图 第二轮",
+    "current_directory": "D:/Tuning/O19/0_pic/02_IN_pic/逆光对比度低,发蒙问题澄清/O19改前",
     "file_type_option": "显示所有文件",
-    "combobox1_checked_items": [
-        "O19",
-        "印度目标图 第一轮_"
-    ],
+    "combobox1_checked_items": [],
     "combobox1_all_items": [
-        "O19",
-        "印度目标图 第一轮_"
+        "0625",
+        "0630",
+        "0701",
+        "N19",
+        "O19改后",
+        "V50"
     ],
     "sort_option": "按修改时间排序",
     "theme_option": "默认主题",

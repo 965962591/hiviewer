@@ -24,16 +24,12 @@ from PyQt5.QtCore import (
 from PyQt5.QtGui import (
     QIcon, QPixmap, QFont, QDragEnterEvent, QDropEvent, QColor
 )
+
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
 from PyQt5.QtWidgets import QStyle
-
-# 图片处理库导入
-try:
-    from PIL import Image, ImageDraw, ImageFont
-    print("✅ PIL/Pillow库加载成功！")
-except ImportError:
-    print("❌ 错误: 请安装PIL/Pillow库: pip install Pillow")
-    sys.exit(1)
-
+from PIL import Image, ImageDraw, ImageFont
 # 支持的图片格式 (PIL/Pillow)
 SUPPORTED_FORMATS = {
     'JPEG': ['.jpg', '.jpeg'],
@@ -41,8 +37,24 @@ SUPPORTED_FORMATS = {
     'WEBP': ['.webp'],
     'TIFF': ['.tiff', '.tif'],
     'BMP': ['.bmp'],
-    'GIF': ['.gif']
-    # 注意：HEIC和AVIF需要额外的库支持
+    'GIF': ['.gif'],
+    'ICO': ['.ico'],
+    'TGA': ['.tga'],
+    'PSD': ['.psd'],
+    'PCX': ['.pcx'],
+    'XBM': ['.xbm'],
+    'XPM': ['.xpm'],
+    'PPM': ['.ppm', '.pgm', '.pbm'],
+    'DDS': ['.dds'],
+    'DIB': ['.dib'],
+    'EPS': ['.eps'],
+    'FLI': ['.fli', '.flc'],
+    'HEIC': ['.heic', '.heif'],  # 需要 pillow-heif
+    'AVIF': ['.avif'],  # 需要 pillow-avif
+    'JP2': ['.jp2', '.j2k', '.jpc'],  # JPEG 2000
+    'SPIDER': ['.spi'],
+    'SUN': ['.ras'],
+    'WAL': ['.wal']
 }
 
 # 所有支持的扩展名
@@ -121,8 +133,600 @@ class CompressionRatioDelegate(QStyledItemDelegate):
         return QSize(120, 20)
 
 
+class MultiThreadFormatConvertWorker(QThread):
+    """多线程图片格式转换处理线程"""
+    progress_updated = pyqtSignal(int, str)  # 进度, 状态信息
+    file_processed = pyqtSignal(int, str, str)  # 行号, 状态, 消息
+    file_stats_updated = pyqtSignal(bool, int)  # 是否成功, 转换后文件大小
+    file_info_updated = pyqtSignal(int, dict)  # 行号, 文件信息更新
+    thread_finished = pyqtSignal()  # 单个线程完成信号
+    finished = pyqtSignal()  # 所有线程完成信号
+    
+    def __init__(self, files_info, settings, thread_id, total_threads):
+        super().__init__()
+        self.files_info = files_info
+        self.settings = settings
+        self.thread_id = thread_id
+        self.total_threads = total_threads
+        self.is_running = True
+    
+    def stop(self):
+        self.is_running = False
+    
+    def run(self):
+        try:
+            # 顺序处理文件（从上到下），但只处理分配给当前线程的文件
+            total_files = len(self.files_info)
+            files_per_thread = total_files // self.total_threads
+            remainder = total_files % self.total_threads
+            
+            # 计算当前线程需要处理的文件范围
+            start_idx = self.thread_id * files_per_thread
+            if self.thread_id < remainder:
+                start_idx += self.thread_id
+                end_idx = start_idx + files_per_thread + 1
+            else:
+                start_idx += remainder
+                end_idx = start_idx + files_per_thread
+            
+            # 顺序处理分配给当前线程的文件（从上到下）
+            for i in range(start_idx, end_idx):
+                if not self.is_running:
+                    break
+                
+                if i < len(self.files_info):
+                    try:
+                        self.process_single_image(i, self.files_info[i])
+                    except Exception as e:
+                        self.file_processed.emit(i, "错误", str(e))
+            
+        except Exception as e:
+            print(f"线程 {self.thread_id} 出错: {str(e)}")
+        finally:
+            self.thread_finished.emit()
+    
+    def process_single_image(self, row_index, file_info):
+        """处理单个图片文件转换"""
+        input_path = file_info['path']
+        
+        try:
+            # 获取设置
+            target_format = self.settings.get('target_format', 'JPEG')
+            quality = self.settings.get('quality', 85)
+            keep_exif = self.settings.get('keep_exif', True)
+            output_dir = self.settings.get('output_dir') or os.path.dirname(input_path)
+            naming_mode = self.settings.get('naming_mode', '保持原名')
+            prefix = self.settings.get('prefix', '')
+            
+            # 生成输出文件名
+            original_name = os.path.basename(input_path)
+            name_without_ext = os.path.splitext(original_name)[0]
+            target_ext = SUPPORTED_FORMATS.get(target_format, ['.jpg'])[0]
+            
+            if naming_mode == "保持原名":
+                output_filename = name_without_ext + target_ext
+            elif naming_mode == "添加格式后缀":
+                output_filename = f"{name_without_ext}_{target_format.lower()}{target_ext}"
+            else:  # 自定义前缀
+                output_filename = prefix + name_without_ext + target_ext
+            
+            output_path = os.path.join(output_dir, output_filename)
+            
+            # 检查是否需要转换（相同格式直接复制）
+            original_ext = os.path.splitext(original_name)[1].lower()
+            if original_ext == target_ext.lower() and output_path == input_path:
+                # 格式相同且路径相同，跳过转换
+                self.file_processed.emit(row_index, "跳过", "格式相同，无需转换")
+                # 发送统计信息，将跳过的文件计入成功数
+                self.file_stats_updated.emit(True, 0)
+                return
+            
+            # 确保输出目录存在
+            os.makedirs(output_dir, exist_ok=True)
+            
+            # 读取图片
+            with Image.open(input_path) as image:
+                # 保留原始EXIF信息
+                exif_dict = image.info.get('exif') if keep_exif else None
+                
+                # 优化：只在需要时复制图片
+                if target_format == 'JPEG' and image.mode in ['RGBA', 'P']:
+                    # 转换为RGB模式（JPEG需要）
+                    if image.mode == 'P':
+                        image = image.convert('RGBA')
+                    # 创建白色背景
+                    rgb_image = Image.new('RGB', image.size, (255, 255, 255))
+                    rgb_image.paste(image, mask=image.split()[-1] if image.mode == 'RGBA' else None)
+                    processed_image = rgb_image
+                elif target_format == 'GIF' and image.mode != 'P':
+                    # GIF格式转换
+                    processed_image = image.convert('P', palette=Image.ADAPTIVE)
+                else:
+                    # 其他格式直接使用原图
+                    processed_image = image
+                
+                # 准备保存参数（优化：减少不必要的参数）
+                save_kwargs = {}
+                
+                if target_format == 'JPEG':
+                    save_kwargs['quality'] = quality
+                    # 质量100%时跳过压缩优化
+                    if quality < 100:
+                        save_kwargs['optimize'] = True
+                    if exif_dict:
+                        save_kwargs['exif'] = exif_dict
+                elif target_format == 'PNG':
+                    # 优化：使用更快的压缩级别
+                    compress_level = min(6, int((100 - quality) / 16))  # 降低压缩级别以提高速度
+                    save_kwargs['compress_level'] = compress_level
+                    save_kwargs['optimize'] = False  # 关闭优化以提高速度
+                elif target_format == 'WEBP':
+                    save_kwargs['quality'] = quality
+                    # 质量100%时使用最高质量压缩方法
+                    if quality < 100:
+                        save_kwargs['method'] = 4  # 使用更快的压缩方法
+                    else:
+                        save_kwargs['method'] = 6  # 最高质量
+                elif target_format == 'TIFF':
+                    save_kwargs['compression'] = 'tiff_lzw'
+                # 其他格式不需要额外参数
+                
+                # 保存图片
+                processed_image.save(output_path, format=target_format, **save_kwargs)
+                
+                # 计算文件大小变化
+                original_size = os.path.getsize(input_path)
+                converted_size = os.path.getsize(output_path)
+                size_change = converted_size - original_size
+                size_change_percent = (size_change / original_size) * 100 if original_size > 0 else 0
+                
+                # 更新文件信息
+                if row_index < len(self.files_info):
+                    self.files_info[row_index]['converted_size'] = converted_size
+                    self.files_info[row_index]['size_change'] = size_change
+                    self.files_info[row_index]['size_change_percent'] = size_change_percent
+                    self.files_info[row_index]['output_filename'] = output_filename
+                    
+                    # 发送文件信息更新信号
+                    self.file_info_updated.emit(row_index, {
+                        'converted_size': converted_size,
+                        'size_change': size_change,
+                        'size_change_percent': size_change_percent,
+                        'output_filename': output_filename
+                    })
+                
+                # 发送统计信息
+                self.file_stats_updated.emit(True, converted_size)
+                
+                self.file_processed.emit(
+                    row_index, 
+                    "完成", 
+                    f"转换完成 | 输出: {output_filename}"
+                )
+            
+        except Exception as e:
+            self.file_stats_updated.emit(False, 0)
+            self.file_processed.emit(row_index, "错误", f"转换失败: {str(e)}")
+
+
+class ImageFormatConvertWorker(QThread):
+    """图片格式转换处理线程"""
+    progress_updated = pyqtSignal(int, str)  # 进度, 状态信息
+    file_processed = pyqtSignal(int, str, str)  # 行号, 状态, 消息
+    file_stats_updated = pyqtSignal(bool, int)  # 是否成功, 转换后文件大小
+    file_info_updated = pyqtSignal(int, dict)  # 行号, 文件信息更新
+    finished = pyqtSignal()
+    
+    def __init__(self, files_info, settings):
+        super().__init__()
+        self.files_info = files_info
+        self.settings = settings
+        self.is_running = True
+    
+    def stop(self):
+        self.is_running = False
+    
+    def run(self):
+        try:
+            total_files = len(self.files_info)
+            target_format = self.settings.get('target_format', 'JPEG')
+            target_ext = SUPPORTED_FORMATS.get(target_format, ['.jpg'])[0]
+            
+            # 预检查：统计需要转换的文件数量
+            need_conversion_count = 0
+            for file_info in self.files_info:
+                original_ext = os.path.splitext(file_info['name'])[1].lower()
+                if original_ext != target_ext.lower():
+                    need_conversion_count += 1
+            
+            if need_conversion_count == 0:
+                self.progress_updated.emit(100, "所有文件格式相同，无需转换")
+                self.finished.emit()
+                return
+            
+            processed_count = 0
+            for i, file_info in enumerate(self.files_info):
+                if not self.is_running:
+                    break
+                
+                try:
+                    self.process_single_image(i, file_info)
+                    processed_count += 1
+                    progress = int(processed_count * 100 / need_conversion_count)
+                    self.progress_updated.emit(progress, f"已处理 {processed_count}/{need_conversion_count} 个需要转换的文件")
+                except Exception as e:
+                    self.file_processed.emit(i, "错误", str(e))
+            
+            if self.is_running:
+                self.progress_updated.emit(100, "转换完成")
+        except Exception as e:
+            self.progress_updated.emit(0, f"转换出错: {str(e)}")
+        finally:
+            self.finished.emit()
+    
+    def process_single_image(self, row_index, file_info):
+        """处理单个图片文件转换"""
+        input_path = file_info['path']
+        
+        try:
+            # 获取设置
+            target_format = self.settings.get('target_format', 'JPEG')
+            quality = self.settings.get('quality', 85)
+            keep_exif = self.settings.get('keep_exif', True)
+            output_dir = self.settings.get('output_dir') or os.path.dirname(input_path)
+            naming_mode = self.settings.get('naming_mode', '保持原名')
+            prefix = self.settings.get('prefix', '')
+            
+            # 生成输出文件名
+            original_name = os.path.basename(input_path)
+            name_without_ext = os.path.splitext(original_name)[0]
+            target_ext = SUPPORTED_FORMATS.get(target_format, ['.jpg'])[0]
+            
+            if naming_mode == "保持原名":
+                output_filename = name_without_ext + target_ext
+            elif naming_mode == "添加格式后缀":
+                output_filename = f"{name_without_ext}_{target_format.lower()}{target_ext}"
+            else:  # 自定义前缀
+                output_filename = prefix + name_without_ext + target_ext
+            
+            output_path = os.path.join(output_dir, output_filename)
+            
+            # 检查是否需要转换（相同格式直接复制）
+            original_ext = os.path.splitext(original_name)[1].lower()
+            if original_ext == target_ext.lower() and output_path == input_path:
+                # 格式相同且路径相同，跳过转换
+                self.file_processed.emit(row_index, "跳过", "格式相同，无需转换")
+                # 发送统计信息，将跳过的文件计入成功数
+                self.file_stats_updated.emit(True, 0)
+                return
+            
+            # 确保输出目录存在
+            os.makedirs(output_dir, exist_ok=True)
+            
+            # 读取图片
+            with Image.open(input_path) as image:
+                # 保留原始EXIF信息
+                exif_dict = image.info.get('exif') if keep_exif else None
+                
+                # 优化：只在需要时复制图片
+                if target_format == 'JPEG' and image.mode in ['RGBA', 'P']:
+                    # 转换为RGB模式（JPEG需要）
+                    if image.mode == 'P':
+                        image = image.convert('RGBA')
+                    # 创建白色背景
+                    rgb_image = Image.new('RGB', image.size, (255, 255, 255))
+                    rgb_image.paste(image, mask=image.split()[-1] if image.mode == 'RGBA' else None)
+                    processed_image = rgb_image
+                elif target_format == 'GIF' and image.mode != 'P':
+                    # GIF格式转换
+                    processed_image = image.convert('P', palette=Image.ADAPTIVE)
+                else:
+                    # 其他格式直接使用原图
+                    processed_image = image
+                
+                # 准备保存参数（优化：减少不必要的参数）
+                save_kwargs = {}
+                
+                if target_format == 'JPEG':
+                    save_kwargs['quality'] = quality
+                    # 质量100%时跳过压缩优化
+                    if quality < 100:
+                        save_kwargs['optimize'] = True
+                    if exif_dict:
+                        save_kwargs['exif'] = exif_dict
+                elif target_format == 'PNG':
+                    # 优化：使用更快的压缩级别
+                    compress_level = min(6, int((100 - quality) / 16))  # 降低压缩级别以提高速度
+                    save_kwargs['compress_level'] = compress_level
+                    save_kwargs['optimize'] = False  # 关闭优化以提高速度
+                elif target_format == 'WEBP':
+                    save_kwargs['quality'] = quality
+                    # 质量100%时使用最高质量压缩方法
+                    if quality < 100:
+                        save_kwargs['method'] = 4  # 使用更快的压缩方法
+                    else:
+                        save_kwargs['method'] = 6  # 最高质量
+                elif target_format == 'TIFF':
+                    save_kwargs['compression'] = 'tiff_lzw'
+                # 其他格式不需要额外参数
+                
+                # 保存图片
+                processed_image.save(output_path, format=target_format, **save_kwargs)
+                
+                # 计算文件大小变化
+                original_size = os.path.getsize(input_path)
+                converted_size = os.path.getsize(output_path)
+                size_change = converted_size - original_size
+                size_change_percent = (size_change / original_size) * 100 if original_size > 0 else 0
+                
+                # 更新文件信息
+                if row_index < len(self.files_info):
+                    self.files_info[row_index]['converted_size'] = converted_size
+                    self.files_info[row_index]['size_change'] = size_change
+                    self.files_info[row_index]['size_change_percent'] = size_change_percent
+                    self.files_info[row_index]['output_filename'] = output_filename
+                    
+                    # 发送文件信息更新信号
+                    self.file_info_updated.emit(row_index, {
+                        'converted_size': converted_size,
+                        'size_change': size_change,
+                        'size_change_percent': size_change_percent,
+                        'output_filename': output_filename
+                    })
+                
+                # 发送统计信息
+                self.file_stats_updated.emit(True, converted_size)
+                
+                self.file_processed.emit(
+                    row_index, 
+                    "完成", 
+                    f"转换完成 | 输出: {output_filename}"
+                )
+            
+        except Exception as e:
+            self.file_stats_updated.emit(False, 0)
+            self.file_processed.emit(row_index, "错误", f"转换失败: {str(e)}")
+
+
+class MultiThreadImageCompressionWorker(QThread):
+    """多线程图片压缩处理线程"""
+    progress_updated = pyqtSignal(int, str)  # 进度, 状态信息
+    file_processed = pyqtSignal(int, str, str)  # 行号, 状态, 消息
+    file_stats_updated = pyqtSignal(bool, int)  # 是否成功, 压缩后文件大小
+    file_info_updated = pyqtSignal(int, dict)  # 行号, 文件信息更新
+    thread_finished = pyqtSignal()  # 单个线程完成信号
+    finished = pyqtSignal()  # 所有线程完成信号
+    
+    def __init__(self, files_info, settings, thread_id, total_threads):
+        super().__init__()
+        self.files_info = files_info
+        self.settings = settings
+        self.thread_id = thread_id
+        self.total_threads = total_threads
+        self.is_running = True
+    
+    def stop(self):
+        self.is_running = False
+    
+    def run(self):
+        try:
+            # 顺序处理文件（从上到下），但只处理分配给当前线程的文件
+            total_files = len(self.files_info)
+            files_per_thread = total_files // self.total_threads
+            remainder = total_files % self.total_threads
+            
+            # 计算当前线程需要处理的文件范围
+            # 前remainder个线程每个处理(files_per_thread + 1)个文件
+            # 后面的线程每个处理files_per_thread个文件
+            if self.thread_id < remainder:
+                start_idx = self.thread_id * (files_per_thread + 1)
+                end_idx = start_idx + files_per_thread + 1
+            else:
+                start_idx = remainder * (files_per_thread + 1) + (self.thread_id - remainder) * files_per_thread
+                end_idx = start_idx + files_per_thread
+            
+            print(f"线程 {self.thread_id}: 处理文件范围 [{start_idx}, {end_idx}), 共 {end_idx - start_idx} 个文件")
+            
+            # 顺序处理分配给当前线程的文件（从上到下）
+            for i in range(start_idx, end_idx):
+                if not self.is_running:
+                    break
+                
+                if i < len(self.files_info):
+                    try:
+                        self.process_single_image(i, self.files_info[i])
+                    except Exception as e:
+                        self.file_processed.emit(i, "错误", str(e))
+            
+        except Exception as e:
+            print(f"压缩线程 {self.thread_id} 出错: {str(e)}")
+        finally:
+            self.thread_finished.emit()
+    
+    def process_single_image(self, row_index, file_info):
+        """处理单个图片文件压缩"""
+        try:
+            # 获取文件信息
+            input_path = file_info['path']
+            file_name = file_info['name']
+            
+            # 生成输出路径
+            output_path = self.generate_output_path(input_path, file_name)
+            
+            # 检查是否需要处理
+            if not self.should_process_file(input_path, output_path):
+                self.file_processed.emit(row_index, "跳过", "文件已存在或格式相同")
+                # 发送统计信息，将跳过的文件计入成功数
+                self.file_stats_updated.emit(True, 0)
+                return
+            
+            # 执行压缩
+            success, compressed_size = self.compress_image(input_path, output_path)
+            
+            if success:
+                # 计算原始文件大小
+                original_size = os.path.getsize(input_path)
+                saved_space = original_size - compressed_size
+                compression_ratio = (1 - compressed_size / original_size) * 100 if original_size > 0 else 0
+                
+                # 更新文件信息
+                file_info['compressed_size'] = compressed_size
+                file_info['output_path'] = output_path
+                file_info['saved_space'] = saved_space
+                file_info['compression_ratio'] = compression_ratio
+                
+                # 发送成功信号
+                self.file_processed.emit(row_index, "完成", f"压缩完成: {os.path.basename(output_path)}")
+                self.file_stats_updated.emit(True, compressed_size)
+                
+                # 更新文件信息
+                self.file_info_updated.emit(row_index, {
+                    'compressed_size': compressed_size,
+                    'output_path': output_path,
+                    'saved_space': saved_space,
+                    'compression_ratio': compression_ratio
+                })
+            else:
+                self.file_processed.emit(row_index, "错误", "压缩失败")
+                self.file_stats_updated.emit(False, 0)
+                
+        except Exception as e:
+            self.file_processed.emit(row_index, "错误", f"压缩失败: {str(e)}")
+    
+    def generate_output_path(self, input_path, file_name):
+        """生成输出路径"""
+        # 获取输出目录
+        output_dir = self.settings.get('output_dir')
+        if not output_dir:
+            output_dir = os.path.dirname(input_path)
+        
+        # 确保输出目录存在
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # 生成输出文件名
+        name, ext = os.path.splitext(file_name)
+        output_format = self.settings.get('output_format', 'JPEG')
+        
+        # 根据格式确定扩展名
+        format_extensions = {
+            'JPEG': '.jpg',
+            'PNG': '.png',
+            'WEBP': '.webp'
+        }
+        output_ext = format_extensions.get(output_format, '.jpg')
+        
+        # 如果格式相同且输出目录相同，添加后缀
+        if ext.lower() == output_ext.lower() and output_dir == os.path.dirname(input_path):
+            output_name = f"{name}_compressed{output_ext}"
+        else:
+            output_name = f"{name}{output_ext}"
+        
+        return os.path.join(output_dir, output_name)
+    
+    def should_process_file(self, input_path, output_path):
+        """检查是否需要处理文件"""
+        # 如果输出文件已存在，跳过
+        if os.path.exists(output_path):
+            return False
+        
+        # 如果输入和输出路径相同，跳过
+        if input_path == output_path:
+            return False
+        
+        return True
+    
+    def compress_image(self, input_path, output_path):
+        """压缩图片"""
+        try:
+            from PIL import Image
+            
+            print(f"开始压缩图片: {input_path} -> {output_path}")
+            
+            # 打开图片
+            with Image.open(input_path) as img:
+                print(f"原始图片模式: {img.mode}, 尺寸: {img.size}")
+                
+                # 转换为RGB模式（JPEG需要）
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    print("转换图片模式为RGB")
+                    # 创建白色背景
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    if img.mode == 'P':
+                        img = img.convert('RGBA')
+                    background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                    img = background
+                elif img.mode != 'RGB':
+                    print(f"转换图片模式从 {img.mode} 到 RGB")
+                    img = img.convert('RGB')
+                
+                # 应用尺寸调整
+                if self.settings.get('resize_enabled', False):
+                    print("应用尺寸调整")
+                    img = self.apply_resize(img)
+                
+                # 应用水印
+                if self.settings.get('watermark', {}).get('enabled', False):
+                    print("应用水印")
+                    img = self.apply_watermark(img)
+                
+                # 保存图片
+                output_format = self.settings.get('output_format', 'JPEG')
+                quality = self.settings.get('quality', 85)
+                
+                print(f"输出格式: {output_format}, 质量: {quality}")
+                
+                save_kwargs = {'format': output_format}
+                if output_format == 'JPEG':
+                    save_kwargs['quality'] = quality
+                    save_kwargs['optimize'] = True
+                elif output_format == 'WEBP':
+                    save_kwargs['quality'] = quality
+                    save_kwargs['method'] = 6  # 最佳压缩
+                
+                # 暂时跳过EXIF信息处理
+                print(f"保存参数: {save_kwargs}")
+                print(f"保存图片到: {output_path}")
+                
+                img.save(output_path, **save_kwargs)
+                
+                # 返回压缩后文件大小
+                compressed_size = os.path.getsize(output_path)
+                print(f"压缩完成，文件大小: {compressed_size} bytes")
+                return True, compressed_size
+                
+        except Exception as e:
+            print(f"压缩图片失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return False, 0
+    
+    def apply_resize(self, img):
+        """应用尺寸调整"""
+        resize_mode = self.settings.get('resize_mode', 'percentage')
+        
+        if resize_mode == 'percentage':
+            percentage = self.settings.get('resize_percentage', 80)
+            new_size = (int(img.width * percentage / 100), int(img.height * percentage / 100))
+        else:  # pixel
+            new_width = self.settings.get('resize_width', 800)
+            new_height = self.settings.get('resize_height', 600)
+            new_size = (new_width, new_height)
+        
+        return img.resize(new_size, Image.Resampling.LANCZOS)
+    
+    def apply_watermark(self, img):
+        """应用水印"""
+        watermark_settings = self.settings.get('watermark', {})
+        if not watermark_settings.get('enabled', False):
+            return img
+        
+        # 这里可以添加水印逻辑
+        # 暂时返回原图
+        return img
+
+
 class ImageCompressionWorker(QThread):
-    """图片压缩处理线程"""
+    """图片压缩处理线程（单线程版本，保持兼容性）"""
     progress_updated = pyqtSignal(int, str)  # 进度, 状态信息
     file_processed = pyqtSignal(int, str, str)  # 行号, 状态, 消息
     file_stats_updated = pyqtSignal(bool, int)  # 是否成功, 压缩后文件大小
@@ -180,17 +784,18 @@ class ImageCompressionWorker(QThread):
                 keep_exif = self.settings.get('keep_exif', True)
                 output_dir = self.settings.get('output_dir') or os.path.dirname(input_path)
                 
-                # 复制图片以避免修改原始图片
-                processed_image = image.copy()
-                
-                # 转换为RGB模式（JPEG需要）
-                if output_format == 'JPEG' and processed_image.mode in ['RGBA', 'P']:
+                # 优化：只在需要时复制图片
+                if output_format == 'JPEG' and image.mode in ['RGBA', 'P']:
+                    # 转换为RGB模式（JPEG需要）
+                    if image.mode == 'P':
+                        image = image.convert('RGBA')
                     # 创建白色背景
-                    rgb_image = Image.new('RGB', processed_image.size, (255, 255, 255))
-                    if processed_image.mode == 'P':
-                        processed_image = processed_image.convert('RGBA')
-                    rgb_image.paste(processed_image, mask=processed_image.split()[-1] if processed_image.mode == 'RGBA' else None)
+                    rgb_image = Image.new('RGB', image.size, (255, 255, 255))
+                    rgb_image.paste(image, mask=image.split()[-1] if image.mode == 'RGBA' else None)
                     processed_image = rgb_image
+                else:
+                    # 其他格式直接使用原图
+                    processed_image = image
                 
                 # 尺寸调整
                 if resize_enabled:
@@ -240,13 +845,13 @@ class ImageCompressionWorker(QThread):
                     if keep_exif and exif_dict:
                         save_kwargs['exif'] = exif_dict
                 elif output_format == 'PNG':
-                    # PNG压缩级别 (0-9, 9最高压缩)
-                    compress_level = min(9, int((100 - quality) / 11))
+                    # 优化：使用更快的压缩级别
+                    compress_level = min(6, int((100 - quality) / 16))  # 降低压缩级别以提高速度
                     save_kwargs['compress_level'] = compress_level
-                    save_kwargs['optimize'] = True
+                    save_kwargs['optimize'] = False  # 关闭优化以提高速度
                 elif output_format == 'WEBP':
                     save_kwargs['quality'] = quality
-                    save_kwargs['method'] = 6  # 最高质量的压缩方法
+                    save_kwargs['method'] = 4  # 使用更快的压缩方法
                 
                 # 保存图片
                 processed_image.save(output_path, format=output_format, **save_kwargs)
@@ -640,6 +1245,195 @@ class BatchRenameDialog(QDialog):
         }
 
 
+class BatchFormatConvertDialog(QDialog):
+    """批量格式转换对话框"""
+    def __init__(self, file_list, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("批量格式转换")
+        self.setMinimumSize(600, 500)
+        self.file_list = file_list
+        
+        layout = QVBoxLayout()
+        
+        # 转换设置
+        convert_group = QGroupBox("转换设置")
+        convert_layout = QFormLayout(convert_group)
+        
+        # 目标格式选择
+        self.target_format_combo = QComboBox()
+        # 添加常用格式
+        common_formats = ['JPEG', 'PNG', 'WEBP', 'TIFF', 'BMP', 'GIF', 'ICO', 'TGA']
+        self.target_format_combo.addItems(common_formats)
+        convert_layout.addRow("目标格式:", self.target_format_combo)
+        
+        # 质量设置（仅对JPEG和WEBP有效）
+        self.quality_spinbox = QSpinBox()
+        self.quality_spinbox.setRange(1, 100)
+        self.quality_spinbox.setValue(85)
+        self.quality_spinbox.setSuffix("%")
+        convert_layout.addRow("质量 (JPEG/WEBP):", self.quality_spinbox)
+        
+        # 保留EXIF信息
+        self.keep_exif_checkbox = QCheckBox()
+        self.keep_exif_checkbox.setChecked(True)
+        convert_layout.addRow("保留EXIF信息:", self.keep_exif_checkbox)
+        
+        # 输出目录设置
+        output_layout = QHBoxLayout()
+        self.output_dir_line = QLineEdit()
+        self.output_dir_line.setPlaceholderText("留空使用源文件目录")
+        output_layout.addWidget(QLabel("输出目录:"))
+        output_layout.addWidget(self.output_dir_line)
+        
+        browse_btn = QPushButton("浏览...")
+        browse_btn.clicked.connect(self.browse_output_dir)
+        output_layout.addWidget(browse_btn)
+        convert_layout.addRow("", output_layout)
+        
+        # 文件命名设置
+        naming_layout = QHBoxLayout()
+        self.naming_combo = QComboBox()
+        self.naming_combo.addItems(["保持原名", "添加格式后缀", "自定义前缀"])
+        naming_layout.addWidget(QLabel("文件命名:"))
+        naming_layout.addWidget(self.naming_combo)
+        convert_layout.addRow("", naming_layout)
+        
+        # 自定义前缀输入框
+        self.prefix_line = QLineEdit()
+        self.prefix_line.setPlaceholderText("例如: converted_")
+        self.prefix_line.setEnabled(False)
+        convert_layout.addRow("自定义前缀:", self.prefix_line)
+        
+        # 连接信号
+        self.naming_combo.currentTextChanged.connect(self.on_naming_changed)
+        self.target_format_combo.currentTextChanged.connect(self.on_format_changed)
+        
+        layout.addWidget(convert_group)
+        
+        # 转换预览
+        preview_group = QGroupBox("转换预览")
+        preview_layout = QVBoxLayout(preview_group)
+        
+        self.preview_list = QTextEdit()
+        self.preview_list.setMaximumHeight(200)
+        self.preview_list.setReadOnly(True)
+        preview_layout.addWidget(self.preview_list)
+        
+        update_preview_btn = QPushButton("更新预览")
+        update_preview_btn.clicked.connect(self.update_preview)
+        preview_layout.addWidget(update_preview_btn)
+        
+        layout.addWidget(preview_group)
+        
+        # 统计信息
+        stats_group = QGroupBox("转换统计")
+        stats_layout = QVBoxLayout(stats_group)
+        
+        self.stats_label = QLabel()
+        self.stats_label.setStyleSheet("padding: 5px; background-color: #f0f0f0; border-radius: 3px;")
+        stats_layout.addWidget(self.stats_label)
+        
+        layout.addWidget(stats_group)
+        
+        # 按钮
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        )
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+        
+        self.setLayout(layout)
+        
+        # 初始预览和统计
+        self.update_preview()
+        self.update_stats()
+    
+    def browse_output_dir(self):
+        """浏览输出目录"""
+        dir_path = QFileDialog.getExistingDirectory(self, "选择输出目录")
+        if dir_path:
+            self.output_dir_line.setText(dir_path)
+    
+    def on_naming_changed(self, text):
+        """命名方式改变时的处理"""
+        self.prefix_line.setEnabled(text == "自定义前缀")
+        self.update_preview()
+    
+    def on_format_changed(self, format_name):
+        """格式改变时的处理"""
+        # 根据格式调整质量设置的可视性
+        if format_name in ['JPEG', 'WEBP']:
+            self.quality_spinbox.setEnabled(True)
+        else:
+            self.quality_spinbox.setEnabled(False)
+        self.update_preview()
+    
+    def update_preview(self):
+        """更新转换预览"""
+        preview_text = ""
+        target_format = self.target_format_combo.currentText()
+        naming_mode = self.naming_combo.currentText()
+        prefix = self.prefix_line.text()
+        
+        # 获取目标格式的扩展名
+        target_ext = SUPPORTED_FORMATS.get(target_format, ['.jpg'])[0]
+        
+        for i, file_info in enumerate(self.file_list[:10]):  # 只显示前10个
+            original_name = file_info['name']
+            name_without_ext = os.path.splitext(original_name)[0]
+            original_ext = os.path.splitext(original_name)[1]
+            
+            # 生成新文件名
+            if naming_mode == "保持原名":
+                new_name = name_without_ext + target_ext
+            elif naming_mode == "添加格式后缀":
+                new_name = f"{name_without_ext}_{target_format.lower()}{target_ext}"
+            else:  # 自定义前缀
+                new_name = prefix + name_without_ext + target_ext
+            
+            # 检查是否需要转换
+            needs_conversion = original_ext.lower() != target_ext.lower()
+            status = "需要转换" if needs_conversion else "格式相同"
+            
+            preview_text += f"{original_name} → {new_name} ({status})\n"
+        
+        if len(self.file_list) > 10:
+            preview_text += f"... 还有 {len(self.file_list) - 10} 个文件"
+        
+        self.preview_list.setPlainText(preview_text)
+    
+    def update_stats(self):
+        """更新转换统计"""
+        target_format = self.target_format_combo.currentText()
+        target_ext = SUPPORTED_FORMATS.get(target_format, ['.jpg'])[0]
+        
+        total_files = len(self.file_list)
+        need_conversion = 0
+        same_format = 0
+        
+        for file_info in self.file_list:
+            original_ext = os.path.splitext(file_info['name'])[1]
+            if original_ext.lower() != target_ext.lower():
+                need_conversion += 1
+            else:
+                same_format += 1
+        
+        stats_text = f"总文件数: {total_files} | 需要转换: {need_conversion} | 格式相同: {same_format}"
+        self.stats_label.setText(stats_text)
+    
+    def get_conversion_settings(self):
+        """获取转换设置"""
+        return {
+            'target_format': self.target_format_combo.currentText(),
+            'quality': self.quality_spinbox.value(),
+            'keep_exif': self.keep_exif_checkbox.isChecked(),
+            'output_dir': self.output_dir_line.text().strip() or None,
+            'naming_mode': self.naming_combo.currentText(),
+            'prefix': self.prefix_line.text()
+        }
+
+
 class ColumnSettingsDialog(QDialog):
     """列设置对话框"""
     def __init__(self, column_settings, parent=None):
@@ -701,7 +1495,11 @@ class ColumnSettingsDialog(QDialog):
         """恢复默认设置"""
         for i, checkbox in self.checkboxes.items():
             if checkbox.isEnabled():
-                checkbox.setChecked(True)
+                # 输出文件名列默认不选中
+                if i == 1:  # 输出文件名列
+                    checkbox.setChecked(False)
+                else:
+                    checkbox.setChecked(True)
     
     def get_column_settings(self):
         """获取列设置"""
@@ -779,12 +1577,12 @@ class SettingsDialog(QDialog):
         
         # 输出目录设置
         self.output_dir_combo = QComboBox()
-        self.output_dir_combo.addItems(["源文件目录", "自定义目录"])
+        self.output_dir_combo.addItems(["源文件目录"])
         basic_layout.addRow("输出目录:", self.output_dir_combo)
         
         # 文件命名设置
         self.naming_combo = QComboBox()
-        self.naming_combo.addItems(["添加后缀", "覆盖原文件", "自定义前缀"])
+        self.naming_combo.addItems(["添加后缀"])
         basic_layout.addRow("文件命名:", self.naming_combo)
         
         # 保留EXIF信息
@@ -880,6 +1678,14 @@ class PicZipMainWindow(QMainWindow):
         
         # 压缩线程
         self.compression_worker = None
+        self.compression_workers = []  # 多线程压缩
+        self.compression_thread_count = 0  # 当前运行的压缩线程数
+        
+        # 格式转换线程
+        self.conversion_worker = None
+        self.conversion_workers = []  # 多线程转换
+        self.conversion_thread_count = 0  # 当前运行的转换线程数
+        self.active_thread_count = 0  # 当前活跃的线程数
         
         # 文件列表
         self.file_list = []
@@ -905,10 +1711,10 @@ class PicZipMainWindow(QMainWindow):
             'processing_time': 0
         }
         
-        # 列显示设置 (默认显示所有列)
+        # 列显示设置 (默认显示所有列，除了输出文件名)
         self.column_settings = {
             0: True,  # 文件名
-            1: True,  # 输出文件名
+            1: False,  # 输出文件名
             2: True,  # 尺寸
             3: True,  # 原始大小
             4: True,  # 压缩大小
@@ -920,6 +1726,10 @@ class PicZipMainWindow(QMainWindow):
         self.init_ui()
         self.load_settings()
         
+        # 添加ESC键关闭快捷键
+        self.shortcut_esc = QShortcut(QKeySequence(Qt.Key_Escape), self)
+        self.shortcut_esc.activated.connect(self.close)        
+
         # 启用拖拽
         self.setAcceptDrops(True)
     
@@ -1005,6 +1815,10 @@ class PicZipMainWindow(QMainWindow):
         batch_rename_action.triggered.connect(self.show_batch_rename_dialog)
         tools_menu.addAction(batch_rename_action)
         
+        batch_convert_action = QAction('批量格式转换...', self)
+        batch_convert_action.triggered.connect(self.show_batch_format_convert_dialog)
+        tools_menu.addAction(batch_convert_action)
+        
         tools_menu.addSeparator()
         
         preset_menu = tools_menu.addMenu('压缩预设')
@@ -1079,6 +1893,11 @@ class PicZipMainWindow(QMainWindow):
         rename_btn = QPushButton("批量重命名")
         rename_btn.clicked.connect(self.show_batch_rename_dialog)
         toolbar2.addWidget(rename_btn)
+        
+        # 批量格式转换按钮
+        convert_btn = QPushButton("格式转换")
+        convert_btn.clicked.connect(self.show_batch_format_convert_dialog)
+        toolbar2.addWidget(convert_btn)
         
         # 分隔符
         toolbar2.addSeparator()
@@ -1237,6 +2056,20 @@ class PicZipMainWindow(QMainWindow):
         
         self.progress_bar = QProgressBar()
         progress_layout.addWidget(self.progress_bar)
+        
+        # 线程状态显示
+        thread_status_layout = QHBoxLayout()
+        thread_status_layout.addWidget(QLabel("当前线程数:"))
+        self.thread_count_label = QLabel("0")
+        self.thread_count_label.setStyleSheet("color: #2196F3; font-weight: bold;")
+        thread_status_layout.addWidget(self.thread_count_label)
+        thread_status_layout.addStretch()
+        progress_layout.addLayout(thread_status_layout)
+        
+        # 处理状态显示
+        self.status_label = QLabel("就绪")
+        self.status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+        progress_layout.addWidget(self.status_label)
         
         layout.addWidget(progress_group)
         
@@ -1598,27 +2431,227 @@ class PicZipMainWindow(QMainWindow):
         for i in range(len(self.file_list)):
             self.file_table.setItem(i, 7, QTableWidgetItem("处理中..."))
         
-        # 创建并启动压缩线程
-        self.compression_worker = ImageCompressionWorker(self.file_list.copy(), settings)
-        self.compression_worker.progress_updated.connect(self.update_progress)
-        self.compression_worker.file_processed.connect(self.update_file_status)
-        self.compression_worker.finished.connect(self.compression_finished)
-        self.compression_worker.file_stats_updated.connect(self.update_processing_stats)
-        self.compression_worker.file_info_updated.connect(self.update_file_info)
-        self.compression_worker.start()
+        # 获取线程数设置
+        thread_count = settings.get('thread_count', 4)
+        thread_count = min(thread_count, len(self.file_list))  # 不超过文件数量
+        
+        # 清理之前的线程
+        if hasattr(self, 'compression_workers'):
+            self.compression_workers = []
+        
+        # 如果只有一个线程，使用单线程模式
+        if thread_count == 1:
+            self.compression_worker = ImageCompressionWorker(self.file_list.copy(), settings)
+            self.compression_worker.progress_updated.connect(self.update_progress)
+            self.compression_worker.file_processed.connect(self.update_file_status)
+            self.compression_worker.finished.connect(self.compression_finished)
+            self.compression_worker.file_stats_updated.connect(self.update_processing_stats)
+            self.compression_worker.file_info_updated.connect(self.update_file_info)
+            self.compression_worker.start()
+            
+            # 更新线程数和状态显示
+            self.active_thread_count = 1
+            self.update_thread_count_display()
+            self.update_status_display("压缩中...")
+        else:
+            # 多线程模式
+            self.compression_workers = []
+            self.compression_thread_count = thread_count
+            self.finished_thread_count = 0
+            
+            # 创建多个工作线程
+            for i in range(thread_count):
+                worker = MultiThreadImageCompressionWorker(
+                    self.file_list.copy(), settings, i, thread_count
+                )
+                worker.file_processed.connect(self.update_file_status)
+                worker.file_stats_updated.connect(self.update_processing_stats)
+                worker.file_info_updated.connect(self.update_file_info)
+                worker.thread_finished.connect(self.on_compression_thread_finished)
+                
+                self.compression_workers.append(worker)
+                worker.start()
+            
+            # 更新线程数和状态显示
+            self.active_thread_count = thread_count
+            self.update_thread_count_display()
+            self.update_status_display(f"压缩中... ({thread_count}个线程)")
+            
+            # 启动进度更新定时器
+            self.start_compression_progress_timer()
+    
+    def on_compression_thread_finished(self):
+        """单个压缩线程完成"""
+        self.finished_thread_count += 1
+        
+        # 检查是否所有线程都完成了
+        if self.finished_thread_count >= self.compression_thread_count:
+            self.compression_finished()
+    
+    def start_compression_progress_timer(self):
+        """启动压缩进度更新定时器"""
+        from PyQt5.QtCore import QTimer
+        self.compression_progress_timer = QTimer()
+        self.compression_progress_timer.timeout.connect(self.update_multi_thread_compression_progress)
+        self.compression_progress_timer.start(500)  # 每500ms更新一次进度
+    
+    def update_multi_thread_compression_progress(self):
+        """更新多线程压缩进度"""
+        if not hasattr(self, 'compression_workers') or not self.compression_workers:
+            return
+        
+        # 检查是否所有线程都已完成
+        if self.finished_thread_count >= self.compression_thread_count:
+            # 所有线程完成，设置进度为100%
+            self.progress_bar.setValue(100)
+        else:
+            # 计算总体进度
+            total_files = len(self.file_list)
+            completed_files = self.processing_stats.get('success_count', 0) + self.processing_stats.get('error_count', 0)
+            
+            if total_files > 0:
+                progress = int((completed_files * 100) / total_files)
+                self.progress_bar.setValue(progress)
     
     def stop_compression(self):
-        """停止压缩"""
+        """停止压缩或转换"""
         if self.compression_worker:
             self.compression_worker.stop()
-            self.compression_worker.wait()
+            # 使用异步方式等待线程结束，避免UI阻塞
+            self.async_wait_for_worker(self.compression_worker, 'compression')
+            self.update_status_display("正在停止压缩...")
+        elif hasattr(self, 'compression_workers') and self.compression_workers:
+            # 停止所有压缩线程
+            for worker in self.compression_workers:
+                worker.stop()
+            # 使用异步方式等待所有线程结束
+            self.async_wait_for_compression_workers(self.compression_workers)
+            self.update_status_display("正在停止压缩...")
+        elif self.conversion_worker:
+            self.conversion_worker.stop()
+            # 使用异步方式等待线程结束，避免UI阻塞
+            self.async_wait_for_worker(self.conversion_worker, 'conversion')
+            self.update_status_display("正在停止转换...")
+        elif hasattr(self, 'conversion_workers') and self.conversion_workers:
+            # 停止所有转换线程
+            for worker in self.conversion_workers:
+                worker.stop()
+            # 使用异步方式等待所有线程结束
+            self.async_wait_for_workers(self.conversion_workers)
+            self.update_status_display("正在停止转换...")
+    
+    def async_wait_for_worker(self, worker, worker_type):
+        """异步等待单个工作线程结束"""
+        from PyQt5.QtCore import QTimer
         
-        self.compression_finished()
+        def check_worker():
+            if not worker.isRunning():
+                if worker_type == 'compression':
+                    self.compression_worker = None
+                    self.update_status_display("压缩已停止")
+                elif worker_type == 'conversion':
+                    self.conversion_worker = None
+                    self.update_status_display("转换已停止")
+                # 更新线程数显示
+                self.active_thread_count = 0
+                self.update_thread_count_display()
+                timer.stop()
+            else:
+                # 如果线程还在运行，继续检查
+                timer.start(50)  # 50ms后再次检查
+        
+        timer = QTimer()
+        timer.timeout.connect(check_worker)
+        timer.start(50)  # 立即开始检查
+    
+    def async_wait_for_workers(self, workers):
+        """异步等待多个工作线程结束"""
+        from PyQt5.QtCore import QTimer
+        
+        def check_workers():
+            running_workers = [w for w in workers if w.isRunning()]
+            if not running_workers:
+                # 所有线程都已结束
+                # 更新状态为暂停
+                for i in range(len(self.file_list)):
+                    current_status = self.file_table.item(i, 7)
+                    if current_status and current_status.text() == "转换中...":
+                        self.file_table.setItem(i, 7, QTableWidgetItem("暂停"))
+                
+                # 清理线程列表
+                self.conversion_workers = []
+                # 更新线程数和状态显示
+                self.active_thread_count = 0
+                self.update_thread_count_display()
+                self.update_status_display("转换已停止")
+                timer.stop()
+            else:
+                # 还有线程在运行，继续检查
+                timer.start(50)  # 50ms后再次检查
+        
+        timer = QTimer()
+        timer.timeout.connect(check_workers)
+        timer.start(50)  # 立即开始检查
+    
+    def async_wait_for_compression_workers(self, workers):
+        """异步等待多个压缩工作线程结束"""
+        from PyQt5.QtCore import QTimer
+        
+        def check_workers():
+            running_workers = [w for w in workers if w.isRunning()]
+            if not running_workers:
+                # 所有线程都已结束
+                # 更新状态为暂停
+                for i in range(len(self.file_list)):
+                    current_status = self.file_table.item(i, 7)
+                    if current_status and current_status.text() == "处理中...":
+                        self.file_table.setItem(i, 7, QTableWidgetItem("暂停"))
+                
+                # 清理线程列表
+                self.compression_workers = []
+                # 更新线程数和状态显示
+                self.active_thread_count = 0
+                self.update_thread_count_display()
+                self.update_status_display("压缩已停止")
+                timer.stop()
+            else:
+                # 还有线程在运行，继续检查
+                timer.start(50)  # 50ms后再次检查
+        
+        timer = QTimer()
+        timer.timeout.connect(check_workers)
+        timer.start(50)  # 立即开始检查
+    
+    def update_thread_count_display(self):
+        """更新线程数显示"""
+        if hasattr(self, 'thread_count_label'):
+            self.thread_count_label.setText(str(self.active_thread_count))
+    
+    def update_status_display(self, status):
+        """更新状态显示"""
+        if hasattr(self, 'status_label'):
+            self.status_label.setText(status)
+            # 根据状态设置不同的颜色
+            if "处理中" in status or "转换中" in status:
+                self.status_label.setStyleSheet("color: #FF9800; font-weight: bold;")
+            elif "完成" in status or "就绪" in status:
+                self.status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+            elif "错误" in status or "失败" in status:
+                self.status_label.setStyleSheet("color: #F44336; font-weight: bold;")
+            else:
+                self.status_label.setStyleSheet("color: #2196F3; font-weight: bold;")
     
     def compression_finished(self):
         """压缩完成"""
         self.start_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
+        
+        # 停止压缩进度定时器
+        if hasattr(self, 'compression_progress_timer'):
+            self.compression_progress_timer.stop()
+        
+        # 确保进度条显示100%
+        self.progress_bar.setValue(100)
         
         # 计算处理时间
         if 'start_time' in self.processing_stats:
@@ -1628,10 +2661,24 @@ class PicZipMainWindow(QMainWindow):
         if self.processing_stats['total_files'] > 0:
             self.show_stats_dialog(self.processing_stats)
         
+        # 更新线程数和状态显示
+        self.active_thread_count = 0
+        self.update_thread_count_display()
+        self.update_status_display("压缩完成")
+        
+        # 清理线程
         self.compression_worker = None
+        if hasattr(self, 'compression_workers'):
+            self.compression_workers = []
+        self.compression_thread_count = 0
+        self.finished_thread_count = 0
     
     def get_compression_settings(self):
         """获取压缩设置"""
+        # 获取线程数设置
+        thread_count = self.settings.value("thread_count", 4, int)
+        thread_count = min(thread_count, len(self.file_list)) if self.file_list else thread_count
+        
         settings = {
             'quality': self.quality_slider.value(),
             'output_format': self.format_combo.currentText(),
@@ -1641,7 +2688,8 @@ class PicZipMainWindow(QMainWindow):
             'resize_width': self.width_spinbox.value(),
             'resize_height': self.height_spinbox.value(),
             'keep_exif': self.keep_exif_checkbox.isChecked(),
-            'output_dir': self.output_dir_line.text().strip() or None
+            'output_dir': self.output_dir_line.text().strip() or None,
+            'thread_count': thread_count
         }
         return settings
     
@@ -1671,12 +2719,12 @@ class PicZipMainWindow(QMainWindow):
                         self.file_table.setItem(row, 4, QTableWidgetItem(f"{compressed_size_mb:.2f} MB"))
                     
                     # 更新保存空间
-                    if self.column_settings.get(5, True):
+                    if self.column_settings.get(5, True) and 'saved_space' in file_info:
                         saved_space_mb = file_info['saved_space'] / (1024 * 1024)
                         self.file_table.setItem(row, 5, QTableWidgetItem(f"{saved_space_mb:.2f} MB"))
                     
                     # 更新压缩率
-                    if self.column_settings.get(6, True):
+                    if self.column_settings.get(6, True) and 'compression_ratio' in file_info:
                         compression_ratio = file_info['compression_ratio']
                         ratio_item = QTableWidgetItem()
                         ratio_item.setText(f"{compression_ratio:.1f}%")
@@ -1744,6 +2792,17 @@ class PicZipMainWindow(QMainWindow):
             rename_settings = dialog.get_rename_settings()
             self.apply_batch_rename(rename_settings)
     
+    def show_batch_format_convert_dialog(self):
+        """显示批量格式转换对话框"""
+        if not self.file_list:
+            QMessageBox.warning(self, "警告", "请先添加文件再进行格式转换")
+            return
+        
+        dialog = BatchFormatConvertDialog(self.file_list, self)
+        if dialog.exec_() == QDialog.Accepted:
+            conversion_settings = dialog.get_conversion_settings()
+            self.start_format_conversion(conversion_settings)
+    
     def apply_batch_rename(self, settings):
         """应用批量重命名"""
         try:
@@ -1765,6 +2824,145 @@ class PicZipMainWindow(QMainWindow):
             QMessageBox.information(self, "成功", "批量重命名规则已应用")
         except Exception as e:
             QMessageBox.critical(self, "错误", f"批量重命名失败: {str(e)}")
+    
+    def start_format_conversion(self, settings):
+        """开始格式转换"""
+        if not self.file_list:
+            QMessageBox.warning(self, "警告", "请先添加要转换的图片文件")
+            return
+        
+        # 获取线程数设置
+        thread_count = self.settings.value("thread_count", 4, int)
+        thread_count = min(thread_count, len(self.file_list))  # 不超过文件数量
+        
+        # 重置统计信息
+        self.processing_stats = {
+            'total_files': len(self.file_list),
+            'success_count': 0,
+            'error_count': 0,
+            'total_original_size': sum(os.path.getsize(f['path']) for f in self.file_list),
+            'total_compressed_size': 0,
+            'processing_time': 0,
+            'start_time': time.time()
+        }
+        
+        # 禁用开始按钮，启用停止按钮
+        self.start_btn.setEnabled(False)
+        self.stop_btn.setEnabled(True)
+        
+        # 重置状态
+        for i in range(len(self.file_list)):
+            self.file_table.setItem(i, 7, QTableWidgetItem("转换中..."))
+        
+        # 清理之前的线程
+        if hasattr(self, 'conversion_workers'):
+            self.conversion_workers = []
+        
+        # 如果只有一个线程，使用单线程模式
+        if thread_count == 1:
+            self.conversion_worker = ImageFormatConvertWorker(self.file_list.copy(), settings)
+            self.conversion_worker.progress_updated.connect(self.update_progress)
+            self.conversion_worker.file_processed.connect(self.update_file_status)
+            self.conversion_worker.finished.connect(self.conversion_finished)
+            self.conversion_worker.file_stats_updated.connect(self.update_processing_stats)
+            self.conversion_worker.file_info_updated.connect(self.update_file_info)
+            self.conversion_worker.start()
+            
+            # 更新线程数和状态显示
+            self.active_thread_count = 1
+            self.update_thread_count_display()
+            self.update_status_display("转换中...")
+        else:
+            # 多线程模式
+            self.conversion_workers = []
+            self.conversion_thread_count = thread_count
+            self.finished_thread_count = 0
+            
+            # 创建多个工作线程
+            for i in range(thread_count):
+                worker = MultiThreadFormatConvertWorker(
+                    self.file_list.copy(), settings, i, thread_count
+                )
+                worker.file_processed.connect(self.update_file_status)
+                worker.file_stats_updated.connect(self.update_processing_stats)
+                worker.file_info_updated.connect(self.update_file_info)
+                worker.thread_finished.connect(self.on_conversion_thread_finished)
+                
+                self.conversion_workers.append(worker)
+                worker.start()
+            
+            # 更新线程数和状态显示
+            self.active_thread_count = thread_count
+            self.update_thread_count_display()
+            self.update_status_display(f"转换中... ({thread_count}个线程)")
+            
+            # 启动进度更新定时器
+            self.start_progress_timer()
+    
+    def on_conversion_thread_finished(self):
+        """单个转换线程完成"""
+        self.finished_thread_count += 1
+        
+        # 检查是否所有线程都完成了
+        if self.finished_thread_count >= self.conversion_thread_count:
+            self.conversion_finished()
+    
+    def start_progress_timer(self):
+        """启动进度更新定时器"""
+        from PyQt5.QtCore import QTimer
+        self.progress_timer = QTimer()
+        self.progress_timer.timeout.connect(self.update_multi_thread_progress)
+        self.progress_timer.start(500)  # 每500ms更新一次进度
+    
+    def update_multi_thread_progress(self):
+        """更新多线程进度"""
+        if not hasattr(self, 'conversion_workers') or not self.conversion_workers:
+            return
+        
+        # 检查是否所有线程都已完成
+        if self.finished_thread_count >= self.conversion_thread_count:
+            # 所有线程完成，设置进度为100%
+            self.progress_bar.setValue(100)
+        else:
+            # 计算总体进度
+            total_files = len(self.file_list)
+            completed_files = self.processing_stats.get('success_count', 0) + self.processing_stats.get('error_count', 0)
+            
+            if total_files > 0:
+                progress = int((completed_files * 100) / total_files)
+                self.progress_bar.setValue(progress)
+    
+    def conversion_finished(self):
+        """格式转换完成"""
+        self.start_btn.setEnabled(True)
+        self.stop_btn.setEnabled(False)
+        
+        # 停止进度定时器
+        if hasattr(self, 'progress_timer'):
+            self.progress_timer.stop()
+        
+        # 确保进度条显示100%
+        self.progress_bar.setValue(100)
+        
+        # 计算处理时间
+        if 'start_time' in self.processing_stats:
+            self.processing_stats['processing_time'] = time.time() - self.processing_stats['start_time']
+        
+        # 显示处理统计
+        if self.processing_stats['total_files'] > 0:
+            self.show_stats_dialog(self.processing_stats)
+        
+        # 更新线程数和状态显示
+        self.active_thread_count = 0
+        self.update_thread_count_display()
+        self.update_status_display("转换完成")
+        
+        # 清理线程
+        self.conversion_worker = None
+        if hasattr(self, 'conversion_workers'):
+            self.conversion_workers = []
+        self.conversion_thread_count = 0
+        self.finished_thread_count = 0
     
     def apply_preset(self, preset_type):
         """应用压缩预设"""
@@ -1865,6 +3063,11 @@ class PicZipMainWindow(QMainWindow):
         compress_selected_action = QAction("压缩选中文件", self)
         compress_selected_action.triggered.connect(self.compress_selected_files)
         menu.addAction(compress_selected_action)
+        
+        # 转换选中文件格式
+        convert_selected_action = QAction("转换选中文件格式", self)
+        convert_selected_action.triggered.connect(self.convert_selected_files)
+        menu.addAction(convert_selected_action)
         
         menu.addSeparator()
         
@@ -2021,6 +3224,40 @@ class PicZipMainWindow(QMainWindow):
         # 恢复原始文件列表
         self.file_list = original_file_list
     
+    def convert_selected_files(self):
+        """转换选中的文件格式"""
+        selected_rows = set()
+        for item in self.file_table.selectedItems():
+            selected_rows.add(item.row())
+        
+        if not selected_rows:
+            QMessageBox.information(self, "提示", "请先选择要转换格式的文件")
+            return
+        
+        # 创建选中文件的临时列表
+        selected_files = []
+        for row in sorted(selected_rows):
+            if 0 <= row < len(self.file_list):
+                selected_files.append(self.file_list[row])
+        
+        if not selected_files:
+            return
+        
+        # 显示格式转换对话框
+        dialog = BatchFormatConvertDialog(selected_files, self)
+        if dialog.exec_() == QDialog.Accepted:
+            conversion_settings = dialog.get_conversion_settings()
+            
+            # 临时替换文件列表
+            original_file_list = self.file_list.copy()
+            self.file_list = selected_files
+            
+            # 开始转换
+            self.start_format_conversion(conversion_settings)
+            
+            # 恢复原始文件列表
+            self.file_list = original_file_list
+    
     def show_stats_dialog(self, stats_data):
         """显示处理统计对话框"""
         dialog = StatsDialog(stats_data, self)
@@ -2068,6 +3305,9 @@ class PicZipMainWindow(QMainWindow):
         
         # 加载列宽设置
         self.load_column_widths()
+        
+        # 加载线程数设置（用于格式转换）
+        # 注意：这个设置会在start_format_conversion中读取
     
     def closeEvent(self, event):
         """关闭事件"""
@@ -2088,10 +3328,28 @@ class PicZipMainWindow(QMainWindow):
         # 保存列宽设置
         self.save_column_widths()
         
-        # 停止压缩线程
+        # 停止压缩和转换线程
         if self.compression_worker:
             self.compression_worker.stop()
             self.compression_worker.wait()
+        if hasattr(self, 'compression_workers') and self.compression_workers:
+            for worker in self.compression_workers:
+                worker.stop()
+            for worker in self.compression_workers:
+                worker.wait()
+        if self.conversion_worker:
+            self.conversion_worker.stop()
+            self.conversion_worker.wait()
+        if hasattr(self, 'conversion_workers') and self.conversion_workers:
+            for worker in self.conversion_workers:
+                worker.stop()
+            for worker in self.conversion_workers:
+                worker.wait()
+        # 停止进度定时器
+        if hasattr(self, 'progress_timer'):
+            self.progress_timer.stop()
+        if hasattr(self, 'compression_progress_timer'):
+            self.compression_progress_timer.stop()
         
         event.accept()
 
@@ -2102,6 +3360,5 @@ if __name__ == '__main__':
     # image_list  = [r"D:\o19\image\0616\0616 O19国际二供FT1原图\0616 O19国际二供FT1原图\HDR\N12]
     app = QApplication(sys.argv)
     window = PicZipMainWindow()
-    # window.set_image_list(image_list)
     window.show()
     sys.exit(app.exec_())
