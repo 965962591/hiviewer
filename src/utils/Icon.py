@@ -120,13 +120,10 @@ class IconCache:
                 return icon
 
             # 生成新图标 
-            icon = cls._generate_icon(file_path)
-            if icon:
+            if icon := cls._generate_icon(file_path):
                 # print("获取图标, 进入生成新图标")
                 cls._save_to_cache(file_path, icon)
-            
             return icon
-
         except Exception as e:
             print(f"获取图标失败: {e}")
             return QIcon()
@@ -162,7 +159,6 @@ class IconCache:
                 if file_ext == ".heic":
                     if new_path:= extract_jpg_from_heic(file_path):
                         file_path = new_path
-                
                 return cls._generate_image_icon(file_path)
             
             # 其它文件类型
@@ -185,36 +181,30 @@ class IconCache:
             QIcon: 处理后的图标对象
         """
         try:
-            # 方案一：使用QImageReader高效加载   
+            # 方案一：使用QImageReader高效加载；设置自动转换（处理EXIF方向信息），设置高质量缩放
             reader = QImageReader(file_path)
-            reader.setAutoTransform(True)     # 设置自动转换（处理EXIF方向信息）
-            reader.setQuality(100)            # 设置高质量缩放
-            
-            if True:
-                # 设置高效缩放，获取原始图像尺寸
-                original_size = reader.size()
-                if original_size.isValid():
-                    # 计算等比例缩放尺寸
-                    target_size = QtCore.QSize(48, 48)
-                    # 计算缩放比例
-                    width_ratio = target_size.width() / original_size.width()
-                    height_ratio = target_size.height() / original_size.height()
-                    scale_ratio = min(width_ratio, height_ratio)
-                    
-                    # 计算新的尺寸
-                    new_width = int(original_size.width() * scale_ratio)
-                    new_height = int(original_size.height() * scale_ratio)
-                    
-                    # 设置缩放尺寸
-                    reader.setScaledSize(QtCore.QSize(new_width, new_height))
-            
+            reader.setAutoTransform(True)
+            reader.setQuality(100)        
+            # 设置高效缩放，获取原始图像尺寸
+            if (original_size := reader.size()).isValid():
+                # 计算等比例缩放尺寸
+                target_size = QtCore.QSize(48, 48)
+                # 计算缩放比例
+                width_ratio = target_size.width() / original_size.width()
+                height_ratio = target_size.height() / original_size.height()
+                scale_ratio = min(width_ratio, height_ratio)
+                # 计算新的尺寸
+                new_width = int(original_size.width() * scale_ratio)
+                new_height = int(original_size.height() * scale_ratio)
+                # 设置缩放尺寸
+                reader.setScaledSize(QtCore.QSize(new_width, new_height))
             # 尝试读取图像
             if bool(img := reader.read()):
                 # print("方案一：使用QImageReader高效加载")
                 pixmap = QPixmap.fromImage(img)
                 return QIcon(pixmap)
             
-            # 方案二：使用PIL 加载，ImageOps.exif_transpose自动处理EXIF方向信息
+            # 方案二：使用PIL 加载，ImageOps.exif_transpose自动处理EXIF方向信息, 备选(效率较低)
             with Image.open(file_path) as img:
                 if bool(pixmap := pil_to_pixmap(img)):
                     # print("方案二：使用PIL 加载")
