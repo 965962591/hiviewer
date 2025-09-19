@@ -40,8 +40,8 @@ from src.components.ui_sub_image import Ui_MainWindow                   # 看图
 from src.components.custom_qMbox_showinfo import show_message_box       # 导入消息框类
 from src.components.custom_qdialog_problems import ProblemsDialog       # 导入问题对话框类
 from src.common.manager_color_exif import load_exif_settings            # 导入json配置模块
-from src.common.manager_color_exif import load_color_settings                                                
-from src.common.manager_font import SingleFontManager                   # 看图子界面，导入字体管理器
+from src.common.manager_color_exif import load_color_settings
+from src.common.font import JetBrainsMonoLoader                         # 看图子界面，导入字体管理器                   
 from src.utils.ai_tips import CustomLLM_Siliconflow                     # 看图子界面，AI提示看图复选框功能模块
 from src.utils.hisnot import WScreenshot                                # 看图子界面，导入自定义截图的类
 from src.utils.aebox_link import check_process_running, get_api_data    # 导入与AEBOX通信的模块函数
@@ -575,10 +575,7 @@ class MyGraphicsView(QGraphicsView):
         self.parent_SubMainWindow = self.window()
 
         # 初始化字体管理器
-        self.font_manager_view = (
-            self.parent_SubMainWindow.font_manager_j11 if self.parent_SubMainWindow.font_manager_j11 
-            else SingleFontManager.get_font(10)
-        ) 
+        self.font_manager_view = JetBrainsMonoLoader.font(11) 
 
         # 初始化基本信息(exif信息, stats信息, 控制exif显示, stats显示, 直方图, 控制直方图显示)
         self.exif_text = exif_text
@@ -1148,25 +1145,11 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.dict_exif_info_visibility = {} 
         self.dict_label_info_visibility = {}
 
-        
-        # 导入主界面的一些设置:字体设置，颜色设置等
-        if self.parent_window:
-            self.custom_font = (       # 12号字体
-                self.parent_window.custom_font if self.parent_window.custom_font 
-                else SingleFontManager.get_font(12) 
-            )
-            self.font_manager_j12 = (  # 12号字体
-                self.parent_window.custom_font_jetbrains if self.parent_window.custom_font_jetbrains 
-                else self.custom_font
-            )           
-            self.font_manager_j11= (  # 11号字体
-                self.parent_window.custom_font_jetbrains_medium if self.parent_window.custom_font_jetbrains_medium 
-                else SingleFontManager.get_font(11)
-            )   
-            self.font_manager_j10 = (  # 10号字体
-                self.parent_window.custom_font_jetbrains_small if self.parent_window.custom_font_jetbrains_small 
-                else SingleFontManager.get_font(10)
-            )   
+        # 字体设置
+        self.font_manager_j12 = JetBrainsMonoLoader.font(12)
+        self.font_manager_j11 = JetBrainsMonoLoader.font(11)
+        self.font_manager_j10 = JetBrainsMonoLoader.font(11)
+
 
 
 
@@ -1268,7 +1251,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.comboBox_1.addItems(["✅颜色设置", "⭕一键重置", "🔽背景颜色>>", "🔽表格填充颜色>>", "🔽字体颜色>>", "🔽exif字体颜色>>"])  # 添加主选项
         self.comboBox_1.setEditable(False)  # 设置 QComboBox 不可编辑
         self.comboBox_1.setCurrentIndex(0)  # 设置默认显示索引为0
-        self.comboBox_1.setFont(self.custom_font)
+        self.comboBox_1.setFont(self.font_manager_j12)
 
         # 设置下拉框self.comboBox_2选项（优化版）
         color_space_list = [self.auto_color_space, self.srgb_color_space, self.gray_color_space, self.p3_color_space]  # 列表中存放三个颜色空间显示标志位
@@ -1277,11 +1260,11 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.comboBox_2.clear(); self.comboBox_2.addItems(options)
         # 设置默认显示索引为当前激活的颜色空间, 并设置自定义字体
         self.comboBox_2.setCurrentIndex(next(i for i, state in enumerate(color_space_list) if state))
-        self.comboBox_2.setFont(self.custom_font)
+        self.comboBox_2.setFont(self.font_manager_j12)
 
         # 设置复选框
         for checkbox in [self.checkBox_1, self.checkBox_2, self.checkBox_3, self.checkBox_4]:
-            checkbox.setFont(self.custom_font)
+            checkbox.setFont(self.font_manager_j12)
         self.checkBox_1.setText("直方图")
         self.checkBox_2.setText("EXIF信息")
         self.checkBox_3.setText("ROI信息")
@@ -1301,7 +1284,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         self.tableWidget_medium.verticalHeader().setVisible(False)
         self.tableWidget_medium.verticalHeader().setDefaultSectionSize(0)
         # self.tableWidget_medium.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch) # 设置表格列宽自适应
-        header.setFont(self.custom_font)
+        header.setFont(self.font_manager_j12)
 
         # 设置底部状态栏组件文本显示
         # self.statusbar_left_button # 设置按钮
@@ -2176,7 +2159,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                     # 传递 color 和 index
                     action.triggered.connect(lambda checked, color=color, index=index: self.on_comboBox_1_changed(color, index))  
                     self.menu_1.addAction(action)
-                self.menu_1.setFont(self.custom_font)
+                self.menu_1.setFont(self.font_manager_j12)
 
                 # 获取 QComboBox 顶部的矩形区域
                 rect = self.comboBox_1.rect()

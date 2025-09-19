@@ -9,11 +9,12 @@
 注意事项：
   1. 使用函数get_app_dir()获取当前程序根目录,避免在冻结态使用 __file__ 推导资源路径，
     会出现短文件名别名报错(如:HIVIEW~1.DIS)
+  2. 使用函数make_unique_dir_names()获取指定文件夹内的唯一文件夹名称
 '''
 
 """记录程序启动时间"""
 import time
-flag_start = time.time()
+STIME = time.time()
 
 """导入python内置模块"""
 import gc
@@ -42,43 +43,33 @@ from PyQt5.QtCore import (
 
 """导入用户自定义的模块"""
 from src.view.sub_compare_image_view import SubMainWindow                   # 假设这是你的子窗口类名
-from src.view.sub_compare_video_view import VideoWall                       # 假设这是你的子窗口类名 
 from src.view.sub_rename_view import FileOrganizer                          # 添加这行以导入批量重名名类名
 from src.view.sub_image_process_view import SubCompare                      # 确保导入 SubCompare 类
 from src.view.sub_bat_view import LogVerboseMaskApp                         # 导入批量执行命令的类
 from src.view.sub_search_view import SearchOverlay                          # 导入图片搜索工具类(ctrl+f)
-from src.view.sub_image_skinny_view import PicZipMainWindow                 # 导入图片瘦身子界面
 from src.components.ui_main import Ui_MainWindow                            # 假设你的主窗口类名为Ui_MainWindow
 from src.components.custom_qMbox_showinfo import show_message_box           # 导入消息框类
 from src.components.custom_qdialog_about import AboutDialog                 # 导入关于对话框类,显示帮助信息
-from src.components.custom_qdialog_LinkQualcomAebox import Qualcom_Dialog   # 导入高通工具自定义对话框的类
-from src.components.custom_qdialog_LinkUnisocAebox import Unisoc_Dialog     # 导入展锐工具自定义对话框的类
-from src.components.custom_qdialog_LinkMTKAebox import MTK_Dialog           # 导入展锐工具自定义对话框的类
+
+
 from src.components.custom_qdialog_rename import SingleFileRenameDialog     # 导入自定义重命名对话框类
-from src.components.custom_qCombox_spinner import (                         # 导入自定义下拉框类中的数据模型和委托代理类
-CheckBoxListModel, CheckBoxDelegate)       
-from src.components.custom_qdialog_progress import (                        # 导入自定义压缩进度对话框类
-ProgressDialog, InputDialog, CompressWorker)      
+from src.common.font import JetBrainsMonoLoader                             # 字体管理器
+
+from src.components.custom_qCombox_spinner import CheckBoxListModel,CheckBoxDelegate        # 导入自定义下拉框类中的数据模型和委托代理类
 from src.common.img_preview import ImageViewer                              # 导入自定义图片预览组件  
-from src.common.manager_font import MultiFontManager                        # 字体管理器
 from src.common.manager_version import version_init, fastapi_init           # 版本号&IP地址初始化
 from src.common.manager_color_exif import load_color_settings               # 导入自定义json配置文件
 from src.common.manager_log import setup_logging, get_logger                # 导入日志文件相关配置
-from src.common.decorator import (                                          # 导入自定义装饰器函数 
-CC_TimeDec, log_performance_decorator, log_error_decorator)             
+from src.common.decorator import log_performance_decorator                  # 导入自定义装饰器函数 
+from src.common.decorator import log_error_decorator
 from src.utils.raw2jpg import Mipi2RawConverterApp                          # 导入MIPI RAW文件转换为JPG文件的类
 from src.utils.update import check_update, pre_check_update                 # 导入自动更新检查程序
 from src.utils.hisnot import WScreenshot                                    # 导入截图工具类
 from src.utils.xml import save_excel_data                                   # 导入xml文件解析工具类
-from src.utils.delete import (                                              # 导入强制删除文件夹功能函数，清除日志，清除缓存相关函数
-force_delete_folder, clear_log_files,clear_cache_files)          
 from src.utils.Icon import IconCache, ImagePreloader                        # 导入文件Icon图标加载类
-from src.utils.heic import extract_jpg_from_heic                            # 导入heic文件解析工具类
 from src.utils.video import extract_video_first_frame                       # 导入视频预览工具类
 from src.utils.image import ImageProcessor                                  # 导入图片处理工具类
 from src.utils.sort import sort_by_custom                                   # 导入文件排序工具类
-from src.utils.aebox_link import (                                          # 导入Fast API配置与Aebox通信
-check_process_running, urlencode_folder_path, get_api_data)
 
 
 
@@ -106,20 +97,17 @@ def get_app_dir():
     return base
 
 def make_unique_dir_names(folder_paths):
-    """
-    输入: 文件夹路径列表（str 或 Path）
+    """ 从【文件夹路径列表】中获取唯一的【名称列表】
+    输入: 文件夹路径列表(str 或 Path)
     返回: 与输入顺序对应的唯一化目录名列表
     """
     ps = [Path(p).resolve() for p in folder_paths]
     cnt = Counter(p.name for p in ps)
-
     # 第一轮：只用 parent/name
     names = [f"{p.parent.name}/{p.name}" if cnt[p.name] > 1 else p.name for p in ps]
-
     # 如果仍全同名，再往上加一层，一般也就加到这一层就可以保证唯一
     if len(set(names)) == 1:
         names = [f"{p.parent.parent.name}/{p.parent.name}/{p.name}" if cnt[p.name] > 1 else p.name for p in ps]
-
     return names
 
 """
@@ -131,8 +119,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def __init__(self, parent=None):
         super(HiviewerMainwindow, self).__init__(parent)
         # 记录程序启动时间；设置图标路径；读取本地版本信息，并初始化新版本信息
-        self.start_time = flag_start
-
+        self.start_time = STIME
         # 设置根目录和icon图标目录
         self.root_path = get_app_dir()
         self.icon_path =  self.root_path / "resource" / "icons"
@@ -149,7 +136,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 版本信息和fast api地址端口的初始化
         self.version_info, self.new_version_info,  = version_init(), False     
         self.fast_api_host, self.fast_api_port = fastapi_init()
-        
+
         # 创建启动画面、启动画面、显示主窗口以及相关初始化在self.update_splash_message()函数通过定时器实现
         self.create_splash_screen()
 
@@ -217,18 +204,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.font_color_exif = basic_color_settings.get("font_color_exif", "rgb(255, 255, 255)")                  # Exif字体颜色_纯白色
 
         """加载字体相关设置""" # 初始化字体管理器,并获取字体，设置默认字体 self.custom_font
-        font_paths = [
-            (self.root_path / "resource" / "fonts" / "JetBrainsMapleMono_Regular.ttf").as_posix(), # JetBrains Maple Mono
-            (self.root_path / "resource" / "fonts" / "xialu_wenkai.ttf").as_posix(),               # LXGW WenKai
-            (self.root_path / "resource" / "fonts" / "MapleMonoNormal_Regular.ttf").as_posix()     # Maple Mono Normal
-        ]
-        MultiFontManager.initialize(font_paths=font_paths)
-        self.custom_font = MultiFontManager.get_font(font_family="LXGW WenKai", size=12)
-        self.custom_font_jetbrains = MultiFontManager.get_font(font_family="JetBrains Maple Mono", size=12)
-        self.custom_font_jetbrains_medium = MultiFontManager.get_font(font_family="JetBrains Maple Mono", size=11)
-        self.custom_font_jetbrains_small = MultiFontManager.get_font(font_family="JetBrains Maple Mono", size=10)
-        self.custom_font = self.custom_font_jetbrains
-
+        self.font_jetbrains = JetBrainsMonoLoader.font(12)
+        self.font_jetbrains_m = JetBrainsMonoLoader.font(11)
+        self.font_jetbrains_s = JetBrainsMonoLoader.font(10)
 
     """
     设置动画显示区域开始线
@@ -246,23 +224,19 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             splash_pixmap = QPixmap(400, 200)
             splash_pixmap.fill(Qt.white)
             
-        # 创建启动画面
+        # 创建启动画面；获取当前屏幕并计算居中位置, 移动到该位置, 设置半透明效果
         self.splash = QSplashScreen(splash_pixmap)
-        
-        # 获取当前屏幕并计算居中位置, 移动到该位置
         x, y, _, _ = self.get_screen_geometry()
         self.splash.move(x, y)
-        
-        # 设置半透明效果
         self.splash.setWindowOpacity(0)
         
-        # 创建渐入动画
+        # 创建渐入动画，设置800ms的渐入动画
         self.fade_anim = QPropertyAnimation(self.splash, b"windowOpacity")
-        self.fade_anim.setDuration(1000)  # 1000ms的渐入动画
+        self.fade_anim.setDuration(800)  
         self.fade_anim.setStartValue(0)
         self.fade_anim.setEndValue(1)
         self.fade_anim.start()
-        
+
         # 设置启动画面的样式
         self.splash.setStyleSheet("""
             QSplashScreen {
@@ -270,17 +244,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 color: white;
                 border-radius: 10px;
             }
-        """)
+        """) 
+        self.splash.show() # 显示启动画面
         
-        # 显示启动画面
-        self.splash.show()
-        
-        # 设置进度更新定时器
-        self.fla = 0         # 记录启动画面更新次数
-        self.dots_count = 0  # 记录启动画面更新点
-        self.splash_progress_timer = QTimer()  # 启动进度更新定时器
-        self.splash_progress_timer.timeout.connect(self.update_splash_message)  # 连接定时器到更新函数,相关函数变量的初始化
-        self.splash_progress_timer.start(10)   # 每10ms更新一次
+        # 设置进度更新定时器，记录启动画面更新次数，记录启动画面更新点，启动进度更新定时器，设置每10ms更新一次
+        self.fla = 0      
+        self.dots_count = 0
+        self.splash_progress_timer = QTimer() 
+        self.splash_progress_timer.timeout.connect(self.update_splash_message)
+        self.splash_progress_timer.start(10)   
 
 
     def update_splash_message(self):
@@ -313,7 +285,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             
             # 创建渐出动画
             self.fade_out = QPropertyAnimation(self.splash, b"windowOpacity")
-            self.fade_out.setDuration(1000)  # 1000ms的渐出动画
+            self.fade_out.setDuration(800)  # 800ms的渐出动画
             self.fade_out.setStartValue(1)
             self.fade_out.setEndValue(0)
             self.fade_out.finished.connect(self.splash.close)
@@ -331,8 +303,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
             # 延时显示主窗口,方便启动画面渐出
             QTimer.singleShot(800, self.show)
-
-
             # 记录结束时间并计算耗时
             self.preview_label.setText(f"⏰启动耗时: {(time.time()-self.start_time):.2f} 秒")
             print(f"----------[hiviewer主程序启动成功], 共耗时: {(time.time()-self.start_time):.2f} 秒----------")
@@ -408,8 +378,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             QMenu {{
                 /*background-color: #F0F0F0;   背景色 */
 
-                font-family: "{self.custom_font_jetbrains_small.family()}";
-                font-size: {self.custom_font_jetbrains_small.pointSize()}pt;    
+                font-family: "{self.font_jetbrains_s.family()}";
+                font-size: {self.font_jetbrains_s.pointSize()}pt;    
             }}
             QMenu::item:selected {{
                 background-color: {self.background_color_default};   /* 选中项背景色 */
@@ -523,13 +493,14 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.treeview_context_menu.setStyleSheet(f"""
             QMenu {{
                 /*background-color: #F0F0F0;   背景色 */
-
-                font-family: "{self.custom_font_jetbrains_small.family()}";
-                font-size: {self.custom_font_jetbrains_small.pointSize()}pt;    
+                font-family: "{self.font_jetbrains_s.family()}";
+                font-size: {self.font_jetbrains_s.pointSize()}pt;    
             }}
             QMenu::item:selected {{
-                background-color: {self.background_color_default};   /* 选中项背景色 */
-                color: #000000;               /* 选中项字体颜色 */
+                /* 选中项背景色 */
+                background-color: {self.background_color_default};   
+                /* 选中项字体颜色 */
+                color: #000000; 
             }}
         """)
 
@@ -571,12 +542,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     设置右键菜单函数区域结束线
     ---------------------------------------------------------------------------------------------------------------------------------------------
     """
-
     @log_performance_decorator(tips="设置主界面图标以及标题", log_args=False, log_result=False)
     def set_stylesheet(self):
         """设置主界面图标以及标题"""
-        # print("[set_stylesheet]-->设置主界面相关组件")
-
         self.main_ui_icon = (self.icon_path / "viewer_3.ico").as_posix()
         self.setWindowIcon(QIcon(self.main_ui_icon))
         self.setWindowTitle(f"HiViewer")
@@ -632,7 +600,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
         # 设置QDir的过滤器默认只显示文件夹
         self.file_system_model.setFilter(QDir.NoDot | QDir.NoDotDot | QDir.AllDirs)    # 使用QDir的过滤器,只显示文件夹
-        
 
 
         """ 右侧组件
@@ -683,7 +650,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     @log_performance_decorator(tips="快捷键和槽函数连接事件", log_args=False, log_result=False)
     def set_shortcut(self):
         """快捷键和槽函数连接事件"""
-
         """1.快捷键设置"""
         # 添加快捷键 切换主题
         self.p_shortcut = QShortcut(QKeySequence('p'), self)
@@ -957,9 +923,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 os.chmod(path, stat.S_IWRITE)
                 func(path)
 
-            deleted_count = 0
-            failed_paths = []
-
+            deleted_count, failed_paths = 0, []
             for one_path in path:
                 try:
                     if not os.path.exists(one_path):
@@ -1067,6 +1031,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 show_message_box(f"仅支持发送文件夹, 请确保选中文件夹后发送", "提示", 1500)
                 return                
 
+            # 导入Fast API配置与Aebox通信
+            from src.utils.aebox_link import check_process_running, urlencode_folder_path, get_api_data 
             if not check_process_running("aebox"):
                 show_message_box(f"未检测到aebox进程, 请先手动打开aebox软件", "提示", 1500)
                 return
@@ -1466,7 +1432,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     # 高效提取路径方法, 根据表格索引直接从self.paths_list中拿文件路径
                     if (full_path := self.paths_list[col][row]) and os.path.isfile(full_path):
                         file_full_path_list.append(full_path) 
-                    else: # 常规拼接构建完整路径的办法，效率较低
+                    # 常规拼接构建完整路径的办法，效率较低
+                    else: 
                         if(full_path := self.get_single_full_path(row, col)): 
                             file_full_path_list.append(full_path)
 
@@ -1605,7 +1572,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             show_message_box("🚩从源文件删除选中的文件时发生错误!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
             
 
-
     def compress_selected_files(self):
         """压缩选中的文件并复制压缩包文件到剪贴板"""
         try:
@@ -1613,6 +1579,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             if not (files_to_compress := self.get_selected_file_path()):
                 show_message_box("🚩没有选中的项 | 没有有效的文件可压缩!!!", "提示", 1000)
                 return
+            
+            # 导入自定义压缩进度对话框类       
+            from src.components.custom_qdialog_progress import InputDialog, ProgressDialog, CompressWorker   
 
             # 获取压缩包名称
             zip_name_dialog = InputDialog(self)
@@ -1623,7 +1592,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 print(f"[compress_selected_files]-->取消压缩文件 | 未输入有效压缩文件名")
                 self.logger.error(f"[compress_selected_files]-->取消压缩文件 | 未输入有效压缩文件名")
                 return
-
 
             # 设置压缩包文件路径存在; 确保父目录存在; 将path格式转换为str格式
             zip_path = self.root_path / "cache" / f"{zip_name}.zip"
@@ -1666,6 +1634,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 return
 
             # 打开图片瘦身子界面
+            from src.view.sub_image_skinny_view import PicZipMainWindow                
             self.image_skinny_window = PicZipMainWindow()
             self.image_skinny_window.set_image_list(file_paths)
             self.image_skinny_window.setWindowIcon(QIcon((self.icon_path/"image_skinny.ico").as_posix()))  
@@ -1726,6 +1695,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         
         # 若是压缩取消，强制删除缓存文件中的zip文件
         if (cache_dir := self.root_path / "cache").exists():
+            # 导入强制删除函数并调用
+            from src.utils.delete import force_delete_folder
             force_delete_folder(cache_dir.as_posix(), '.zip')
         
         # 提示信息
@@ -2294,6 +2265,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             if (file_extension := os.path.splitext(preview_file_path)[1].lower()).endswith(self.IMAGE_FORMATS):
                 # 处理HEIC格式图片，成功提取则创建并显示图片预览，反之则显示提取失败
                 if file_extension.endswith(".heic"):
+                    # 导入heic文件解析工具类
+                    from src.utils.heic import extract_jpg_from_heic                            
                     if new_path := extract_jpg_from_heic(preview_file_path):
                         self.create_image_preview(new_path)
                         return
@@ -2362,7 +2335,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         try:
             error_label = QLabel(message)
             error_label.setStyleSheet("color: white;")
-            error_label.setFont(self.custom_font_jetbrains)
+            error_label.setFont(self.font_jetbrains_m)
             error_label.setAlignment(Qt.AlignCenter)
             self.verticalLayout_left_2.addWidget(error_label)
         except Exception as e:
@@ -2445,8 +2418,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 text-align: center;
                 padding: 3px;
                 margin: 1px;
-                font-family: "{self.custom_font.family()}";
-                font-size: {self.custom_font.pointSize()}pt;
+                font-family: "{self.font_jetbrains.family()}";
+                font-size: {self.font_jetbrains.pointSize()}pt;
             }}
             /* 修改左上角区域样式 */
             QTableWidget#RB_QTableWidget0::corner {{
@@ -2468,8 +2441,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 background-color: {WHITE};
                 color: {FONTCOLOR};
                 text-align: center;
-                font-family: "{self.custom_font.family()}";
-                font-size: {self.custom_font.pointSize()}pt;
+                font-family: "{self.font_jetbrains.family()}";
+                font-size: {self.font_jetbrains.pointSize()}pt;
             }}
             QPushButton:hover {{
                 border: 1px solid {BACKCOLOR};
@@ -2510,8 +2483,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 selection-background-color: {BACKCOLOR};
                 selection-color: {FONTCOLOR};
                 min-height: 30px;
-                font-family: "{self.custom_font.family()}";
-                font-size: {self.custom_font.pointSize()}pt;
+                font-family: "{self.font_jetbrains.family()}";
+                font-size: {self.font_jetbrains.pointSize()}pt;
             }}
             QComboBox QAbstractItemView {{
                 /* 下拉列表样式 */
@@ -2519,15 +2492,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 color: {FONTCOLOR};
                 selection-background-color: {BACKCOLOR};
                 selection-color: {FONTCOLOR};
-                font-family: "{self.custom_font.family()}";
-                font-size: {self.custom_font.pointSize()}pt;
+                font-family: "{self.font_jetbrains.family()}";
+                font-size: {self.font_jetbrains.pointSize()}pt;
             }}
             QComboBox QAbstractItemView::item {{
                 /* 下拉项样式 */
                 min-height: 25px;
                 padding: 5px;
-                font-family: "{self.custom_font.family()}";
-                font-size: {self.custom_font.pointSize()}pt;
+                font-family: "{self.font_jetbrains.family()}";
+                font-size: {self.font_jetbrains.pointSize()}pt;
             }}
             QComboBox::hover {{
                 background-color: {BACKCOLOR};
@@ -2543,8 +2516,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 selection-background-color: {BACKCOLOR};
                 selection-color: {FONTCOLOR};
                 min-height: 30px;
-                font-family: "{self.custom_font.family()}";
-                font-size: {self.custom_font.pointSize()}pt;
+                font-family: "{self.font_jetbrains.family()}";
+                font-size: {self.font_jetbrains.pointSize()}pt;
             }}
             QComboBox QAbstractItemView {{
                 /* 下拉列表样式 */
@@ -2552,15 +2525,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 color: {FONTCOLOR};
                 selection-background-color: {BACKCOLOR};
                 selection-color: {FONTCOLOR};
-                font-family: "{self.custom_font.family()}";
-                font-size: {self.custom_font.pointSize()}pt;
+                font-family: "{self.font_jetbrains.family()}";
+                font-size: {self.font_jetbrains.pointSize()}pt;
             }}
             QComboBox QAbstractItemView::item {{
                 /* 下拉项样式 */
                 min-height: 25px;
                 padding: 5px;
-                font-family: "{self.custom_font.family()}";
-                font-size: {self.custom_font.pointSize()}pt;
+                font-family: "{self.font_jetbrains.family()}";
+                font-size: {self.font_jetbrains.pointSize()}pt;
             }}
 
         """
@@ -2570,8 +2543,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 border: none;
                 color: {"rgb(255,255,255)"};
                 text-align: center;
-                font-family: "{self.custom_font_jetbrains_small.family()}";
-                font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
+                font-family: "{self.font_jetbrains_s.family()}";
+                font-size: {self.font_jetbrains_s.pointSize()}pt;
             }}
             /* 添加悬浮效果 
             QLabel:hover {{
@@ -2586,8 +2559,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 border: none;
                 color: {"rgb(255,255,255)"};
                 text-align: center;
-                font-family: "{self.custom_font_jetbrains_small.family()}";
-                font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
+                font-family: "{self.font_jetbrains_s.family()}";
+                font-size: {self.font_jetbrains_s.pointSize()}pt;
             }}
             QPushButton:hover {{
                 border: 1px solid {BACKCOLOR};
@@ -2602,8 +2575,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 color: {"rgb(255,0,0)"};/* 检测到新版本设置字体颜色为红色 */
                 text-align: center;
                 background-color: {BACKCOLOR};
-                font-family: "{self.custom_font_jetbrains_small.family()}";
-                font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
+                font-family: "{self.font_jetbrains_s.family()}";
+                font-size: {self.font_jetbrains_s.pointSize()}pt;
             }}
             QPushButton:hover {{
                 border: 1px solid {BACKCOLOR};
@@ -2615,8 +2588,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             border: none;
             background-color: {GRAY};
             color: {FONTCOLOR};
-            font-family: {self.custom_font_jetbrains_small.family()};
-            font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
+            font-family: {self.font_jetbrains_s.family()};
+            font-size: {self.font_jetbrains_s.pointSize()}pt;
             
         """
         # 设置左上侧文件浏览区域样式
@@ -2684,8 +2657,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     text-align: center;
                     padding: 3px;
                     margin: 1px;
-                    font-family: "{self.custom_font.family()}";
-                    font-size: {self.custom_font.pointSize()}pt;
+                    font-family: "{self.font_jetbrains.family()}";
+                    font-size: {self.font_jetbrains.pointSize()}pt;
                 }}
                 /* 设置空列头的背景色 */
                 QTableWidget::verticalHeader {{
@@ -2738,8 +2711,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     background-color: rgb( 58, 71, 80);
                     color: {WHITE};
                     text-align: center;
-                    font-family: "{self.custom_font.family()}";
-                    font-size: {self.custom_font.pointSize()}pt;
+                    font-family: "{self.font_jetbrains.family()}";
+                    font-size: {self.font_jetbrains.pointSize()}pt;
                 }}
                 QPushButton:hover {{
                     border: 1px solid {BACKCOLOR};
@@ -2794,8 +2767,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     selection-background-color: {BACKCOLOR};
                     selection-color: {WHITE};
                     min-height: 30px;
-                    font-family: "{self.custom_font.family()}";
-                    font-size: {self.custom_font.pointSize()}pt;
+                    font-family: "{self.font_jetbrains.family()}";
+                    font-size: {self.font_jetbrains.pointSize()}pt;
                 }}
                 QComboBox QAbstractItemView {{
                     /* 下拉列表样式 */
@@ -2803,15 +2776,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     color: {WHITE};
                     selection-background-color: {WHITE};
                     selection-color: {BLACK};
-                    font-family: "{self.custom_font.family()}";
-                    font-size: {self.custom_font.pointSize()}pt;
+                    font-family: "{self.font_jetbrains.family()}";
+                    font-size: {self.font_jetbrains.pointSize()}pt;
                 }}
                 QComboBox QAbstractItemView::item {{
                     /* 下拉项样式 */
                     min-height: 25px;
                     padding: 5px;
-                    font-family: "{self.custom_font.family()}";
-                    font-size: {self.custom_font.pointSize()}pt;
+                    font-family: "{self.font_jetbrains.family()}";
+                    font-size: {self.font_jetbrains.pointSize()}pt;
                 }}
                 QComboBox::hover {{
                     background-color: {BACKCOLOR};
@@ -2828,8 +2801,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     selection-background-color: {BACKCOLOR};
                     selection-color: {WHITE};
                     min-height: 30px;
-                    font-family: "{self.custom_font.family()}";
-                    font-size: {self.custom_font.pointSize()}pt;
+                    font-family: "{self.font_jetbrains.family()}";
+                    font-size: {self.font_jetbrains.pointSize()}pt;
                 }}
                 QComboBox QAbstractItemView {{
                     /* 下拉列表样式 */
@@ -2837,30 +2810,30 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     color: {BLACK};
                     selection-background-color: {BACKCOLOR_};
                     selection-color: {WHITE};
-                    font-family: "{self.custom_font.family()}";
-                    font-size: {self.custom_font.pointSize()}pt;
+                    font-family: "{self.font_jetbrains.family()}";
+                    font-size: {self.font_jetbrains.pointSize()}pt;
                 }}
                 QComboBox QAbstractItemView::item {{
                     /* 下拉项样式 */
                     min-height: 25px;
                     padding: 5px;
-                    font-family: "{self.custom_font.family()}";
-                    font-size: {self.custom_font.pointSize()}pt;
+                    font-family: "{self.font_jetbrains.family()}";
+                    font-size: {self.font_jetbrains.pointSize()}pt;
                 }}
             """
             statusbar_label_style = f"""
                 border: none;
                 color: {WHITE};
-                font-family: {self.custom_font_jetbrains_small.family()};
-                font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
+                font-family: {self.font_jetbrains_s.family()};
+                font-size: {self.font_jetbrains_s.pointSize()}pt;
             """
             statusbar_button_style = f"""
                 QPushButton {{
                     background-color: {BLACK};
                     color: {WHITE};
                     text-align: center;
-                    font-family: "{self.custom_font_jetbrains_small.family()}";
-                    font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
+                    font-family: "{self.font_jetbrains_s.family()}";
+                    font-size: {self.font_jetbrains_s.pointSize()}pt;
                 }}
                 QPushButton:hover {{
                     border: 1px solid {BACKCOLOR};
@@ -2873,8 +2846,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     background-color: {"rgb(245,108,108)"};
                     color: {WHITE};
                     text-align: center;
-                    font-family: "{self.custom_font_jetbrains_small.family()}";
-                    font-size: {self.custom_font_jetbrains_small.pointSize()}pt;
+                    font-family: "{self.font_jetbrains_s.family()}";
+                    font-size: {self.font_jetbrains_s.pointSize()}pt;
                 }}
                 QPushButton:hover {{
                     border: 1px solid {BACKCOLOR};
@@ -3286,10 +3259,12 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             else: # 统计每列行索引需要移动step 
                 step_row = [sum(1 for item in selected_items if item.column() == i) 
                             for i in range(max((item.column() for item in selected_items), default=-1) + 1)]
+            
             # 清除所有选中的项; 初始化用于存储文件路径和文件索引的列表，初始化最大最小行索引
             self.RB_QTableWidget0.clearSelection() 
             row_min, row_max = 0, self.RB_QTableWidget0.rowCount() - 1
             file_path_list, file_index_list = [], []
+
             # 遍历选中项，移动到相应位置，返回选中文件路径列表和索引列表
             for item in selected_items: 
                 # 获取表格列/行索引，然后通过判断按键类型key_type来控制选中的单元格上移和下移的位置 
@@ -3300,6 +3275,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     row_index += step_row[col_index] # 默认使用下移方案【同时也是按下space键的功能】
                 else:
                     row_index += step_row[col_index] # 默认使用下移方案【同时也是按下space键的功能】
+
                 # 获取选中项文件完整路径列表. 
                 # 1.先判断选中项移动位置是否超出表格范围，若超出则抛出异常，退出函数
                 # 2.未超出表格范围，移动到正确的位置后，收集完整路径保存到列表中
@@ -3309,21 +3285,23 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                         new_item.setSelected(True)
                         if (full_path := self.paths_list[col_index][row_index]) and os.path.isfile(full_path):  
                             file_path_list.append(full_path)
-                        else: # 备用低效方案，拼接各个组件获取完整路径
+                        # 备用低效方案，拼接各个组件获取完整路径
+                        else: 
                             if(full_path := self.get_single_full_path(row_index, col_index)):
                                 file_path_list.append(full_path)
                     else:
                         raise Exception(f"new_item is None")
                 else:
                     raise Exception(f"当前计算的行索引：{row_index}超出表格范围【{row_min}~{row_max}】")
+
                 # 获取选中项文件索引列表.
                 # 1. 先检查最大行索引image_index_max是否有效，然后再获取当前图片张数
                 self.image_index_max = self.image_index_max if self.image_index_max else [self.RB_QTableWidget0.rowCount()] * self.RB_QTableWidget0.columnCount()
                 index = f"{row_index+1}/{self.image_index_max[col_index]}" if row_index + 1 <= self.image_index_max[col_index] else "None" 
                 file_index_list.append(index)
-            # 将选中的单元格滚动到视图中间位置
+
+            # 将选中的单元格滚动到视图中间位置; 返回文件路径列表和当前图片张数列表
             self.RB_QTableWidget0.scrollToItem(new_item, QAbstractItemView.PositionAtCenter)
-            # 返回文件路径列表和当前图片张数列表
             return file_path_list, file_index_list  
         except Exception as e:
             print(f"[press_space_or_b_get_selected_file_list]-->error--处理键盘按下事件报错: {e}")
@@ -3401,14 +3379,13 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         show_message_box("刷新表格&清除缓存-", "提示", 500)
         # 清除icon缓存
         IconCache.clear_cache()
-        # 清除指定后缀缓存
-        clear_cache_files(base_path=None, file_types=[".jpg", ".png", ".json"])
         # 重新更新表格
         self.update_RB_QTableWidget0()
 
     @log_error_decorator(tips="清除日志文件以及zip缓存文件")
     def clear_log_and_cache_files(self):
         """清除日志文件以及zip缓存文件"""
+        from src.utils.delete import clear_log_files, clear_cache_files
         # 使用工具函数清除日志文件以及zip等缓存
         clear_log_files()
         clear_cache_files(base_path=None, file_types=[".zip",".json",".ini"])
@@ -3473,10 +3450,14 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         函数功能说明: 调用高通工具后台解析图片的exif信息
         """
         try:
-            # 获取当前选中的文件类型
-            selected_option = self.RT_QComboBox.currentText()
-            # 创建并显示自定义对话框,传入图片列表
-            dialog = Qualcom_Dialog(selected_option)
+            # 导入高通工具自定义对话框的类
+            from src.components.custom_qdialog_LinkQualcomAebox import Qualcom_Dialog   
+
+            # 创建自定义对话框, 传入地址栏文件夹路径，设置图标
+            select_ = str(self.RT_QComboBox.currentText())
+            dialog = Qualcom_Dialog(select_, self)
+            dialog.setWindowIcon(QIcon(self.main_ui_icon))
+
             # 显示对话框
             if dialog.exec_() == QDialog.Accepted:
                 # 记录时间
@@ -3533,10 +3514,14 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         函数功能说明: 调用联发科工具后台解析图片的exif信息
         """
         try:
-            # 获取当前选中的文件类型
-            selected_option = self.RT_QComboBox.currentText()
-            # 创建并显示自定义对话框,传入图片列表
-            dialog = MTK_Dialog(selected_option)
+            # 导入MTK工具自定义对话框的类
+            from src.components.custom_qdialog_LinkMTKAebox import MTK_Dialog
+
+            # 创建自定义对话框, 传入地址栏文件夹路径，设置图标
+            select_ = str(self.RT_QComboBox.currentText())
+            dialog = MTK_Dialog(select_, self)
+            dialog.setWindowIcon(QIcon(self.main_ui_icon))
+
             # 显示对话框
             if dialog.exec_() == QDialog.Accepted:
                 # 记录时间
@@ -3593,10 +3578,14 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         函数功能说明: 调用展锐工具后台解析图片的exif信息
         """
         try:
-            # 获取当前选中的文件类型
-            selected_option = self.RT_QComboBox.currentText()
-            # 创建并显示自定义对话框,传入图片列表
-            dialog = Unisoc_Dialog(selected_option)
+            # 导入展锐工具自定义对话框的类
+            from src.components.custom_qdialog_LinkUnisocAebox import Unisoc_Dialog 
+
+            # 创建自定义对话框, 传入地址栏文件夹路径，设置图标
+            select_ = str(self.RT_QComboBox.currentText())
+            dialog = Unisoc_Dialog(select_, self)
+            dialog.setWindowIcon(QIcon(self.main_ui_icon))
+            
             # 显示对话框
             if dialog.exec_() == QDialog.Accepted:
                 # 记录起始时间
@@ -3913,15 +3902,31 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     @log_error_decorator(tips="创建视频播放器的统一方法")
     def create_video_player(self, selected_file_paths, image_indexs):
         """创建视频播放器的统一方法"""
-        self.video_player = VideoWall(selected_file_paths)
-        self.video_player.setWindowTitle("多视频播放程序")
-        self.video_player.setWindowFlags(Qt.Window) 
-        # 设置窗口图标
-        icon_path = (self.icon_path / "video_icon.ico").as_posix()
-        self.video_player.setWindowIcon(QIcon(icon_path))
-        self.video_player.closed.connect(self.on_video_player_closed)
-        self.video_player.show()
-        self.hide()
+
+        if True:
+            # 使用vlc播放器打开视频文件
+            from src.view.sub_compare_vlc_video_view import VideoWall
+            self.video_player = VideoWall()
+            self.video_player.add_video_list(selected_file_paths)
+            # self.video_player.closed.connect(self.on_video_player_closed)
+            self.video_player.showFullScreen()
+            # self.hide()
+            return
+
+        if True:
+            # 使用opencv方式打开视频
+            from src.view.sub_compare_video_view import VideoWall                
+            self.video_player = VideoWall(selected_file_paths)
+            self.video_player.setWindowTitle("多视频播放程序")
+            self.video_player.setWindowFlags(Qt.Window) 
+            # 设置窗口图标
+            icon_path = (self.icon_path / "video_icon.ico").as_posix()
+            self.video_player.setWindowIcon(QIcon(icon_path))
+            self.video_player.closed.connect(self.on_video_player_closed)
+            self.video_player.show()
+            self.hide()
+            return
+
 
     @log_error_decorator(tips="打开单文件重命名功能子界面")
     def open_sigle_file_rename_tool(self, current_folder, selected_items):
@@ -3990,6 +3995,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # 删除引用以释放资源
             self.video_player.deleteLater()
             self.video_player = None
+            gc.collect()
         # 显示主窗口
         self.show() 
         # 恢复第一次按下键盘空格键或B键

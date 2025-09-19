@@ -9,6 +9,7 @@
 
 """导入python内置模块"""
 import os
+import sys
 import json
 
 """导入python第三方模块"""
@@ -21,16 +22,14 @@ from PyQt5.QtWidgets import (QLabel, QComboBox, QLineEdit, QPushButton, QDialogB
 
 """导入项目自定义模块"""
 from src.utils.stitchimg import stitch_images  # 导入拼接图片工具
-from src.common.manager_font import SingleFontManager  # 导入字体管理器
+from src.common.font import JetBrainsMonoLoader # 导入字体管理器
 from src.components.custom_qMbox_showinfo import show_message_box  # 导入消息框类
 
 """设置本项目的入口路径,全局变量BasePath"""
-# 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
-if True:
-    BasePath = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# 方法二：直接读取主函数的路径，获取项目入口目录,只适用于hiviewer.py同级目录下的py文件调用
-if False: # 暂时禁用，不支持单独运行该模块
-    BasePath = os.path.dirname(os.path.abspath(sys.argv[0]))    
+from pathlib import Path
+# 直接读取主函数的路径，获取项目入口目录
+BasePath = Path(sys.argv[0]).parent.as_posix()
+SAVEPATH = Path(BasePath, "cache", "test_settings.json")
 
 
 class ProblemsDialog(QDialog):
@@ -57,21 +56,17 @@ class ProblemsDialog(QDialog):
 
     def init_ui(self):
         """初始化对话框UI"""
-
-        # 设置窗口标题
+        # 设置窗口标题, 设置窗口大小
         self.setWindowTitle("Camera Test 问题点记录")
-        # 设置窗口大小
         self.setFixedSize(1200, 600)  # 设置对话框大小
         
         # 设置json保存路径
-        self.save_path = os.path.join(BasePath, "cache", "test_settings.json")
+        self.save_path = SAVEPATH
         
-        # 初始化字体管理器，标签组件使用;设置全局变量，定义项目基础路径
-        self.font_manager_jetbrains_big = (self.parent_SubMainWindow.font_manager_j12 if self.parent_SubMainWindow and self.parent_SubMainWindow.font_manager_j12 
-                                           else SingleFontManager.get_font(size=12, font_path=os.path.join(BasePath, "resource", "fonts", "JetBrainsMapleMono_Regular.ttf")))
-        self.font_manager_jetbrains_small = (self.parent_SubMainWindow.font_manager_j10 if self.parent_SubMainWindow and self.parent_SubMainWindow.font_manager_j10 
-                                             else SingleFontManager.get_font(size=10, font_path=os.path.join(BasePath, "resource", "fonts", "JetBrainsMapleMono_Regular.ttf")))
-        
+        # 初始化字体管理器
+        self.font_manager_jetbrains_big = JetBrainsMonoLoader.font(12)
+        self.font_manager_jetbrains_small = JetBrainsMonoLoader.font(10)
+
         # 创建主布局
         self.layout = QVBoxLayout(self)
 

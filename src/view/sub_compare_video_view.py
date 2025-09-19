@@ -9,7 +9,6 @@ import threading
 
 """导入python第三方模块"""
 import cv2
-from cv2 import VideoCapture
 import numpy as np
 from PyQt5.QtGui import QImage, QPixmap, QCursor, QKeySequence, QIcon, QMovie, QKeySequence
 from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal
@@ -19,16 +18,12 @@ from PyQt5.QtWidgets import (
     QSpinBox, QScrollArea, QSizePolicy, QDoubleSpinBox, QGridLayout, QMessageBox)
 
 """导入自定义模块"""
-from src.common.manager_font import SingleFontManager 
+from src.common.font import JetBrainsMonoLoader
 from src.common.manager_color_exif import load_color_settings 
 
-"""设置本项目的入口路径,全局变量BasePath"""
-# 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
-if True:
-    BasePath = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# 方法二：直接读取主函数的路径，获取项目入口目录,只适用于hiviewer.py同级目录下的py文件调用
-if False: # 暂时禁用，不支持单独运行该模块
-    BasePath = os.path.dirname(os.path.abspath(sys.argv[0]))  
+"""设置本项目的入口路径, 以及图标根目录"""
+BasePath = pathlib.Path(sys.argv[0]).parent
+DIRICON = BasePath / "resource" / "icons"
 
 
 """"自定义类"""
@@ -361,8 +356,8 @@ class VideoPlayer(QWidget):
         self.video_path = video_path
 
         # 初始化字体管理器
-        self.font_manager = SingleFontManager.get_font(10)
-        self.font_manager_small = SingleFontManager.get_font(10)
+        self.font_manager = JetBrainsMonoLoader.font(12)
+        self.font_manager_small = JetBrainsMonoLoader.font(10)
         
         try:
             # 初始化帧读取线程，使用信号槽代替队列
@@ -745,14 +740,14 @@ class VideoPlayer(QWidget):
 
         # 控制按钮和设置
         self.play_button = QPushButton(self)
-        play_icon_path = os.path.abspath(os.path.join(BasePath, "resource", "icons", "play.ico"))
+        play_icon_path = (DIRICON / "play.ico").as_posix()
         self.play_button.setIcon(QIcon(play_icon_path))  # 设置播放图标
         self.play_button.setToolTip("播放/暂停")
         self.play_button.setStyleSheet("border: none;")  # 去掉按钮边框
         self.play_button.clicked.connect(self.play_pause)
 
         self.replay_button = QPushButton(self)
-        replay_icon_path = os.path.abspath(os.path.join(BasePath, "resource", "icons", "replay.ico"))
+        replay_icon_path = (DIRICON / "replay.ico").as_posix()
         self.replay_button.setIcon(QIcon(replay_icon_path))  # 设置重播图标
         self.replay_button.setStyleSheet("border: none;")    # 去掉按钮边框
         self.replay_button.setToolTip("重播")
@@ -778,21 +773,21 @@ class VideoPlayer(QWidget):
         # 旋转按钮
         self.rotate_left_button = QPushButton(self)
         self.rotate_left_button.setStyleSheet("border: none;")
-        rotate_left_icon_path = os.path.abspath(os.path.join(BasePath, "resource", "icons", "left.ico"))
+        rotate_left_icon_path = (DIRICON / "left.ico").as_posix()
         self.rotate_left_button.setToolTip("左转90°")
         self.rotate_left_button.setIcon(QIcon(rotate_left_icon_path))  # 设置左转图标
         self.rotate_left_button.clicked.connect(self.rotate_left)
 
         self.rotate_right_button = QPushButton(self)
         self.rotate_right_button.setStyleSheet("border: none;")
-        rotate_right_icon_path = os.path.abspath(os.path.join(BasePath, "resource", "icons", "right.ico"))
+        rotate_right_icon_path = (DIRICON / "right.ico").as_posix()
         self.rotate_right_button.setToolTip("右转90°")
         self.rotate_right_button.setIcon(QIcon(rotate_right_icon_path))  # 设置右转图标
         self.rotate_right_button.clicked.connect(self.rotate_right)
 
         # 添加 "main" 按钮
         self.main_button = QPushButton(self)
-        main_icon_path = os.path.abspath(os.path.join(BasePath, "resource", "icons", "base.ico"))
+        main_icon_path = (DIRICON / "base.ico").as_posix()
         self.main_button.setIcon(QIcon(main_icon_path))  # 设置主图标
         self.main_button.setToolTip("设置为基准视频，计算并设置其他视频的跳帧数")
         self.main_button.setStyleSheet("border: none;")
@@ -1007,12 +1002,12 @@ class VideoPlayer(QWidget):
             self.is_paused = False
             self.frame_reader.resume()
             self.last_update_time = time.time()  # 重置时间基准
-            play_icon_path = os.path.abspath(os.path.join(BasePath, "resource", "icons", "play.ico"))
+            play_icon_path = (DIRICON / "play.ico").as_posix()
             self.play_button.setIcon(QIcon(play_icon_path))
         else:
             self.is_paused = True
             self.frame_reader.pause()
-            pause_icon_path = os.path.abspath(os.path.join(BasePath, "resource", "icons", "pause.ico"))
+            pause_icon_path = (DIRICON / "pause.ico").as_posix()
             self.play_button.setIcon(QIcon(pause_icon_path))
 
     def replay(self):
@@ -1100,7 +1095,7 @@ class VideoPlayer(QWidget):
         # 创建 QLabel 用于显示 GIF
         self.progress_label = QLabel(self.progress_widget)
         # 路径
-        gif_path = os.path.abspath(os.path.join(BasePath, "resource", "icons", "ncat.gif"))
+        gif_path = (DIRICON / "ncat.ico").as_posix()
         self.movie = QMovie(gif_path)
         
         # 设置GIF显示大小
@@ -1328,12 +1323,6 @@ class VideoWall(QWidget):
     def __init__(self, video_list):
         super().__init__()
         self.setWindowTitle("多视频播放器")
-
-        # 设置程序窗口图标
-        # 根据 icon_abs 选择路径
-        icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icon", "video.ico")
-        self.setWindowIcon(QIcon(icon_path))
-
         self.setAcceptDrops(True)
         self.init_ui()
         self.players = []
@@ -1623,7 +1612,7 @@ class VideoWall(QWidget):
                             player.last_update_time = time.time()  # 重置时间基准
                             
                             # 更新播放/暂停按钮图标
-                            play_icon_path = os.path.abspath(os.path.join(BasePath, "resource", "icons", "play.ico"))   
+                            play_icon_path = (DIRICON / "play.ico").as_posix()
                             player.play_button.setIcon(QIcon(play_icon_path))
                         
                         # 恢复视频读取器运行
@@ -1760,19 +1749,6 @@ def main():
     video_list = [
         'D:/Tuning/M5151/0_picture/20241121_FT/1122-C3N后置GL四供第二轮FT（小米之家+小米园区）/video/四供/VID_20241122_100543.mp4',
         'D:/Tuning/M5151/0_picture/20241121_FT/1122-C3N后置GL四供第二轮FT（小米之家+小米园区）/video/2024_11_22_15_54_IMG_4233.MOV'
-    ]
-    video_list1 = [
-        'D:/Tuning/M5151/0_picture/20241105_FT/1105-C3N后置GL四供第一轮FT（宜家+日月光）/Video\\iPhone\\IMG_2484.MOV', 
-        'D:/Tuning/M5151/0_picture/20241105_FT/1105-C3N后置GL四供第一轮FT（宜家+日月光）/Video\\14U\\VID_20241105_185158_DOLBY.mp4', 
-        'D:/Tuning/M5151/0_picture/20241105_FT/1105-C3N后置GL四供第一轮FT（宜家+日月光）/Video\\C3N\\VID_20241105_125627.mp4', 
-        'D:/Tuning/M5151/0_picture/20241105_FT/1105-C3N后置GL四供第一轮FT（宜家+日月光）/Video\\M19A\\VID_20241105_185056.mp4', 
-        'D:/Tuning/M5151/0_picture/20241105_FT/1105-C3N后置GL四供第一轮FT（宜家+日月光）/Video\\一供\\VID_20241105_185012.mp4']
-    video_list_info = [
-        '1/1',
-        '1/1',
-        '1/1',
-        '1/1',
-        '1/1'
     ]
     
     app = QApplication(sys.argv)

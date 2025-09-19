@@ -2,54 +2,39 @@
 import os
 import sys
 import json
-from PyQt5.QtWidgets import (QApplication, QLabel, QDialogButtonBox, QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog)
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QIcon
-
-# 新增运行模式判断，是单独调试该模块，还是被其它模块调用
-is_standalone = os.path.basename(sys.argv[0]).lower() == "custom_qdialog_LinkUnisocAebox.py"
-# 单独调试该模块,将项目根目录添加到sys.path
-if is_standalone:
-    # 添加项目根目录到系统路径
-    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-
+from PyQt5.QtWidgets import QApplication, QLabel, QDialogButtonBox, QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog
 
 """导入自定义的模块"""
-from src.common.manager_font import SingleFontManager
-from src.utils.aebox_link import launch_aebox,urlencode_folder_path,get_api_data
-
+from src.utils.aebox_link import launch_aebox, urlencode_folder_path, get_api_data
+from src.common.font import JetBrainsMonoLoader 
 
 """设置本项目的入口路径,全局变量BasePath"""
-# 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
-if True:
-    BasePath = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from pathlib import Path
+# 方法一：手动找寻上级目录，获取项目入口路径
+BasePath = Path(__file__).parent.parent.parent.as_posix()
 # 方法二：直接读取主函数的路径，获取项目入口目录,只适用于hiviewer.py同级目录下的py文件调用
-if False: # 暂时禁用，不支持单独运行该模块
-    BasePath = os.path.dirname(os.path.abspath(sys.argv[0]))    
+BasePath = Path(sys.argv[0]).parent.as_posix()
+# 设置保存的json路径
+JsonPath = Path(BasePath, "cache", "Unisoc_exif_settings.json").as_posix()
 
 class Unisoc_Dialog(QDialog):
     """自定义对话框类, 用于输入信息"""
-    def __init__(self, images_path_list=None, parent=None):
+    def __init__(self, dir_path=None, parent=None):
         super().__init__(parent)
-
-        # 初始化对话框UI
-        self.init_ui()
-
-        # 设置信号槽
-        self.setShortcut()
+        # 初始化UI组件
+        self.init_ui(dir_path)
 
         # 设置是否加载设置
         self.load_settings()
 
-        # 高通工具、AEBOX工具、图片文件夹等初始化状态检查
+        # 三个输入框状态检查
         self.test_button1()
         self.test_button3()
         self.test_connection()
 
-        # 根据传入的图片路径列表设置关联图片下拉框；
-        if images_path_list and os.path.exists(images_path_list):
-            # 优先选择传入的图片文件夹路径
-            self.text_input3.setText(images_path_list)
+        # 设置信号槽
+        self.setShortcut()
 
 
     def setShortcut(self):
@@ -71,35 +56,33 @@ class Unisoc_Dialog(QDialog):
     def get_data(self):
         return {
             "Unisoc工具路径": self.text_input1.text(),
-            "AEBOX工具路径": self.text_input2.text(),  # 新增数据项
+            "AEBOX工具路径": self.text_input2.text(), 
             "Image文件夹路径": self.text_input3.text(),
         }
 
-    def init_ui(self):
+    def init_ui(self, dir_path):
         """初始化对话框UI"""
-
-        # 设置窗口标题，窗口大小，窗口图标
+        # 设置窗口标题，窗口大小，(窗口图标在初始化对话框时手动设置)
         self.setWindowTitle("Unisoc(IQT)工具解析图片接口")
         self.setFixedSize(1200, 300)
-        self.setWindowIcon(QIcon(os.path.join(BasePath, "resource", "icons", "viewer_3.ico")))
-        
+        # self.setWindowIcon(QIcon())
+
         # 设置保存的json路径
-        self.json_path = os.path.join(BasePath, "cache", "Unisoc_exif_settings.json")
+        self.json_path = JsonPath
 
-        # 初始化字体管理器
-        self.font_path_jetbrains = os.path.join(BasePath, "resource", "fonts", "JetBrainsMapleMono_Regular.ttf")
-        self.font_manager_jetbrains_big = SingleFontManager.get_font(size=12, font_path=self.font_path_jetbrains) 
-        self.font_manager_jetbrains_small = SingleFontManager.get_font(size=10, font_path=self.font_path_jetbrains)
+        # 设置传入的地址栏文件夹路径
+        self.dir_path = dir_path
 
-        self.setFont(self.font_manager_jetbrains_big)
-
+        # 字体设置
+        self.font_manager_jetbrains_big =  JetBrainsMonoLoader.font(12)
+        self.font_manager_jetbrains_small = JetBrainsMonoLoader.font(9,False,True)
+        
         # 创建主布局
         self.layout = QVBoxLayout(self)
 
         # 统一的下拉框高度
         combo_box_height = 35
 
-        
         # 第一行：标签 + 输入框 + 加载按钮 + 状态检查按钮 高通工具路径🚀
         layout_one = QHBoxLayout()
         self.label1 = QLabel("Unisoc工具路径:", self)
@@ -107,7 +90,7 @@ class Unisoc_Dialog(QDialog):
         self.text_input1 = QLineEdit(self)
         self.text_input1.setFixedHeight(combo_box_height)  # 设置下拉框高度
         self.text_input1.setFont(self.font_manager_jetbrains_small)
-        self.text_input1.setPlaceholderText(r"如:C:\ViviMagic_TOOL_V1.5_R1.W25.2502\plugins\3aTool\IQT.exe")  # 设置提示文本
+        self.text_input1.setPlaceholderText(r"如:C:/ViviMagic_TOOL_V1.5_R1.W25.2502/plugins/3aTool/IQT.exe")  # 设置提示文本
         self.load_button = QPushButton("加载", self)
         self.load_button.setFont(self.font_manager_jetbrains_big)
         self.load_button.setFixedHeight(combo_box_height)  # 设置下拉框高度
@@ -122,9 +105,7 @@ class Unisoc_Dialog(QDialog):
         layout_one.setStretch(0, 1)   # label1 的比例
         layout_one.setStretch(1, 10)  # combo_box1 的比例
         layout_one.setStretch(2, 1)   # load_button 的比例
-        # layout_one.setStretch(3, 1)  
         self.layout.addLayout(layout_one)
-
 
         # 第二行：标签 + 输入框 + 加载按钮+状态检查按钮  AEBOX工具路径
         layout_two = QHBoxLayout()
@@ -133,7 +114,7 @@ class Unisoc_Dialog(QDialog):
         self.text_input2 = QLineEdit(self)
         self.text_input2.setFixedHeight(combo_box_height)
         self.text_input2.setFont(self.font_manager_jetbrains_small)
-        self.text_input2.setPlaceholderText(r"如:D:\Image_process\aebox_utrl\aebox\aebox.exe")
+        self.text_input2.setPlaceholderText(r"如:D:/Image_process/aebox_utrl/aebox/aebox.exe")
         self.load_aebox_button = QPushButton("加载", self)
         self.load_aebox_button.setFont(self.font_manager_jetbrains_big)
         self.load_aebox_button.setFixedHeight(combo_box_height)
@@ -148,9 +129,7 @@ class Unisoc_Dialog(QDialog):
         layout_two.setStretch(0, 1)
         layout_two.setStretch(1, 10)
         layout_two.setStretch(2, 1)
-        # layout_two.setStretch(3, 1)
         self.layout.addLayout(layout_two)
-
 
         # 第三行：标签 + 输入框 + 加载按钮+状态检查按钮  图片文件夹
         layout_three = QHBoxLayout()
@@ -174,12 +153,14 @@ class Unisoc_Dialog(QDialog):
         layout_three.setStretch(0, 1)   # label2 的比例
         layout_three.setStretch(1, 10)  # combo_box2 的比例
         layout_three.setStretch(2, 1)   # load_images_button 的比例
-        # layout_three.setStretch(3, 1) 
         self.layout.addLayout(layout_three)
 
         # 添加确认和取消按钮
         self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        self.button_box.setFont(self.font_manager_jetbrains_big)
+        self.button_box.button(QDialogButtonBox.Ok).setFont(self.font_manager_jetbrains_big)
+        self.button_box.button(QDialogButtonBox.Ok).setFixedHeight(combo_box_height)
+        self.button_box.button(QDialogButtonBox.Cancel).setFont(self.font_manager_jetbrains_big)
+        self.button_box.button(QDialogButtonBox.Cancel).setFixedHeight(combo_box_height)
         self.layout.addWidget(self.button_box)
 
 
@@ -366,11 +347,17 @@ class Unisoc_Dialog(QDialog):
         try:
             with open(self.json_path, 'r', encoding='utf-8') as f:
                 settings = json.load(f)
-
+                
                 # 恢复上一次打开的信息
                 self.text_input1.setText(settings.get("展锐IQT工具路径", ""))
                 self.text_input2.setText(settings.get("AEBOX工具路径", ""))
+                
                 self.text_input3.setText(settings.get("Image文件夹路径", ""))
+                # 根据传入的地址栏路径设置关联图片下拉框；
+                if self.dir_path and os.path.exists(self.dir_path):
+                    # 优先选择传入的图片文件夹路径
+                    self.text_input3.setText(self.dir_path)
+                
             print("Unisoc_Dialog类_配置已成功读取")
         except Exception as e:
             print(f"Unisoc_Dialog类_读取配置失败: {e}")

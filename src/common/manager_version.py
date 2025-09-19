@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import time
 from pathlib import Path
-from src.common.decorator import CC_TimeDec, log_performance_decorator      # 导入自定义装饰器函数 
+from src.common.decorator import log_performance_decorator      # 导入自定义装饰器函数 
 
 @log_performance_decorator(tips="读取版本号", log_args=False, log_result=False)
 def version_init(VERSION="release-v2.3.2"):

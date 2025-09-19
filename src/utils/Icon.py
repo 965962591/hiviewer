@@ -305,7 +305,6 @@ class IconCache:
             pixmap = pixmap.scaled(size[0], size[1], QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
             
             return QIcon(pixmap)
-            
         except Exception as e:
             print(f"get_video_thumbnail()-获取视频缩略图失败--{video_path}: {str(e)}")
             

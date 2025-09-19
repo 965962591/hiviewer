@@ -7,35 +7,27 @@ from PyQt5.QtGui import QIcon, QDesktopServices
 from PyQt5.QtCore import QUrl, Qt
 
 """导入自定义模块,主函数调用"""
-from src.common.manager_font import SingleFontManager
+from src.common.font import JetBrainsMonoLoader
 from src.utils.update import check_update
 from src.common.manager_version import version_init
 
-"""
-在本项目结构中正确导入自定义模块的方法：
 
-1. 使用相对路径, 符合Python模块导入规范:
-from Custom_Font_class import SingleFontManager
-from update import check_update
-
-2. 添加项目根目录到系统路径:
-import sys
-# 添加项目根目录到系统路径
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from src.utils.Custom_Font_class import SingleFontManager
-from src.utils.update import check_update
-
-"""
-
-
-"""设置本项目的入口路径"""
-# 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
-if True:
-    BasePath = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+"""设置本项目的入口路径,全局变量BasePath"""
+from pathlib import Path
+# 方法一：手动找寻上级目录，获取项目入口路径
+BasePath = Path(__file__).parent.parent.parent.as_posix()
 # 方法二：直接读取主函数的路径，获取项目入口目录,只适用于hiviewer.py同级目录下的py文件调用
-if False: # 暂时禁用，不支持单独运行该模块
-    BasePath = os.path.dirname(os.path.abspath(sys.argv[0]))
-    
+BasePath = Path(sys.argv[0]).parent.as_posix()
+
+# 设置md文件路径
+USERPATH = Path(BasePath, "resource", "docs", "User_Manual.md").as_posix()
+VWESIONPATH = Path(BasePath, "resource", "docs", "Version_Updates.md").as_posix()
+
+# 设置图标路径
+ICONPATH = Path(BasePath, "resource", "icons", "about.ico").as_posix()
+ICONLABELPATH = Path(BasePath, "resource", "icons", "viewer_3.ico").as_posix()
+
+
 
 class AboutDialog(QDialog):
     def __init__(self, md_path_user=None, md_path_version=None):
@@ -43,12 +35,12 @@ class AboutDialog(QDialog):
 
         # 设置使用说明markdown文件，备用文件
         if not md_path_user or not os.path.exists(md_path_user):
-            md_path_user = os.path.join(BasePath, "resource", "docs", "User_Manual.md")
+            md_path_user = USERPATH
         self.User_Manual_Mdpath = md_path_user
 
         # 设置版本更新markdown文件
         if not md_path_version or not os.path.exists(md_path_version):
-            md_path_version = os.path.join(BasePath, "resource", "docs", "Version_Updates.md")
+            md_path_version = VWESIONPATH
         self.Version_Update_Mdpath = md_path_version
         
         # 设置默认版本号，并从version.ini配置文件中读取当前最新的版本号
@@ -72,9 +64,8 @@ class AboutDialog(QDialog):
         
         # 创建一个垂直布局，用于放置图标和版本号
         self.icon_layout = QVBoxLayout()
-        self.icon_label = QLabel() # 放置图标
-        icon_path = os.path.join(BasePath, "resource", "icons", "viewer_3.ico")
-        self.icon_label.setPixmap(QIcon(icon_path).pixmap(108, 108))
+        self.icon_label = QLabel()
+        self.icon_label.setPixmap(QIcon(ICONLABELPATH).pixmap(108, 108))
         self.icon_layout.addWidget(self.icon_label)
         self.icon_label.setAlignment(Qt.AlignCenter)
         self.main_layout.addLayout(self.icon_layout)
@@ -140,8 +131,7 @@ class AboutDialog(QDialog):
         """设置窗口标题组件和样式表"""
         # 设置标题和图标
         self.setWindowTitle("关于")
-        icon_path = os.path.join(BasePath, "resource", "icons", "about.ico")
-        self.setWindowIcon(QIcon(icon_path))
+        self.setWindowIcon(QIcon(ICONPATH))
 
         # 获取鼠标所在屏幕，并根据当前屏幕分辨率自适应界面大小
         screen = QtWidgets.QApplication.desktop().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
@@ -151,9 +141,9 @@ class AboutDialog(QDialog):
         self.resize(self.width, self.height)
         
         # 设置图标下的标题和描述信息的字体
-        font_manager_10 = SingleFontManager.get_font(10)
-        font_manager_12 = SingleFontManager.get_font(12)
-        font_manager_20 = SingleFontManager.get_font(20)
+        font_manager_10 = JetBrainsMonoLoader.font(10)
+        font_manager_12 = JetBrainsMonoLoader.font(12)
+        font_manager_20 = JetBrainsMonoLoader.font(20)
         
         self.title_label.setFont(font_manager_20)
         self.basic_description_label.setFont(font_manager_10)
