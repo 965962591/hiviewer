@@ -7,8 +7,8 @@
 @Description  :relize setting ui design
 
 使用pathlib获取图片路径notes:
-    base_dir = Path(__file__).parent.parent.parent
-    icon_path = base_dir / "resource" / "icons" / "setting.png"
+    ICONDIR = Path(__file__).parent.parent.parent
+    icon_path = ICONDIR / "setting.png"
 str风格图片路径:
     icon_path.as_posix()    # POSIX风格 'd:/Image_process/hiviewer/resource/icons/setting.png'
     icon_path._str          # 原始字符串 'd:\\Image_process\\hiviewer\\resource\\icons\\setting.png'
@@ -22,18 +22,49 @@ str风格图片路径:
 import os
 import sys
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
-                           QHBoxLayout, QSplitter, QListWidget, QGraphicsView,
+                           QHBoxLayout, QSplitter, QListWidget, QTextBrowser,
                            QGraphicsScene, QToolBar, QPushButton, QAbstractItemView,
                            QMessageBox, QLabel, QTableWidget, QScrollArea,
                            QMenu, QAction, QFrame, QListWidgetItem, QSizePolicy,
                            QComboBox, QCheckBox, QShortcut, QRadioButton, QButtonGroup,
                            QLineEdit,QGridLayout)
-from PyQt5.QtCore import Qt, QSize, pyqtSignal, QMimeData, QTimer, QRectF, QPropertyAnimation, QObject, QEvent, QPoint
-from PyQt5.QtGui import QKeySequence, QDrag, QPainter, QIcon, QMouseEvent, QCursor
+from PyQt5.QtCore import Qt, QSize, pyqtSignal, QUrl, QTimer, QRectF, QPropertyAnimation, QObject, QEvent, QPoint
+from PyQt5.QtGui import QKeySequence, QDrag, QDesktopServices, QIcon, QMouseEvent, QCursor
 from pathlib import Path
 
 # 设置项目根路径
-base_dir = Path(__file__).parent.parent.parent
+BASEPATH = Path(__file__).parent.parent.parent
+ICONDIR = BASEPATH / "resource" / "icons" 
+
+# 设置md文件路径
+USERPATH = BASEPATH / "resource" / "docs" / "User_Manual.md"
+VWESIONPATH = BASEPATH / "resource" / "docs" / "Version_Updates.md"
+
+# 设置图标路径
+ICONPATH = Path(BASEPATH, "resource", "icons", "about.ico").as_posix()
+ICONLABELPATH = Path(BASEPATH, "resource", "icons", "viewer_3.ico").as_posix()
+
+
+
+def version_init(VERSION="release-v2.3.2"):
+    """从配置文件中读取当前软件版本号"""
+    default_version_path = BASEPATH / "config" / "version.ini"
+    try:
+        # 检查文件是否存在，如果不存在则创建并写入默认版本号
+        if not default_version_path.exists():
+            # 确保cache目录存在
+            default_version_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(default_version_path, 'w', encoding='utf-8') as f:
+                f.write(VERSION)
+            print(f"[version_init]-->找不到文件{default_version_path}，写入版本号{VERSION}")
+            return VERSION
+        else:
+            with open(default_version_path, 'r', encoding='utf-8') as f:
+                VERSION = f.read().strip()
+                return VERSION
+    except Exception as e:
+        print(f"[version_init]-->读取版本号失败: {str(e)}\n使用默认版本号{VERSION}")
+        return VERSION
 
 class CustomSplitter(QSplitter):
     """自定义分割器，支持双击切换导航区显示状态"""
@@ -400,7 +431,7 @@ class setting_Window(QMainWindow):
         # 根据自定义分区创建导航项和内容区
         for i, sec in enumerate(self.sections):
             # 左侧导航区添加: 名称+图标
-            icon_path = base_dir / "resource" / "icons" / sec["icon"]
+            icon_path = ICONDIR / sec["icon"]
             item = QListWidgetItem(QIcon(icon_path.as_posix()), sec["name"])
             item.setData(Qt.UserRole, sec["name"])
             self.nav_list.addItem(item)
@@ -476,6 +507,8 @@ class setting_Window(QMainWindow):
             self.add_exif_settings_content(content_layout)
         elif section["name"] == "色彩空间":
             self.add_color_space_settings_content(content_layout)
+        elif section["name"] == "关于":
+            self.add_about_settings_content(content_layout)
         else:
             self.add_default_settings_content(content_layout, section["name"])
         
@@ -898,7 +931,6 @@ class setting_Window(QMainWindow):
         self.normal_radio = QRadioButton("常规尺寸显示")
         self.maxed_radio = QRadioButton("最大化显示")
         self.full_radio = QRadioButton("全屏显示")
-
         ## 创建互斥组
         radio_group = QButtonGroup(settings_container)
         radio_group.addButton(self.normal_radio)
@@ -909,6 +941,18 @@ class setting_Window(QMainWindow):
         size_group.layout().addWidget(self.maxed_radio)
         size_group.layout().addWidget(self.full_radio)
         settings_layout.addWidget(size_group)
+
+        # 尺寸设置
+        player_group = self.create_setting_group("播放器设置", "使用vlc对性能较差的电脑比较友好,响应较快,但是需要手动安装vlc; cv(python-opencv)无需额外按照,但是对电脑性能要求较高")
+        self.opencv_player = QRadioButton("CV-播放器内核")
+        self.vlc_player = QRadioButton("VLC-播放器内核")
+        ## 创建互斥组并添加到布局
+        player_radio_group = QButtonGroup(settings_container)
+        player_radio_group.addButton(self.opencv_player)
+        player_radio_group.addButton(self.vlc_player)
+        player_group.layout().addWidget(self.opencv_player)
+        player_group.layout().addWidget(self.vlc_player)
+        settings_layout.addWidget(player_group)
 
         # 主题设置
         theme_group = self.create_setting_group("主题模式", "跟随系统勾选后，应用将跟随设备的系统设置切换主题模式，可选模式置灰处理")
@@ -1277,6 +1321,122 @@ class setting_Window(QMainWindow):
         settings_layout.addWidget(cm_group)
         layout.addWidget(settings_container)
 
+    def add_about_settings_content(self, layout):
+        # 设置使用说明markdown文件，备用文件
+        self.User_Manual_Mdpath = USERPATH.as_posix() if USERPATH.exists() else ""
+        # 设置版本更新markdown文件
+        self.Version_Update_Mdpath = VWESIONPATH.as_posix() if VWESIONPATH.exists() else ""
+        # 设置默认版本号，并从version.ini配置文件中读取当前最新的版本号
+        self.VERSION = version_init()
+
+        # 初始化UI
+        main_layout = QVBoxLayout()
+        # 创建一个垂直布局，用于放置图标和版本号
+        self.icon_layout = QVBoxLayout()
+        self.icon_label = QLabel()
+        self.icon_label.setPixmap(QIcon(ICONLABELPATH).pixmap(108, 108))
+        self.icon_layout.addWidget(self.icon_label)
+        self.icon_label.setAlignment(Qt.AlignCenter)
+        main_layout.addLayout(self.icon_layout)
+
+        # 创建一个水平布局，用于放置标题和版本号
+        self.title_layout = QHBoxLayout()
+        self.title_label = QLabel(f"HiViewer({self.VERSION})")
+        self.title_label.setAlignment(Qt.AlignCenter)
+        self.title_layout.addWidget(self.title_label)
+        main_layout.addLayout(self.title_layout)
+
+        # 基础描述信息 and 作者描述信息
+        self.basic_description_label = QLabel("HiViewer 看图工具，可支持多图片对比查看、多视频同步播放\n并集成有AI提示看图、批量重命名文件、压缩复制文件、局域网传输文件以及存储常见ADB脚本并一键运行等多种实用功能...")
+        self.basic_description_label.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(self.basic_description_label)
+
+        # 添加一个水平布局，用于放置作者描述信息按钮
+        self.button_layout = QHBoxLayout()
+        self.auther_1_button = QPushButton("diamond_cz@163.com")
+        self.auther_2_button = QPushButton("barrymchen@gmail.com")
+        self.button_layout.addStretch(1)
+        self.button_layout.addWidget(self.auther_1_button)
+        self.button_layout.addWidget(self.auther_2_button)
+        self.button_layout.addStretch(1)
+        main_layout.addLayout(self.button_layout)
+        
+        # 设置四个功能按钮
+        self.button_layout = QHBoxLayout()
+        self.user_manual_button = QPushButton("使用说明")
+        self.change_log_button = QPushButton("更新日志")
+        self.button_layout.addWidget(self.user_manual_button)
+        self.button_layout.addWidget(self.change_log_button)
+        main_layout.addLayout(self.button_layout)
+
+        # 设置QTextBrowser组件，支持导入markdown文件显示
+        self.browser_layout = QVBoxLayout()
+        self.changelog_browser = QTextBrowser()
+        self.changelog_content = self.read_changelog(self.User_Manual_Mdpath)
+        self.changelog_browser.setMarkdown(self.changelog_content)
+        self.changelog_browser.setMinimumHeight(6000)
+        self.browser_layout.addWidget(self.changelog_browser)
+
+        # 添加到整体布局中
+        main_layout.addLayout(self.browser_layout)
+        layout.addLayout(main_layout)
+    
+
+    def ui_init(self):
+        """UI界面初始化"""
+
+        """UI界面,整体是一个垂直layout"""
+        main_layout = QVBoxLayout()
+        
+        # 创建一个垂直布局，用于放置图标和版本号
+        self.icon_layout = QVBoxLayout()
+        self.icon_label = QLabel()
+        self.icon_label.setPixmap(QIcon(ICONLABELPATH).pixmap(108, 108))
+        self.icon_layout.addWidget(self.icon_label)
+        self.icon_label.setAlignment(Qt.AlignCenter)
+        main_layout.addLayout(self.icon_layout)
+
+        # 创建一个水平布局，用于放置标题和版本号
+        self.title_layout = QHBoxLayout()
+        self.title_label = QLabel(f"HiViewer({self.VERSION})")
+        self.title_label.setAlignment(Qt.AlignCenter)
+        self.title_layout.addWidget(self.title_label)
+        main_layout.addLayout(self.title_layout)
+
+        # 基础描述信息 and 作者描述信息
+        self.basic_description_label = QLabel("HiViewer 看图工具，可支持多图片对比查看、多视频同步播放\n并集成有AI提示看图、批量重命名文件、压缩复制文件、局域网传输文件以及存储常见ADB脚本并一键运行等多种实用功能...")
+        self.basic_description_label.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(self.basic_description_label)
+
+        # 添加一个水平布局，用于放置作者描述信息按钮
+        self.button_layout = QHBoxLayout()
+        self.auther_1_button = QPushButton("diamond_cz@163.com")
+        self.auther_2_button = QPushButton("barrymchen@gmail.com")
+        self.button_layout.addStretch(1)
+        self.button_layout.addWidget(self.auther_1_button)
+        self.button_layout.addWidget(self.auther_2_button)
+        self.button_layout.addStretch(1)
+        main_layout.addLayout(self.button_layout)
+        
+        # 设置四个功能按钮
+        self.button_layout = QHBoxLayout()
+        self.user_manual_button = QPushButton("使用说明")
+        self.change_log_button = QPushButton("更新日志")
+        self.button_layout.addWidget(self.user_manual_button)
+        self.button_layout.addWidget(self.change_log_button)
+        main_layout.addLayout(self.button_layout)
+
+        # 设置QTextBrowser组件，支持导入markdown文件显示
+        self.changelog_browser = QTextBrowser()
+        self.changelog_content = self.read_changelog(self.User_Manual_Mdpath)
+        self.changelog_browser.setMarkdown(self.changelog_content)
+        self.changelog_browser.setMinimumHeight(1000)
+        main_layout.addWidget(self.changelog_browser)
+
+        # 返回主布局
+        return main_layout
+    
+
     def add_default_settings_content(self, layout, section_name):
         """添加默认设置内容"""
         settings_container = QWidget()
@@ -1367,7 +1527,7 @@ class setting_Window(QMainWindow):
         设置界面-->应用程序图标
         -----------------------------------------------------------------------------------------------------------
         """
-        icon_path = base_dir / "resource" / "icons" / "setting_basic.png"
+        icon_path = ICONDIR / "setting_basic.png"
         self.setWindowIcon(QIcon(icon_path.as_posix()))
         
         """
@@ -1448,75 +1608,75 @@ class setting_Window(QMainWindow):
         
         """内容取组件初始化"""
         if self.main_window:
+            pass
+            # # 通用设置区域
+            # if hasattr(self.main_window, 'is_maxscreen') and self.main_window.is_maxscreen:
+            #     self.maxed_radio.setChecked(True)
+            # if hasattr(self.main_window, 'is_norscreen') and self.main_window.is_norscreen:
+            #     self.normal_radio.setChecked(True)
+            # if hasattr(self.main_window, 'is_fullscreen') and self.main_window.is_fullscreen:
+            #     self.full_radio.setChecked(True)
 
-            # 通用设置区域
-            if hasattr(self.main_window, 'is_maxscreen') and self.main_window.is_maxscreen:
-                self.maxed_radio.setChecked(True)
-            if hasattr(self.main_window, 'is_norscreen') and self.main_window.is_norscreen:
-                self.normal_radio.setChecked(True)
-            if hasattr(self.main_window, 'is_fullscreen') and self.main_window.is_fullscreen:
-                self.full_radio.setChecked(True)
+            # if hasattr(self.main_window, 'parent_window') and hasattr(self.main_window.parent_window, 'current_theme'):
+            #     if self.main_window.parent_window.current_theme == "默认主题":
+            #         self.light_radio.setChecked(True)
+            #     if self.main_window.parent_window.current_theme == "暗黑主题":
+            #         self.dark_radio.setChecked(True)
+            # else:
+            #     self.light_radio.setChecked(True)
+            # self.update_card_styles()  # 更新主题设置
 
-            if hasattr(self.main_window, 'parent_window') and hasattr(self.main_window.parent_window, 'current_theme'):
-                if self.main_window.parent_window.current_theme == "默认主题":
-                    self.light_radio.setChecked(True)
-                if self.main_window.parent_window.current_theme == "暗黑主题":
-                    self.dark_radio.setChecked(True)
-            else:
-                self.light_radio.setChecked(True)
-            self.update_card_styles()  # 更新主题设置
-
-            # 颜色设置区域
-            if hasattr(self.main_window, 'background_color_default'):
-                try:
-                    idx = self.list_colors.index(self.main_window.background_color_default)
-                except ValueError:
-                    idx = 0  
-                self.select_color(self.background_btns, idx, "背景颜色")
-            if hasattr(self.main_window, 'background_color_table'):
-                try:
-                    idx = self.list_colors.index(self.main_window.background_color_table)
-                except ValueError:
-                    idx = 0  
-                self.select_color(self.fill_btns, idx, "填充颜色")
-            if hasattr(self.main_window, 'font_color_default'):
-                try:
-                    idx = self.list_colors.index(self.main_window.font_color_default)
-                except ValueError:
-                    idx = 0  
-                self.select_color(self.font_btns, idx, "字体颜色")
-            if hasattr(self.main_window, 'font_color_exif'):
-                try:
-                    idx = self.list_colors.index(self.main_window.font_color_exif)
-                except ValueError:
-                    idx = 0  
-                self.select_color(self.exif_btns, idx, "EXIF颜色")
+            # # 颜色设置区域
+            # if hasattr(self.main_window, 'background_color_default'):
+            #     try:
+            #         idx = self.list_colors.index(self.main_window.background_color_default)
+            #     except ValueError:
+            #         idx = 0  
+            #     self.select_color(self.background_btns, idx, "背景颜色")
+            # if hasattr(self.main_window, 'background_color_table'):
+            #     try:
+            #         idx = self.list_colors.index(self.main_window.background_color_table)
+            #     except ValueError:
+            #         idx = 0  
+            #     self.select_color(self.fill_btns, idx, "填充颜色")
+            # if hasattr(self.main_window, 'font_color_default'):
+            #     try:
+            #         idx = self.list_colors.index(self.main_window.font_color_default)
+            #     except ValueError:
+            #         idx = 0  
+            #     self.select_color(self.font_btns, idx, "字体颜色")
+            # if hasattr(self.main_window, 'font_color_exif'):
+            #     try:
+            #         idx = self.list_colors.index(self.main_window.font_color_exif)
+            #     except ValueError:
+            #         idx = 0  
+            #     self.select_color(self.exif_btns, idx, "EXIF颜色")
 
 
-            # 显示设置区域
-            if hasattr(self.main_window, 'checkBox_1'):
-                self.hisgram_checkbox.setChecked(self.main_window.checkBox_1.isChecked())
-            if hasattr(self.main_window, 'checkBox_2'):
-                self.exif_checkbox.setChecked(self.main_window.checkBox_2.isChecked())
-            if hasattr(self.main_window, 'checkBox_3'):
-                self.roi_checkbox.setChecked(self.main_window.checkBox_3.isChecked())
-            if hasattr(self.main_window, 'checkBox_4'):
-                self.ai_checkbox.setChecked(self.main_window.checkBox_4.isChecked())
-            if hasattr(self.main_window, 'is_title_on'):
-                self.title_checkbox.setChecked(self.main_window.is_title_on)
-                if not self.title_checkbox.isChecked():
-                    self.radio_custom.setEnabled(self.title_checkbox.isChecked())
-                    self.radio_folder.setEnabled(self.title_checkbox.isChecked())
+            # # 显示设置区域
+            # if hasattr(self.main_window, 'checkBox_1'):
+            #     self.hisgram_checkbox.setChecked(self.main_window.checkBox_1.isChecked())
+            # if hasattr(self.main_window, 'checkBox_2'):
+            #     self.exif_checkbox.setChecked(self.main_window.checkBox_2.isChecked())
+            # if hasattr(self.main_window, 'checkBox_3'):
+            #     self.roi_checkbox.setChecked(self.main_window.checkBox_3.isChecked())
+            # if hasattr(self.main_window, 'checkBox_4'):
+            #     self.ai_checkbox.setChecked(self.main_window.checkBox_4.isChecked())
+            # if hasattr(self.main_window, 'is_title_on'):
+            #     self.title_checkbox.setChecked(self.main_window.is_title_on)
+            #     if not self.title_checkbox.isChecked():
+            #         self.radio_custom.setEnabled(self.title_checkbox.isChecked())
+            #         self.radio_folder.setEnabled(self.title_checkbox.isChecked())
 
-            # 色彩空间区域
-            if hasattr(self.main_window, 'auto_color_space'):
-                self.auto_radio.setChecked(self.main_window.auto_color_space)
-            if hasattr(self.main_window, 'srgb_color_space'):
-                self.rgb_radio.setChecked(self.main_window.srgb_color_space)
-            if hasattr(self.main_window, 'p3_color_space'):
-                self.p3_radio.setChecked(self.main_window.p3_color_space)
-            if hasattr(self.main_window, 'gray_color_space'):
-                self.gray_radio.setChecked(self.main_window.gray_color_space)
+            # # 色彩空间区域
+            # if hasattr(self.main_window, 'auto_color_space'):
+            #     self.auto_radio.setChecked(self.main_window.auto_color_space)
+            # if hasattr(self.main_window, 'srgb_color_space'):
+            #     self.rgb_radio.setChecked(self.main_window.srgb_color_space)
+            # if hasattr(self.main_window, 'p3_color_space'):
+            #     self.p3_radio.setChecked(self.main_window.p3_color_space)
+            # if hasattr(self.main_window, 'gray_color_space'):
+            #     self.gray_radio.setChecked(self.main_window.gray_color_space)
 
         
         else:
@@ -1583,6 +1743,13 @@ class setting_Window(QMainWindow):
         self.p3_radio.clicked.connect(self.toggle_radio_colorspace)
         self.gray_radio.clicked.connect(self.toggle_radio_colorspace)
 
+        # 关于区域；作者信息按钮槽函数，按钮槽函数
+        self.auther_1_button.clicked.connect(self.open_auther1_url)
+        self.auther_2_button.clicked.connect(self.open_auther2_url)
+        self.user_manual_button.clicked.connect(self.open_homepage_url)
+        self.change_log_button.clicked.connect(self.open_faq_url)
+        
+
 
         """全局快键键设置"""
         # 添加ESC键退出快捷键
@@ -1590,8 +1757,8 @@ class setting_Window(QMainWindow):
         self.shortcut_esc.activated.connect(self.close)
 
         # 添加i键退出快捷键
-        self.shortcut_esc = QShortcut(QKeySequence('i'), self)
-        self.shortcut_esc.activated.connect(self.close)
+        # self.shortcut_esc = QShortcut(QKeySequence('i'), self)
+        # self.shortcut_esc.activated.connect(self.close)
         
 
     def show_setting_ui(self):
@@ -1607,6 +1774,9 @@ class setting_Window(QMainWindow):
         y = main_window_rect.y() + (main_window_rect.height() - self.height()) // 2
         w, h = main_window_rect.width(), main_window_rect.height()
         w, h = int(w * 0.55), int(h * 0.60)
+
+        w = 1000 if w < 1000 else w
+        h = 800 if h < 800 else h
 
         # 设置搜索界面位置和大小
         self.move(x, y)
@@ -1770,6 +1940,35 @@ class setting_Window(QMainWindow):
         # 按可见程度排序，返回可见程度最高的分区
         visible_sections.sort(key=lambda x: (-x[1], x[2]))  # 按可见比例降序，然后按位置升序
         return visible_sections[0][0]
+
+
+    def read_changelog(self, filepath):
+        try:
+            with open(filepath, 'r', encoding='utf-8') as file:
+                return file.read()
+        except FileNotFoundError:
+            return "# 更新日志\n无法找到更新日志文件。"
+
+    def open_homepage_url(self):
+        """打开使用说明md文件"""
+        self.changelog_browser.clear()  # 清空内容
+        self.changelog_content = self.read_changelog(self.User_Manual_Mdpath)
+        self.changelog_browser.setMarkdown(self.changelog_content)
+
+    def open_faq_url(self):
+        """打开版本更新md文件"""
+        self.changelog_browser.clear()  # 清空内容
+        self.changelog_content = self.read_changelog(self.Version_Update_Mdpath)
+        self.changelog_browser.setMarkdown(self.changelog_content)
+
+    def open_auther1_url(self): 
+        QDesktopServices.openUrl(QUrl("https://github.com/diamond-cz"))
+
+    def open_auther2_url(self):
+        QDesktopServices.openUrl(QUrl("https://github.com/965962591"))
+
+    
+
 
 
     def closeEvent(self, event):

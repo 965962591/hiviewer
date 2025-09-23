@@ -49,8 +49,6 @@ from src.view.sub_bat_view import LogVerboseMaskApp                         # �
 from src.view.sub_search_view import SearchOverlay                          # 导入图片搜索工具类(ctrl+f)
 from src.components.ui_main import Ui_MainWindow                            # 假设你的主窗口类名为Ui_MainWindow
 from src.components.custom_qMbox_showinfo import show_message_box           # 导入消息框类
-from src.components.custom_qdialog_about import AboutDialog                 # 导入关于对话框类,显示帮助信息
-
 
 from src.components.custom_qdialog_rename import SingleFileRenameDialog     # 导入自定义重命名对话框类
 from src.common.font import JetBrainsMonoLoader                             # 字体管理器
@@ -183,6 +181,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.left_tree_file_display = False     # 设置左侧文件浏览器初始化标志位，只显示文件夹
         self.simple_mode = True                 # 设置默认模式为简单模式，同EXIF信息功能
         self.current_theme = "默认主题"          # 设置初始主题为默认主题
+        self.player_key = True                  # 设置播放器内核，true:cv内核，false:vlc内核
         
 
         # 添加预加载相关的属性初始化
@@ -1116,10 +1115,12 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
     @log_error_decorator(tips="处理底部栏设置按钮点击事件")
     def setting(self, index):
-        self.on_ctrl_h_pressed()
+        self.open_settings_window()
     
     @log_performance_decorator(tips="底部栏点击版本信息按钮检查更新任务", log_args=False, log_result=False)
     def update(self, index):
+        # 处理底部栏版本信息按钮点击事件
+        from src.utils.update import check_update
         check_update()
 
 
@@ -1180,6 +1181,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         检查更新版本信息，并更新状态栏按钮，如果耗时超过2秒，则提示用户更新失败
         """
         # 预检查更新,检查是否有最新版本
+        from src.utils.update import pre_check_update     
         self.new_version_info = pre_check_update()
         if not self.new_version_info:
             self.statusbar_button2.setToolTip("已是最新版本")
@@ -3659,6 +3661,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         函数功能说明: 打开关于界面，集成有作者信息、使用说明、更新日志、建议反馈以及检查更新等功能
         """
         try:
+            # 导入关于对话框类,显示帮助信息
+            from src.components.custom_qdialog_about import AboutDialog                 
+
             # 单例模式管理帮助窗口
             if not hasattr(self, 'help_dialog'):
                 # 构建文档路径,使用说明文档+版本更新文档
@@ -3668,12 +3673,16 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 if not User_path.exists() or not Version_path.exists():
                     show_message_box(f"🚩帮助文档未找到:\n{User_path.as_posix()}or{Version_path.as_posix}", "配置错误", 2000)
                     return
+
                 # 初始化对话框
                 self.help_dialog = AboutDialog(User_path, Version_path)
+            
+            
             # 激活现有窗口
             self.help_dialog.show()
             self.help_dialog.raise_()
             self.help_dialog.activateWindow()
+
             # 链接关闭事件
             self.help_dialog.finished.connect(self.close_helpinfo)
         except Exception as e:
@@ -3681,6 +3690,36 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             error_msg = f"【on_ctrl_h_pressed】-->无法打开帮助文档:\n{str(e)}\n请检查程序是否包含文件: ./resource/docs/update_main_logs.md"
             print(f"[on_ctrl_h_pressed]-->error--无法打开帮助文档:{str(e)}")
             self.logger.error(error_msg)
+
+
+    def open_settings_window(self):
+        """打开设置窗口"""
+        print("打开设置窗口...")
+        from src.view.sub_setting_view import setting_Window
+        self.setting_window = setting_Window(self)
+        
+        # 设置窗口标志，确保设置窗口显示在最顶层
+        # self.setting_window.setWindowFlags(
+        #     Qt.Window |  # 独立窗口
+        #     Qt.WindowStaysOnTopHint |  # 保持在最顶层
+        #     Qt.WindowCloseButtonHint |  # 显示关闭按钮
+        #     Qt.WindowMinimizeButtonHint |  # 显示最小化按钮
+        #     Qt.WindowMaximizeButtonHint  # 显示最大化按钮
+        # )
+        
+        self.setting_window.show_setting_ui()
+
+        # 连接设置子窗口的关闭信号
+        self.setting_window.closed.connect(self.setting_window_closed)
+
+    def setting_window_closed(self):
+        """处理设置子窗口关闭事件"""
+        if hasattr(self, 'setting_window') and self.setting_window:
+            print("[setting_window_closed]-->看图子界面,接受设置子窗口关闭事件")
+            # 清理资源
+            self.setting_window.deleteLater()
+            self.setting_window = None
+
 
     @log_error_decorator(tips="关闭关闭对话框")
     def close_helpinfo(self, index):
@@ -3902,18 +3941,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     @log_error_decorator(tips="创建视频播放器的统一方法")
     def create_video_player(self, selected_file_paths, image_indexs):
         """创建视频播放器的统一方法"""
-
-        if True:
-            # 使用vlc播放器打开视频文件
-            from src.view.sub_compare_vlc_video_view import VideoWall
-            self.video_player = VideoWall()
-            self.video_player.add_video_list(selected_file_paths)
-            # self.video_player.closed.connect(self.on_video_player_closed)
-            self.video_player.showFullScreen()
-            # self.hide()
-            return
-
-        if True:
+        if self.player_key:
             # 使用opencv方式打开视频
             from src.view.sub_compare_video_view import VideoWall                
             self.video_player = VideoWall(selected_file_paths)
@@ -3925,6 +3953,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.video_player.closed.connect(self.on_video_player_closed)
             self.video_player.show()
             self.hide()
+            return
+        else:
+            # 使用vlc播放器打开视频文件
+            from src.view.sub_compare_vlc_video_view import VideoWall
+            self.video_player = VideoWall()
+            self.video_player.add_video_list(selected_file_paths)
+            # self.video_player.closed.connect(self.on_video_player_closed)
+            self.video_player.showFullScreen()
+            # self.hide()
             return
 
 

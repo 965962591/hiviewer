@@ -9,6 +9,7 @@ import threading
 
 """导入python第三方模块"""
 import cv2
+from cv2 import VideoCapture
 import numpy as np
 from PyQt5.QtGui import QImage, QPixmap, QCursor, QKeySequence, QIcon, QMovie, QKeySequence
 from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal
@@ -364,7 +365,7 @@ class VideoPlayer(QWidget):
             self.frame_reader = FrameReader(video_path)
             self.frame_reader.frame_ready.connect(self.on_frame_ready)
             
-            # 临时打开视频获取基本信息(总帧数、帧率、尺寸、时长)
+            # 临时打开视频获取基本信息(总帧数、帧率、尺寸、时长)并检测旋转
             cap = cv2.VideoCapture(video_path)
             try:
                 if not cap.isOpened():
@@ -377,7 +378,12 @@ class VideoPlayer(QWidget):
                     int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                 ]
                 # 视频总时长(毫秒)
-                self.duration_ms = int(self.total_frames * (1000 / self.fps)) 
+                self.duration_ms = int(self.total_frames * (1000 / self.fps))
+                
+                # 自动检测视频旋转角度（修复Python 3.12兼容性问题）
+                self.auto_detected_rotation = self._detect_video_rotation(cap)
+                print(f"自动检测到视频旋转角度: {self.auto_detected_rotation}度")
+                
             finally:
                 cap.release()
 
@@ -387,7 +393,7 @@ class VideoPlayer(QWidget):
             # 变量初始化
             self.is_paused = False
             self.playback_speed = 1.0
-            self.rotation_angle = 0
+            self.rotation_angle = self.auto_detected_rotation  # 使用自动检测的旋转角度
             self.frame_skip = 0
             self.current_frame = 0
             self.current_time = 0  # 当前播放时间(毫秒)
@@ -1079,6 +1085,41 @@ class VideoPlayer(QWidget):
         # 调用原始的鼠标按下事件
         QSlider.mousePressEvent(self.slider, event)
 
+    def _detect_video_rotation(self, cap):
+        """
+        检测视频的旋转角度，解决Python 3.12兼容性问题
+        
+        Args:
+            cap: cv2.VideoCapture对象
+        
+        Returns:
+            int: 检测到的旋转角度 (0, 90, 180, 270)
+        """
+        try:
+            rotation_angle = 0
+            
+            # 方法1: 尝试从多个可能的OpenCV属性获取旋转信息
+            rotation_properties = [
+                'CAP_PROP_ORIENTATION_META',  # 较新版本OpenCV
+                'CAP_PROP_ORIENTATION_AUTO',  # 自动方向
+            ]
+            
+            for prop_name in rotation_properties:
+                if hasattr(cv2, prop_name):
+                    try:
+                        prop_value = getattr(cv2, prop_name)
+                        angle = cap.get(prop_value)
+                        if angle and angle != 0:
+                            rotation_angle = int(angle) % 360
+                            break
+                    except:
+                        continue
+            return rotation_angle
+            
+        except Exception as e:
+            print(f"检测视频旋转角度失败: {e}")
+            return 0
+
     def rotate_image(self, image, angle):
         if angle == 90:
             return cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
@@ -1087,6 +1128,22 @@ class VideoPlayer(QWidget):
         elif angle == 270:
             return cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
         return image
+    
+    def get_video_rotation_info(self):
+        """
+        获取视频旋转信息，用于调试和验证
+        
+        Returns:
+            dict: 包含旋转信息的字典
+        """
+        return {
+            "video_path": self.video_path,
+            "auto_detected_rotation": getattr(self, 'auto_detected_rotation', 0),
+            "current_rotation_angle": self.rotation_angle,
+            "container_size": f"{self.size_[0]}x{self.size_[1]}",
+            "total_rotation": (getattr(self, 'auto_detected_rotation', 0) + 
+                              (self.rotation_angle - getattr(self, 'auto_detected_rotation', 0))) % 360
+        }
 
     def set_as_baseline(self):
         # 创建一个 QWidget 作为容器

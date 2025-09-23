@@ -56,8 +56,8 @@ class Ui_MainWindow(object):
         self.statusbar.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         
         # 创建按钮
-        self.statusbar_button1 = QtWidgets.QPushButton("🔆关于")
-        self.statusbar_button1.setToolTip("关于界面")
+        self.statusbar_button1 = QtWidgets.QPushButton("🔆设置")
+        self.statusbar_button1.setToolTip("设置界面")
         self.statusbar_button2 = QtWidgets.QPushButton("🌼版本(2.3.5)")
         self.statusbar_checkbox = QtWidgets.QCheckBox()
         self.statusbar_button3 = QtWidgets.QPushButton("127.0.0.1:8000")
