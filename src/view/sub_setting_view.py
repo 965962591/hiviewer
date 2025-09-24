@@ -1048,7 +1048,7 @@ class setting_Window(QMainWindow):
         settings_layout.addWidget(size_group)
 
         # 尺寸设置
-        player_group = self.create_setting_group("播放器设置", "使用vlc对性能较差的电脑比较友好,响应较快,但是需要手动安装vlc; cv(python-opencv)无需额外按照,但是对电脑性能要求较高")
+        player_group = self.create_setting_group("播放器设置", "选择视频播放子界面的播放器内核\n1.推荐使用vlc对性能较差电脑友好,需要安装VLC播放器; 2.电脑性能较好使用cv内核无需额外安装播放器")
         self.opencv_player = QRadioButton("CV-播放器内核")
         self.vlc_player = QRadioButton("VLC-播放器内核")
         ## 创建互斥组并添加到布局
@@ -1696,8 +1696,6 @@ class setting_Window(QMainWindow):
                 background: #6ca0dc;  
             }
         """)
-
-
         """
         设置界面-->右侧内容区的样式设置
         -----------------------------------------------------------------------------------------------------------
@@ -1705,11 +1703,8 @@ class setting_Window(QMainWindow):
         self.scroll_content.setStyleSheet("background: #F0F0F0;")
         self.bottom_spacer.setStyleSheet("background: #F0F0F0;")
         
+        
         """内容取组件初始化"""
-        # 读取配置文件
-        # BASICSET = BASEPATH / "config" / "basic_settings.json"
-        # EXIFSET = BASEPATH / "config" / "exif_setting.json"
-
         # 设置界面相关按钮复选框初始化
         if BASICSET.exists():
             with open(BASICSET, "r", encoding='utf-8', errors='ignore') as f:
@@ -2110,9 +2105,6 @@ class setting_Window(QMainWindow):
         QDesktopServices.openUrl(QUrl("https://github.com/965962591"))
 
     
-
-
-
     def closeEvent(self, event):
         """重写设置子界面的关闭事件，发送关闭信号"""
         self.closed.emit()

@@ -3676,12 +3676,11 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 Version_path = self.root_path / "resource" / 'docs' / "Version_Updates.md"
                 # 验证文档文件存在性
                 if not User_path.exists() or not Version_path.exists():
-                    show_message_box(f"🚩帮助文档未找到:\n{User_path.as_posix()}or{Version_path.as_posix}", "配置错误", 2000)
+                    show_message_box(f"🚩帮助文档未找到:\n{User_path.as_posix()}or{Version_path.as_posix()}", "配置错误", 2000)
                     return
 
                 # 初始化对话框
                 self.help_dialog = AboutDialog(User_path, Version_path)
-            
             
             # 激活现有窗口
             self.help_dialog.show()
@@ -3963,10 +3962,13 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # 使用vlc播放器打开视频文件
             from src.view.sub_compare_vlc_video_view import VideoWall
             self.video_player = VideoWall()
-            self.video_player.add_video_list(selected_file_paths)
-            # self.video_player.closed.connect(self.on_video_player_closed)
-            self.video_player.showFullScreen()
-            # self.hide()
+            self.video_player.closed.connect(self.on_video_player_closed)
+            if not self.video_player.vlc_flag:
+                self.video_player.add_video_list(selected_file_paths)
+                self.video_player.showFullScreen()
+                self.hide()
+            else:
+                self.on_video_player_closed()
             return
 
 

@@ -18,14 +18,136 @@ from PyQt5.QtWidgets import (
     QGridLayout,
     QShortcut,
     QMessageBox,
+    QDialog,
 )
 import os
 import time
-import vlc
+import webbrowser
+import shutil
+import pathlib
+import platform
+
+"""设置本项目的入口路径, 以及图标根目录"""
+BASEPATH = pathlib.Path(__file__).parent.parent.parent
+ICONDIR = BASEPATH / "resource" / "icons" 
+
 
 # 全局VLC参数缓存
 _global_vlc_args = None
 _vlc_args_lock = threading.Lock()
+
+# VLC检测和导入
+vlc = None
+
+def check_vlc_installation():
+    """检测VLC是否已安装"""
+    global vlc
+    
+    # 方法1: 尝试导入python-vlc模块
+    try:
+        import vlc as vlc_module
+        vlc = vlc_module
+        # 尝试创建一个简单的VLC实例来验证可用性
+        test_instance = vlc_module.Instance('--quiet')
+        test_instance.release()
+        print("✅ VLC Python模块检测成功")
+        return True
+    except ImportError:
+        print("❌ VLC Python模块未安装")
+    except Exception as e:
+        print(f"❌ VLC模块导入失败: {str(e)}")
+    
+    # 方法2: 检查系统中是否安装了VLC可执行文件
+    vlc_executables = []
+    if platform.system() == "Windows":
+        vlc_executables = ["vlc.exe"]
+        # 检查常见的Windows VLC安装路径
+        common_paths = [
+            r"C:\Program Files\VideoLAN\VLC",
+            r"C:\Program Files (x86)\VideoLAN\VLC",
+            os.path.expanduser(r"~\AppData\Local\Programs\VideoLAN\VLC"),
+        ]
+        for path in common_paths:
+            vlc_path = os.path.join(path, "vlc.exe")
+            if os.path.exists(vlc_path):
+                print(f"✅ 找到VLC安装: {vlc_path}")
+                print("❌ 但VLC Python模块未安装，需要安装python-vlc")
+                return False
+    elif platform.system() == "Darwin":  # macOS
+        vlc_executables = ["vlc"]
+        # 检查macOS VLC安装路径
+        if os.path.exists("/Applications/VLC.app"):
+            print("✅ 找到VLC应用: /Applications/VLC.app")
+            print("❌ 但VLC Python模块未安装，需要安装python-vlc")
+            return False
+    else:  # Linux
+        vlc_executables = ["vlc"]
+    
+    # 检查系统PATH中的VLC
+    for executable in vlc_executables:
+        if shutil.which(executable):
+            print(f"✅ 在系统PATH中找到VLC: {executable}")
+            print("❌ 但VLC Python模块未安装，需要安装python-vlc")
+            return False
+    
+    print("❌ 系统中未找到VLC安装")
+    return False
+
+
+def show_vlc_startup_dialog():
+    """程序启动时的VLC检测和下载对话框"""
+    vlc_dialog = VlcTipsDialog()    
+    icon_path = (ICONDIR / "viewer_3.ico").as_posix()
+    vlc_dialog.setWindowIcon(QIcon(icon_path))
+    if vlc_dialog.exec_() == QDialog.Accepted:
+        # 打开下载链接并复制密码到剪切板
+        download_url = "https://wwco.lanzn.com/iGB7e36woydi"
+        password = "1111"
+        
+        try:
+            # 将密码复制到剪切板
+            from PyQt5.QtWidgets import QApplication
+            clipboard = QApplication.clipboard()
+            clipboard.setText(password)
+            
+            # 打开浏览器
+            webbrowser.open(download_url)
+            
+            print(f"✅ VLC下载链接已在浏览器中打开: {download_url}")
+            print(f"✅ 提取码已复制到剪切板: {password}")
+            
+            show_message_box(f"✅ VLC下载链接已在浏览器中打开, 提取码{password}已复制到剪贴板", "提示", 5000)
+            
+        except Exception as e:
+            print(f"❌ 打开VLC下载链接失败: {str(e)}")
+            show_message_box(f"❌ 打开VLC下载链接失败: {str(e)}", "提示", 5000)
+            
+    else:
+        print(f"[show_vlc_startup_dialog]-->取消VLC下载安转对话框")
+
+
+def show_message_box(text, title="提示", timeout=None):
+    """显示消息框，宽度自适应文本内容
+    
+    Args:
+        text: 显示的文本内容
+        title: 窗口标题，默认为"提示" 
+        timeout: 自动关闭的超时时间(毫秒)，默认为None不自动关闭
+    """
+    msg_box = QMessageBox()
+    msg_box.setWindowTitle(title)
+    msg_box.setText(text)
+    
+    # 设置消息框主图标,获取项目根目录并拼接图标路径
+    BasePath = pathlib.Path(__file__).parent.parent.parent / "resource" / "icons" / "viewer_3.ico"
+    msg_box.setWindowIcon(QIcon(BasePath.as_posix()))
+
+    # 设置定时器自动关闭
+    if timeout is not None:
+        QTimer.singleShot(timeout, msg_box.close)
+
+    # 使用 exec_ 显示模态对话框
+    msg_box.exec_() 
 
 
 def get_global_vlc_args(rotate_angle=0):
@@ -132,6 +254,43 @@ def get_global_vlc_args(rotate_angle=0):
         return args
 
 
+class VlcTipsDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("VLC未安装提示")
+        self.setFixedSize(400, 150)
+        # self.setStyleSheet("""
+        #     QDialog { background: #23242a; color: #fff; }
+        #     QLabel { font-size: 20px; }
+        #     QLineEdit { font-size: 20px; background: #23242a; color: #00bfff; border: 1px solid #444; border-radius: 4px; padding: 2px 2px; }
+        #     QPushButton { background: #23242a; color: #00bfff; border: 1px solid #00bfff; border-radius: 4px; min-width: 80px; min-height: 30px; }
+        #     QPushButton:hover { background: #00bfff; color: #23242a; }
+        # """)
+        # 整体垂直布局layout
+        layout = QVBoxLayout(self)
+
+        # 操作区layout,设置标签栏和编辑栏
+        opera_layout = QVBoxLayout()
+        self.label = QLabel("检测到当前程序未安装VLC播放器内核, \n是否立即下载安转?")
+        # self.label.setStyleSheet("color: #23242a; font-weight: bold;")
+        opera_layout.addWidget(self.label)
+        layout.addLayout(opera_layout)
+
+        # 按钮区layout,设置确定和取消按钮
+        btn_layout = QHBoxLayout()
+        self.ok_btn = QPushButton("确定")
+        self.cancel_btn = QPushButton("取消")
+        btn_layout.addStretch(1)
+        btn_layout.addWidget(self.ok_btn)
+        btn_layout.addWidget(self.cancel_btn)
+        layout.addLayout(btn_layout)
+
+        # 信号链接
+        self.ok_btn.clicked.connect(self.accept)
+        self.cancel_btn.clicked.connect(self.reject)
+
+
+
 class VideoFrame(QWidget):
     """自定义视频显示组件，支持直接绘制图像和动态尺寸调整"""
     
@@ -165,6 +324,7 @@ class VideoFrame(QWidget):
     def paintEvent(self, event):
         """重写绘制事件"""
         from PyQt5.QtGui import QPainter
+        from PyQt5.QtCore import QRect
         painter = QPainter(self)
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
         
@@ -190,12 +350,10 @@ class VideoFrame(QWidget):
             x = (widget_rect.width() - display_width) // 2
             y = (widget_rect.height() - display_height) // 2
             
-            # 绘制图像
-            target_rect = self.current_pixmap.rect()
-            target_rect.setSize(self.current_pixmap.size())
-            target_rect.moveTo(x, y)
-            target_rect.setSize((display_width, display_height))
+            # 创建目标矩形
+            target_rect = QRect(x, y, display_width, display_height)
             
+            # 绘制图像
             painter.drawPixmap(target_rect, self.current_pixmap)
         
         painter.end()
@@ -465,6 +623,8 @@ class VLCDecoder:
     
     def _initialize_vlc(self):
         """初始化VLC实例"""
+        # VLC检测已在程序启动时完成，这里直接初始化
+        global vlc
         try:
             # 创建VLC实例，使用全局缓存的参数
             # 为每个实例添加唯一标识符，避免冲突
@@ -496,7 +656,7 @@ class VLCDecoder:
             import time as time_module
             timeout = 5  # 5秒超时
             start_time = time_module.time()
-            while self.media.get_parsed_status() != vlc.MediaParsedStatus.done:
+            while vlc and self.media.get_parsed_status() != vlc.MediaParsedStatus.done:
                 if time_module.time() - start_time > timeout:
                     print("媒体解析超时，使用默认值继续...")
                     break
@@ -634,10 +794,10 @@ class VLCDecoder:
                     lambda: self.media_player.get_state(),
                     "获取VLC播放状态"
                 )
-                if state == vlc.State.Ended:
+                if vlc and state == vlc.State.Ended:
                     print("VLC播放结束（异常情况），等待FrameReader处理重播")
                     self.is_playing = False
-                elif state == vlc.State.Stopped:
+                elif vlc and state == vlc.State.Stopped:
                     print("VLC播放器停止，等待FrameReader处理重播")
                     self.is_playing = False
             
@@ -1131,7 +1291,7 @@ class FrameReader(QThread):
                         "检查VLC播放状态"
                     )
                     # 由于设置了循环播放，通常不会出现Ended状态
-                    if vlc_state == vlc.State.Stopped:
+                    if vlc and vlc_state == vlc.State.Stopped:
                         print(f"检测到VLC播放器停止，尝试重新启动: {self.video_path}")
                         self._simple_restart_vlc()
             
@@ -1149,7 +1309,7 @@ class FrameReader(QThread):
                     )
                     
                     # 检查VLC播放状态（由于设置了循环播放，通常不会出现Ended状态）
-                    if vlc_state == vlc.State.Ended:
+                    if vlc and vlc_state == vlc.State.Ended:
                         # VLC播放结束，使用简单重启
                         print(f"检测到VLC播放结束，简单重启: {self.video_path}")
                         self._simple_restart_vlc()
@@ -1242,7 +1402,7 @@ class FrameReader(QThread):
                 lambda: self.decoder.media_player.get_state(),
                 "获取VLC播放状态"
             )
-            if state in [vlc.State.Ended, vlc.State.Stopped]:
+            if vlc and state in [vlc.State.Ended, vlc.State.Stopped]:
                 print(f"VLC播放器已结束，跳过暂停操作")
                 return
             
@@ -1311,6 +1471,8 @@ class VideoPlayer(QWidget):
         self.video_path = video_path
         self.rotate_angle = rotate_angle  # 添加旋转角度参数
 
+        # VLC检测已在程序启动时完成，这里直接初始化
+
         try:
             # 初始化帧读取线程，使用信号槽代替队列
             self.frame_reader = FrameReader(video_path, rotate_angle=rotate_angle)
@@ -1363,7 +1525,9 @@ class VideoPlayer(QWidget):
             self.is_cleaning_up = False  # 添加清理标志
 
         except Exception as e:
-            QMessageBox.critical(parent, "错误", f"无法加载视频 {video_path}: {str(e)}")
+            error_msg = f"无法加载视频 {video_path}: {str(e)}"
+            if "VLC未安装" not in str(e):
+                QMessageBox.critical(parent, "错误", error_msg)
             raise
 
     def format_time(self, time_ms):
@@ -1602,7 +1766,7 @@ class VideoPlayer(QWidget):
         # 控制按钮和设置
         self.play_button = QPushButton(self)
         # 设置图标路径
-        play_icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icon", "play.ico")
+        play_icon_path = (ICONDIR / "play.ico").as_posix()
         self.play_button.setIcon(QIcon(play_icon_path))  # 设置播放图标
         self.play_button.setToolTip("播放/暂停")
         self.play_button.setStyleSheet("border: none;")  # 去掉按钮边框
@@ -1610,7 +1774,7 @@ class VideoPlayer(QWidget):
 
         self.replay_button = QPushButton(self)
         # 设置图标路径
-        replay_icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icon", "replay.ico")
+        replay_icon_path = (ICONDIR / "replay.ico").as_posix()
         self.replay_button.setIcon(QIcon(replay_icon_path))  # 设置重播图标
         self.replay_button.setStyleSheet("border: none;")  # 去掉按钮边框
         self.replay_button.setToolTip("重播")
@@ -1631,14 +1795,23 @@ class VideoPlayer(QWidget):
         self.frame_skip_spin.setValue(0)
         self.frame_skip_spin.valueChanged.connect(self.set_frame_skip)
 
-        # 旋转控制按钮
-        self.rotate_button = QPushButton(self)
-        # 设置旋转图标路径
-        rotate_icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icon", "rotate.ico")
-        self.rotate_button.setIcon(QIcon(rotate_icon_path))  # 设置旋转图标
-        self.rotate_button.setToolTip("旋转90度")
-        self.rotate_button.setStyleSheet("border: none;")  # 去掉按钮边框
-        self.rotate_button.clicked.connect(self.rotate_90_degrees)
+        # 旋转控制按钮 - 左转90度
+        self.rotate_left_button = QPushButton(self)
+        # 设置左转图标路径
+        left_icon_path = (ICONDIR / "left.ico").as_posix()
+        self.rotate_left_button.setIcon(QIcon(left_icon_path))  # 设置左转图标
+        self.rotate_left_button.setToolTip("向左旋转90度")
+        self.rotate_left_button.setStyleSheet("border: none;")  # 去掉按钮边框
+        self.rotate_left_button.clicked.connect(self.rotate_left_90)
+
+        # 旋转控制按钮 - 右转90度  
+        self.rotate_right_button = QPushButton(self)
+        # 设置右转图标路径
+        right_icon_path = (ICONDIR / "right.ico").as_posix()
+        self.rotate_right_button.setIcon(QIcon(right_icon_path))  # 设置右转图标
+        self.rotate_right_button.setToolTip("向右旋转90度")
+        self.rotate_right_button.setStyleSheet("border: none;")  # 去掉按钮边框
+        self.rotate_right_button.clicked.connect(self.rotate_right_90)
 
         # 控制布局
         control_layout = QHBoxLayout()
@@ -1649,7 +1822,8 @@ class VideoPlayer(QWidget):
         control_layout.addWidget(self.frame_skip_spin)
         control_layout.addWidget(self.play_button)
         control_layout.addWidget(self.replay_button)
-        control_layout.addWidget(self.rotate_button)
+        control_layout.addWidget(self.rotate_left_button)
+        control_layout.addWidget(self.rotate_right_button)
         control_layout.addStretch()
 
         bottom_layout = QVBoxLayout()
@@ -1784,12 +1958,12 @@ class VideoPlayer(QWidget):
             self.is_paused = False
             self.frame_reader.resume()
             self.last_update_time = time.time()  # 重置时间基准
-            play_icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icon", "play.ico")
+            play_icon_path = (ICONDIR / "play.ico").as_posix()
             self.play_button.setIcon(QIcon(play_icon_path))
         else:
             self.is_paused = True
             self.frame_reader.pause()
-            pause_icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icon", "pause.ico")
+            pause_icon_path = (ICONDIR / "pause.ico").as_posix()
             self.play_button.setIcon(QIcon(pause_icon_path))
 
     def replay(self):
@@ -1987,24 +2161,8 @@ class VideoPlayer(QWidget):
                 # 设置VideoFrame的旋转角度
                 self.video_frame.set_rotation_angle(angle)
                 
-                # 计算合适的显示尺寸（保持宽高比，但限制在合理范围内）
-                max_width = 500   # 最大宽度
-                max_height = 400  # 最大高度
-                
-                # 计算缩放比例
-                scale_w = max_width / new_width
-                scale_h = max_height / new_height
-                scale = min(scale_w, scale_h, 1.0)  # 不放大，只缩小
-                
-                display_width = max(200, int(new_width * scale))  # 最小宽度200
-                display_height = max(150, int(new_height * scale))  # 最小高度150
-                
-                # 设置VideoFrame的推荐尺寸
-                self.video_frame.setMinimumSize(display_width, display_height)
-                
-                # 强制更新布局
-                self.video_frame.updateGeometry()
-                self.updateGeometry()
+                # 不改变VideoFrame的尺寸，让布局管理器自动处理
+                # 只更新内部状态，不强制改变QWidget大小
                 
                 # 更新文件名标签中的尺寸信息
                 if hasattr(self, 'filename_label'):
@@ -2012,7 +2170,7 @@ class VideoPlayer(QWidget):
                     fps = self.frame_reader.decoder.fps
                     self.filename_label.setText(f"{filename} ({fps:.2f}fps, {new_width}x{new_height})")
                 
-                print(f"VideoFrame尺寸调整为: {display_width}x{display_height} (原始: {new_width}x{new_height})")
+                print(f"VideoFrame旋转角度已更新: {angle}度 (原始视频尺寸: {new_width}x{new_height})")
                 
                 # 立即重新设置VLC输出窗口
                 self._setup_vlc_output_immediately()
@@ -2083,19 +2241,14 @@ class VideoPlayer(QWidget):
         except Exception as e:
             print(f"跳转到时间位置失败: {str(e)}")
     
-    def rotate_90_degrees(self):
-        """顺时针旋转90度"""
-        new_angle = (self.rotate_angle + 90) % 360
-        return self.set_rotate_angle(new_angle)
-    
-    def rotate_180_degrees(self):
-        """旋转180度"""
-        new_angle = (self.rotate_angle + 180) % 360
-        return self.set_rotate_angle(new_angle)
-    
-    def rotate_270_degrees(self):
-        """逆时针旋转90度（或顺时针旋转270度）"""
+    def rotate_left_90(self):
+        """向左旋转90度（逆时针）"""
         new_angle = (self.rotate_angle + 270) % 360
+        return self.set_rotate_angle(new_angle)
+    
+    def rotate_right_90(self):
+        """向右旋转90度（顺时针）"""
+        new_angle = (self.rotate_angle + 90) % 360
         return self.set_rotate_angle(new_angle)
     
     def reset_rotation(self):
@@ -2132,9 +2285,22 @@ class VideoPlayer(QWidget):
         """缩小视频"""
         return self.set_video_scale(0.8)  # 缩小20%
 
+
 class VideoWall(QWidget):
+    # 定义关闭信号
+    closed = pyqtSignal()
     def __init__(self):
         super().__init__()
+        # 首先检测VLC，如果未安装则显示下载对话框并退出程序 
+        self.vlc_flag = False
+        if not check_vlc_installation():
+            show_vlc_startup_dialog()
+            self.vlc_flag = True
+            return 
+
+        # 设置图标路径
+        icon_path = (ICONDIR / "video_icon.ico").as_posix()
+        self.setWindowIcon(QIcon(icon_path))
         self.setWindowTitle("多视频播放器")
         self.setAcceptDrops(True)
         self.init_ui()
@@ -2218,12 +2384,15 @@ class VideoWall(QWidget):
         for url in event.mimeData().urls():
             file_path = url.toLocalFile()
             if file_path.lower().endswith(video_extensions):
-                player = VideoPlayer(file_path, parent=self, rotate_angle=0)  # 将 self 作为父级传递
-                self.players.append(player)
-                self.refresh_layout()
+                try:
+                    player = VideoPlayer(file_path, parent=self, rotate_angle=0)  # 将 self 作为父级传递
+                    self.players.append(player)
+                except Exception as e:
+                    print(f"加载视频失败 {file_path}: {str(e)}")
 
         # 隐藏提示标签
         if self.players:
+            self.refresh_layout()
             self.hint_label.hide()
 
     def add_video_list(self, video_paths):
@@ -2248,6 +2417,8 @@ class VideoWall(QWidget):
                 'failed': video_paths if isinstance(video_paths, str) else [],
                 'errors': {'input': '参数必须是列表或元组'}
             }
+        
+        # VLC检测已在程序启动时完成，这里直接处理视频文件
         
         # 支持的视频格式
         video_extensions = (".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v")
@@ -2614,7 +2785,7 @@ class VideoWall(QWidget):
                         player.last_update_time = time.time()  # 重置时间基准
 
                         # 更新播放/暂停按钮图标
-                        play_icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icon", "play.ico")
+                        play_icon_path = (ICONDIR / "play.ico").as_posix()
                         player.play_button.setIcon(QIcon(play_icon_path))
             except Exception as e:
                 print(f"跳转到帧时出错: {str(e)}")
@@ -2822,30 +2993,29 @@ class VideoWall(QWidget):
     def closeEvent(self, event):
         """程序关闭时的清理 - 优化版本"""
         try:
-            print("开始程序关闭清理...")
-            
+            print("[sub_compare_vlc_video_view]-->info--开始程序关闭清理...")
             # 直接调用clear_videos进行清理
             self.clear_videos()
             
             # 强制垃圾回收
-            try:
-                import gc
-                gc.collect()
-                print("✅ 程序关闭清理完成，内存已回收")
-            except Exception as e:
-                print(f"垃圾回收失败: {str(e)}")
+            import gc
+            gc.collect()
             
-            # 接受关闭事件
-            event.accept()
+            # # 接受关闭事件
+            # event.accept()
                 
+            # 发射关闭信号（新增），统一在这里发送信号
+            self.closed.emit()
+            
+            # 最后调用父类方法
+            super().closeEvent(event)
+
         except Exception as e:
             print(f"程序关闭时出错: {str(e)}")
             # 出错时立即退出
             import os
             os._exit(0)
         
-        # 调用父类的closeEvent
-        super().closeEvent(event)
 
     def move_to_current_screen(self):
         # 获取鼠标当前位置
