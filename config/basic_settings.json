@@ -3,7 +3,7 @@
         "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.25-O19-IN-二供-小数包/video/N19123"
     ],
     "current_directory": "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.25-O19-IN-二供-小数包/video/N19123",
-    "file_type_option": "显示视频文件",
+    "file_type_option": "显示图片文件",
     "combobox1_checked_items": [
         "O19-1st",
         "O19-2nd",
@@ -19,5 +19,6 @@
     "current_theme": "默认主题",
     "simple_mode": true,
     "drag_flag": true,
-    "api_flag": false
+    "api_flag": false,
+    "player_key": true
 }

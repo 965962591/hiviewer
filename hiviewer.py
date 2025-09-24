@@ -3150,6 +3150,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 self.statusbar_checkbox.setChecked(self.api_flag)
                 self.fast_api_switch()
 
+                # 恢复播放器内核key
+                self.player_key = settings.get("player_key", True)
 
                 # 恢复同级文件夹选择状态，放在最后
                 all_items = settings.get("combobox1_all_items", [])
@@ -3214,7 +3216,10 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 "drag_flag": self.drag_flag,
 
                 # fast_api开关使能
-                "api_flag":self.statusbar_checkbox.isChecked()
+                "api_flag":self.statusbar_checkbox.isChecked(),
+
+                # 播放器内核开关，True:CV; False:VLC
+                "player_key":self.player_key
             }
             # 保存设置到JSON文件，使用 pathlib 的 write_text 方法
             settings_path.write_text(

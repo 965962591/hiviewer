@@ -21,6 +21,7 @@ str风格图片路径:
 '''
 import os
 import sys
+import json
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                            QHBoxLayout, QSplitter, QListWidget, QTextBrowser,
                            QGraphicsScene, QToolBar, QPushButton, QAbstractItemView,
@@ -44,7 +45,9 @@ VWESIONPATH = BASEPATH / "resource" / "docs" / "Version_Updates.md"
 ICONPATH = Path(BASEPATH, "resource", "icons", "about.ico").as_posix()
 ICONLABELPATH = Path(BASEPATH, "resource", "icons", "viewer_3.ico").as_posix()
 
-
+# 设置配置文件路基
+BASICSET = BASEPATH / "config" / "basic_settings.json"
+EXIFSET = BASEPATH / "config" / "exif_setting.json"
 
 def version_init(VERSION="release-v2.3.2"):
     """从配置文件中读取当前软件版本号"""
@@ -536,31 +539,64 @@ class setting_Window(QMainWindow):
 
             if self.normal_radio.isChecked():
                 print("切换到常规尺寸")
-                if self.main_window and bool(self.main_window.toggle_screen_display):
-                    self.main_window.is_fullscreen = False      
-                    self.main_window.is_norscreen = True
-                    self.main_window.is_maxscreen = False
-                    self.main_window.toggle_screen_display()
-                
+                if self.main_window: 
+                        if hasattr(self.main_window,'toggle_screen_display'):
+                            self.main_window.is_fullscreen = False      
+                            self.main_window.is_norscreen = True
+                            self.main_window.is_maxscreen = False
+                            self.main_window.toggle_screen_display()
+                        if (hasattr(self.main_window, 'compare_window') 
+                        and hasattr(self.main_window.compare_window, 'toggle_screen_display')):   
+                            self.main_window.compare_window.is_fullscreen = False      
+                            self.main_window.compare_window.is_norscreen = True
+                            self.main_window.compare_window.is_maxscreen = False
+                            self.main_window.compare_window.toggle_screen_display()
+
             elif self.maxed_radio.isChecked():
                 print("切换到最大化显示")
-                if self.main_window and bool(self.main_window.toggle_screen_display):
-                    self.main_window.is_fullscreen = False      
-                    self.main_window.is_norscreen = False
-                    self.main_window.is_maxscreen = True
-                    self.main_window.toggle_screen_display()
+                if self.main_window:
+                    if hasattr(self.main_window,'toggle_screen_display'):
+                        self.main_window.is_fullscreen = False      
+                        self.main_window.is_norscreen = False
+                        self.main_window.is_maxscreen = True
+                        self.main_window.toggle_screen_display()
+                    if (hasattr(self.main_window, 'compare_window') 
+                    and hasattr(self.main_window.compare_window, 'toggle_screen_display')):   
+                        self.main_window.compare_window.is_fullscreen = False      
+                        self.main_window.compare_window.is_norscreen = False
+                        self.main_window.compare_window.is_maxscreen = True
+                        self.main_window.compare_window.toggle_screen_display()
 
             elif self.full_radio.isChecked():
                 print("切换到全屏显示")
-                if self.main_window and bool(self.main_window.toggle_screen_display):
-                    self.main_window.is_fullscreen = True   
-                    self.main_window.is_norscreen = False
-                    self.main_window.is_maxscreen = False   
-                    self.main_window.toggle_screen_display()
+                if self.main_window:
+                    if hasattr(self.main_window,'toggle_screen_display'):
+                        self.main_window.is_fullscreen = True   
+                        self.main_window.is_norscreen = False
+                        self.main_window.is_maxscreen = False   
+                        self.main_window.toggle_screen_display()
+                    if (hasattr(self.main_window, 'compare_window') 
+                    and hasattr(self.main_window.compare_window, 'toggle_screen_display')):   
+                        self.main_window.compare_window.is_fullscreen = True  
+                        self.main_window.compare_window.is_norscreen = False
+                        self.main_window.compare_window.is_maxscreen = False
+                        self.main_window.compare_window.toggle_screen_display()
 
         except Exception as e:
             print(f"[toggle_screen_display]-->设置界面-->通用设置—-尺寸设置发生错误: {e}")
 
+
+    def toggle_player(self):
+        """通用设置-->播放器设置的槽函数"""
+        if self.opencv_player.isChecked():
+            print("[toggle_player]-->切换播放器核心为CV")
+            if self.main_window and hasattr(self.main_window, 'player_key'):
+                self.main_window.player_key = True
+                
+        if self.vlc_player.isChecked():
+            print("[toggle_player]-->切换播放器核心为VLC")
+            if self.main_window and hasattr(self.main_window, 'player_key'):
+                self.main_window.player_key = False
 
     # 互斥逻辑
     def on_follow_system_changed(self):
@@ -600,7 +636,6 @@ class setting_Window(QMainWindow):
     def update_card_styles(self):
         """通用设置-->主题模式--深浅色主题选择的槽函数"""
         try:
-
             qss_dark = f"""
                 /* 主窗口样式 */
                 QMainWindow {{
@@ -615,98 +650,121 @@ class setting_Window(QMainWindow):
                     margin: 0 0 0 0; /* 外边距 上右下左 */
                     padding:0 0 0 5; /* 外边距 上右下左 */                  
                 }}
-
                 QMainWindow QComboBox{{
                     background-color: #2D353C;
                 }}
             """
-
             qss_light = f"""
                 /* 主窗口样式 */
-                QMainWindow {{
-                    background-color: #F0F0F0;
-                    color: black;
-                }}
+                QMainWindow {{background-color: #F0F0F0;color: black;}}    
             """
 
             if self.light_radio.isChecked():
-                print("通用设置-->主题模式--选择浅色主题")   
+                print("通用设置-->主题模式--选择浅色主题")
+                self.set_light()   
 
                 if self.main_window:
-                    self.main_window.setStyleSheet(qss_light) 
-                    self.main_window.statusbar.setStyleSheet(f"background-color: {self.main_window.background_color_default};")
-                    self.main_window.label_0.setStyleSheet(f"background-color: {self.main_window.background_color_default};")
+                    # 主界面打开设置界面
+                    if hasattr(self.main_window, 'compare_window') and hasattr(self.main_window, 'current_theme'):
+                        self.main_window.current_theme = "默认主题"
+                        self.main_window.apply_theme()
+                        if (hasattr(self.main_window.compare_window, 'label_0')
+                        and hasattr(self.main_window.compare_window, 'statusbar')):
+                            self.main_window.compare_window.setStyleSheet(qss_light) 
+                            self.main_window.compare_window.statusbar.setStyleSheet(f"background-color: {self.main_window.background_color_default};")
+                            self.main_window.compare_window.label_0.setStyleSheet(f"background-color: {self.main_window.background_color_default};")
+                    # 看图界面打开设置界面
+                    if hasattr(self.main_window, 'toggle_fullscreen'):
+                        self.main_window.setStyleSheet(qss_light) 
+                        self.main_window.statusbar.setStyleSheet(f"background-color: {self.main_window.background_color_default};")
+                        self.main_window.label_0.setStyleSheet(f"background-color: {self.main_window.background_color_default};")
+                        if hasattr(self.main_window, 'parent_window') and hasattr(self.main_window.parent_window, 'current_theme'):
+                            self.main_window.parent_window.current_theme = "默认主题"
+                            self.main_window.parent_window.apply_theme()
 
-                    if hasattr(self.main_window, 'parent_window') and hasattr(self.main_window.parent_window, 'current_theme'):
-                        self.main_window.parent_window.current_theme = "默认主题"
-                        self.main_window.parent_window.apply_theme()
-
-                self.light_card.setStyleSheet("""
-                    QFrame#light_card {
-                        border: 2px solid #409eff;
-                        border-radius: 14px;
-                        background: #fafbfc;
-                        min-width: 220px;
-                        max-width: 240px;
-                        min-height: 120px;
-                        margin: 0 0 0 0;
-                    }
-                """)
-                self.dark_card.setStyleSheet("""
-                    QFrame#dark_card {
-                        border: 2px solid #e0e0e0;
-                        border-radius: 14px;
-                        background: #23272e;
-                        min-width: 220px;
-                        max-width: 240px;
-                        min-height: 120px;
-                        margin: 0 0 0 0;
-                    }
-                """)
             else:
                 print("通用设置-->主题模式--选择深色主题")
-                
-                if self.main_window:
-                    self.main_window.setStyleSheet(qss_dark)
+                self.set_dark()
+
+                # 主界面打开设置界面
+                if hasattr(self.main_window, 'compare_window') and hasattr(self.main_window, 'current_theme'):
+                    self.main_window.current_theme = "暗黑主题"
+                    self.main_window.apply_theme()
+                    if (hasattr(self.main_window.compare_window, 'label_0')
+                    and hasattr(self.main_window.compare_window, 'statusbar')):
+                        self.main_window.compare_window.setStyleSheet(qss_dark) 
+                        self.main_window.compare_window.statusbar.setStyleSheet("background-color: #2D353C;")
+                        self.main_window.compare_window.label_0.setStyleSheet("background-color: #2D353C;")
+                # 看图界面打开设置界面
+                if hasattr(self.main_window, 'toggle_fullscreen'):
+                    self.main_window.setStyleSheet(qss_light) 
                     self.main_window.statusbar.setStyleSheet("background-color: #2D353C;")
                     self.main_window.label_0.setStyleSheet("background-color: #2D353C;")
                     if hasattr(self.main_window, 'parent_window') and hasattr(self.main_window.parent_window, 'current_theme'):
                         self.main_window.parent_window.current_theme = "暗黑主题"
                         self.main_window.parent_window.apply_theme()
-
-                self.light_card.setStyleSheet("""
-                    QFrame#light_card {
-                        border: 2px solid #e0e0e0;
-                        border-radius: 14px;
-                        background: #fafbfc;
-                        min-width: 220px;
-                        max-width: 240px;
-                        min-height: 120px;
-                        margin: 0 0 0 0;
-                    }
-                """)
-                self.dark_card.setStyleSheet("""
-                    QFrame#dark_card {
-                        border: 2px solid #409eff;
-                        border-radius: 14px;
-                        background: #23272e;
-                        min-width: 220px;
-                        max-width: 240px;
-                        min-height: 120px;
-                        margin: 0 0 0 0;
-                    }
-                """)
         except Exception as e:
             print(f"[update_card_styles]-->通用设置-->主题模式--深浅色主题选择发生错误: {e}")
+
+    def set_light(self):
+        self.light_card.setStyleSheet("""
+            QFrame#light_card {
+                border: 2px solid #409eff;
+                border-radius: 14px;
+                background: #fafbfc;
+                min-width: 220px;
+                max-width: 240px;
+                min-height: 120px;
+                margin: 0 0 0 0;
+            }
+        """)
+        self.dark_card.setStyleSheet("""
+            QFrame#dark_card {
+                border: 2px solid #e0e0e0;
+                border-radius: 14px;
+                background: #23272e;
+                min-width: 220px;
+                max-width: 240px;
+                min-height: 120px;
+                margin: 0 0 0 0;
+            }
+        """)
+
+    def set_dark(self):
+        self.light_card.setStyleSheet("""
+            QFrame#light_card {
+                border: 2px solid #e0e0e0;
+                border-radius: 14px;
+                background: #fafbfc;
+                min-width: 220px;
+                max-width: 240px;
+                min-height: 120px;
+                margin: 0 0 0 0;
+            }
+        """)
+        self.dark_card.setStyleSheet("""
+            QFrame#dark_card {
+                border: 2px solid #409eff;
+                border-radius: 14px;
+                background: #23272e;
+                min-width: 220px;
+                max-width: 240px;
+                min-height: 120px;
+                margin: 0 0 0 0;
+            }
+        """)
+
 
 
     def reset_colorsetting(self):
         """颜色设置-->一键重置"""
         try:
             print("设置界面->颜色设置-->一键重置")
-            if self.main_window and bool(self.main_window.show_menu_combox1):
+            if self.main_window and hasattr(self.main_window, "show_menu_combox1"):
                 self.main_window.show_menu_combox1(index=1)
-
+            if (self.main_window and hasattr(self.main_window, 'compare_window') 
+            and hasattr(self.main_window.compare_window, 'show_menu_combox1')):
+                self.main_window.compare_window.show_menu_combox1(index=1)
         except Exception as e:
             print(f"[reset_colorsetting]-->颜色设置-->一键重置时发生错误: {e}")
 
@@ -714,9 +772,13 @@ class setting_Window(QMainWindow):
         """颜色设置-->读取配置文件"""
         try:
             print("设置界面->颜色设置-->读取配置文件")
-            if self.main_window and bool(self.main_window.show_menu_combox1):
+            if self.main_window and hasattr(self.main_window, "show_menu_combox1"):
                 if self.checkbox_checkbox.isChecked():
                     self.main_window.show_menu_combox1(index=0)
+            if (self.main_window and hasattr(self.main_window, 'compare_window') 
+            and hasattr(self.main_window.compare_window, 'show_menu_combox1')):
+                if self.checkbox_checkbox.isChecked():
+                    self.main_window.compare_window.show_menu_combox1(index=0)       
         except Exception as e:
             print(f"[read_colorsetting]-->颜色设置-->读取配置文件时发生错误: {e}")
 
@@ -769,7 +831,6 @@ class setting_Window(QMainWindow):
                     # print(f"🎨 颜色设置 -> {color_type} -> 选中: {self.color_names[idx]} RGB: {self.list_colors[idx]}")
                     b.setProperty("selected", True)
                     b.setStyle(b.style())  
-
                     # 更新看图界面上的显示
                     if self.main_window and hasattr(self.main_window, 'update_ui_styles'):
                         if hasattr(self.main_window, 'background_color_default'):
@@ -783,6 +844,20 @@ class setting_Window(QMainWindow):
                                 self.main_window.font_color_exif = self.list_colors[idx]
                         # 更新样式表
                         self.main_window.update_ui_styles()
+                    # 更新看图界面上的显示
+                    if (self.main_window and hasattr(self.main_window, 'compare_window')
+                    and hasattr(self.main_window.compare_window, 'update_ui_styles')):
+                        if hasattr(self.main_window.compare_window, 'background_color_default'):
+                            if color_type == "背景颜色":
+                                self.main_window.compare_window.background_color_default = self.list_colors[idx]
+                            if color_type == "填充颜色":
+                                self.main_window.compare_window.background_color_table = self.list_colors[idx]
+                            if color_type == "字体颜色":
+                                self.main_window.compare_window.font_color_default = self.list_colors[idx]
+                            if color_type == "EXIF颜色":
+                                self.main_window.compare_window.font_color_exif = self.list_colors[idx]
+                        # 更新样式表
+                        self.main_window.compare_window.update_ui_styles()
                 else:
                     b.setProperty("selected", False)
                     b.setStyle(b.style())  
@@ -808,9 +883,9 @@ class setting_Window(QMainWindow):
         """显示设置-->显示直方图信息的槽函数"""
         try:
             print("设置界面->通用设置->打开->显示直方图信息" if self.hisgram_checkbox.isChecked() else "设置界面->通用设置->关闭->显示直方图信息")
-            if self.main_window and bool(self.main_window.toggle_histogram_info):            
-                self.main_window.checkBox_1.setChecked(self.hisgram_checkbox.isChecked())
-        
+            if (self.main_window and hasattr(self.main_window, 'compare_window') 
+                and hasattr(self.main_window.compare_window, 'checkBox_1')):            
+                self.main_window.compare_window.checkBox_1.setChecked(self.hisgram_checkbox.isChecked())
         except Exception as e:
             print(f"[toggle_hisgram_info]-->设置界面--显示设置-显示直方图信息时发生错误: {e}")
 
@@ -818,8 +893,9 @@ class setting_Window(QMainWindow):
         """显示设置-->显示exif复选框的槽函数"""
         try:
             print("设置界面->通用设置->打开->显示EXIF图信息" if self.exif_checkbox.isChecked() else "设置界面->通用设置->关闭->显示EXIF图信息")
-            if self.main_window and bool(self.main_window.toggle_exif_info):            
-                self.main_window.checkBox_2.setChecked(self.exif_checkbox.isChecked())
+            if (self.main_window and hasattr(self.main_window, 'compare_window') 
+                and hasattr(self.main_window.compare_window, 'checkBox_2')):           
+                self.main_window.compare_window.checkBox_2.setChecked(self.exif_checkbox.isChecked())
             
         except Exception as e:
             print(f"[toggle_exif_info]-->设置界面--显示设置-显示exif复选框时发生错误: {e}")
@@ -828,8 +904,9 @@ class setting_Window(QMainWindow):
         """显示设置-->roi复选框的槽函数"""
         try:
             print("设置界面->通用设置->打开->显示ROI信息" if self.roi_checkbox.isChecked() else "设置界面->通用设置->关闭->显示ROI信息")
-            if self.main_window and bool(self.main_window.roi_stats_checkbox):            
-                self.main_window.checkBox_3.setChecked(self.roi_checkbox.isChecked())
+            if (self.main_window and hasattr(self.main_window, 'compare_window') 
+                and hasattr(self.main_window.compare_window, 'checkBox_3')):          
+                self.main_window.compare_window.checkBox_3.setChecked(self.roi_checkbox.isChecked())
                 
         except Exception as e:
             print(f"[toggle_roi_info]-->设置界面--显示设置-显示ROI信息时发生错误: {e}")
@@ -838,8 +915,9 @@ class setting_Window(QMainWindow):
         """显示设置-->ai复选框的槽函数"""
         try:
             print("设置界面->通用设置->打开->启用AI提示看图功能" if self.ai_checkbox.isChecked() else "设置界面->通用设置->关闭->启用AI提示看图功能")
-            if self.main_window and bool(self.main_window.ai_tips_info):            
-                self.main_window.checkBox_4.setChecked(self.ai_checkbox.isChecked())
+            if (self.main_window and hasattr(self.main_window, 'compare_window') 
+                and hasattr(self.main_window.compare_window, 'checkBox_4')):           
+                self.main_window.compare_window.checkBox_4.setChecked(self.ai_checkbox.isChecked())
                 
         except Exception as e:
             print(f"[toggle_ai_info]-->设置界面--显示设置-启用AI提示看图功能时发生错误: {e}")
@@ -853,8 +931,9 @@ class setting_Window(QMainWindow):
             self.radio_folder.setEnabled(enabled)
 
             # 看图界面显示隐藏标题逻辑
-            if self.main_window and bool(self.main_window.toggle_title_display): 
-                self.main_window.toggle_title_display(enabled)
+            if (self.main_window and hasattr(self.main_window, 'compare_window') 
+                and hasattr(self.main_window.compare_window, 'toggle_title_display')):   
+                self.main_window.compare_window.toggle_title_display(enabled)
 
         except Exception as e:
             print(f"[on_title_checkbox_changed]-->设置界面--点击显示设置相关按钮时发生错误: {e}")
@@ -878,11 +957,17 @@ class setting_Window(QMainWindow):
             result = self.exif_grid.get_status_dict()
 
             # 同步更新看图界面上的显示
-            if self.main_window and hasattr(self.main_window, 'dict_exif_info_visibility'):
-                self.main_window.dict_exif_info_visibility = result
+            if self.main_window:
+                if (hasattr(self.main_window, 'dict_exif_info_visibility')
+                and hasattr(self.main_window, "update_exif_show")):
+                    self.main_window.dict_exif_info_visibility = result
+                    self.main_window.update_exif_show()
 
-            if bool(self.main_window.update_exif_show):
-                self.main_window.update_exif_show()
+                if (hasattr(self.main_window, 'compare_window') 
+                and hasattr(self.main_window.compare_window, 'dict_exif_info_visibility')
+                and hasattr(self.main_window.compare_window, 'update_exif_show')):   
+                    self.main_window.compare_window.dict_exif_info_visibility = result
+                    self.main_window.compare_window.update_exif_show()
 
         except Exception as e:
             print(f"[toggle_checkbox_exif]-->设置界面--更新EXIF显示时发生错误: {e}")
@@ -892,27 +977,47 @@ class setting_Window(QMainWindow):
         try:
             if self.auto_radio.isChecked():
                 print("图像色彩空间管理, 选择AUTO(自动读取并加载图片ICC配置文件)")
-                if self.main_window and bool(self.main_window.on_comboBox_2_changed):
-                    self.main_window.on_comboBox_2_changed(index=0)  
-                    self.main_window.comboBox_2.setCurrentIndex(0)  
+                if self.main_window:
+                    if hasattr(self.main_window, "on_comboBox_2_changed"):
+                        self.main_window.on_comboBox_2_changed(index=0)  
+                        self.main_window.comboBox_2.setCurrentIndex(0)  
+                    if (hasattr(self.main_window, 'compare_window') 
+                    and hasattr(self.main_window.compare_window, 'on_comboBox_2_changed')):   
+                        self.main_window.compare_window.on_comboBox_2_changed(index=0)  
+                        self.main_window.compare_window.comboBox_2.setCurrentIndex(0) 
 
             if self.rgb_radio.isChecked():
                 print("图像色彩空间管理, 选择sRGB色域")
-                if self.main_window and bool(self.main_window.on_comboBox_2_changed):
-                    self.main_window.on_comboBox_2_changed(index=1)
-                    self.main_window.comboBox_2.setCurrentIndex(1)
+                if self.main_window:
+                    if hasattr(self.main_window, "on_comboBox_2_changed"):
+                        self.main_window.on_comboBox_2_changed(index=1)  
+                        self.main_window.comboBox_2.setCurrentIndex(1)  
+                    if (hasattr(self.main_window, 'compare_window') 
+                    and hasattr(self.main_window.compare_window, 'on_comboBox_2_changed')):   
+                        self.main_window.compare_window.on_comboBox_2_changed(index=1)  
+                        self.main_window.compare_window.comboBox_2.setCurrentIndex(1) 
 
             if self.gray_radio.isChecked():
                 print("图像色彩空间管理, 选择gray灰度空间")     
-                if self.main_window and bool(self.main_window.on_comboBox_2_changed):
-                    self.main_window.on_comboBox_2_changed(index=2)
-                    self.main_window.comboBox_2.setCurrentIndex(2)
+                if self.main_window:
+                    if hasattr(self.main_window, "on_comboBox_2_changed"):
+                        self.main_window.on_comboBox_2_changed(index=2)  
+                        self.main_window.comboBox_2.setCurrentIndex(2)  
+                    if (hasattr(self.main_window, 'compare_window') 
+                    and hasattr(self.main_window.compare_window, 'on_comboBox_2_changed')):   
+                        self.main_window.compare_window.on_comboBox_2_changed(index=2)  
+                        self.main_window.compare_window.comboBox_2.setCurrentIndex(2) 
 
             if self.p3_radio.isChecked():
                 print("图像色彩空间管理, 选择Display-P3色域")
-                if self.main_window and bool(self.main_window.on_comboBox_2_changed):
-                    self.main_window.on_comboBox_2_changed(index=3)
-                    self.main_window.comboBox_2.setCurrentIndex(3)
+                if self.main_window:
+                    if hasattr(self.main_window, "on_comboBox_2_changed"):
+                        self.main_window.on_comboBox_2_changed(index=3)  
+                        self.main_window.comboBox_2.setCurrentIndex(3)  
+                    if (hasattr(self.main_window, 'compare_window') 
+                    and hasattr(self.main_window.compare_window, 'on_comboBox_2_changed')):   
+                        self.main_window.compare_window.on_comboBox_2_changed(index=3)  
+                        self.main_window.compare_window.comboBox_2.setCurrentIndex(3) 
         except Exception as e:
             print(f"[toggle_radio_colorspace]-->设置界面--选择图像色彩空间时发生错误: {e}")
 
@@ -1192,11 +1297,6 @@ class setting_Window(QMainWindow):
         radio_layout = QHBoxLayout()
         self.radio_folder = QRadioButton("跟随文件夹")
         self.radio_custom = QRadioButton("名称文本自定义")
-        # checbox: 显示窗口标题;radiobutton: 跟随文件夹,名称文本自定义
-        self.title_checkbox.setChecked(True)
-        self.radio_folder.setChecked(True)
-        self.radio_custom.setChecked(False)
-
         ## 设置互斥分组
         radio_group = QButtonGroup(settings_container)
         radio_group.addButton(self.radio_folder)
@@ -1204,7 +1304,6 @@ class setting_Window(QMainWindow):
         radio_layout.addWidget(self.radio_folder)
         radio_layout.addWidget(self.radio_custom)
         title_group.layout().addLayout(radio_layout)
-        
 
         # 添加组件信息到主布局中
         settings_layout.addWidget(display_group)
@@ -1607,6 +1706,62 @@ class setting_Window(QMainWindow):
         self.bottom_spacer.setStyleSheet("background: #F0F0F0;")
         
         """内容取组件初始化"""
+        # 读取配置文件
+        # BASICSET = BASEPATH / "config" / "basic_settings.json"
+        # EXIFSET = BASEPATH / "config" / "exif_setting.json"
+
+        # 设置界面相关按钮复选框初始化
+        if BASICSET.exists():
+            with open(BASICSET, "r", encoding='utf-8', errors='ignore') as f:
+                settings = json.load(f)
+
+                # 初始化播放器设置
+                player = settings.get("player_key", True)
+                self.opencv_player.setChecked(True) if player else self.vlc_player.setChecked(True)
+
+        if EXIFSET.exists():
+            with open(EXIFSET, "r", encoding='utf-8', errors='ignore') as f:
+                label_setting = json.load(f).get("label_visable_settings",{})
+
+                # 初始化--尺寸设置
+                self.full_radio.setChecked(True) if label_setting.get("is_fullscreen", False) else ...
+                self.normal_radio.setChecked(True) if label_setting.get("is_norscreen", False) else ...
+                self.maxed_radio.setChecked(True) if label_setting.get("is_maxscreen", False) else ...
+
+                # 初始化--显示设置
+                self.hisgram_checkbox.setChecked(label_setting.get("histogram_info", False))
+                self.exif_checkbox.setChecked(label_setting.get("exif_info", False))
+                self.roi_checkbox.setChecked(label_setting.get("roi_info", False))
+                self.ai_checkbox.setChecked(label_setting.get("ai_tips", False))
+
+                # 初始化--标题开关显示
+                self.radio_folder.setChecked(True)
+                self.radio_custom.setChecked(False)
+                self.title_checkbox.setChecked(label_setting.get("is_title_on", False))
+
+
+                # 初始化--色彩空间
+                self.auto_radio.setChecked(True) if label_setting.get("auto_color_space", False) else ...
+                self.rgb_radio.setChecked(True) if label_setting.get("srgb_color_space", False) else ...
+                self.p3_radio.setChecked(True) if label_setting.get("p3_color_space", False) else ...
+                self.gray_radio.setChecked(True) if label_setting.get("gray_color_space", False) else ...
+
+
+        # 主题模式初始化
+        self.follow_system_checkbox.setChecked(True)
+        # self.light_radio.clicked.setChecked(True)
+        # self.dark_radio.clicked.setChecked(True)
+
+
+        # 显示设置区域
+        self.roi_checkbox.setChecked(True)
+
+        # EXIF显示
+
+        # 色彩空间区域
+        self.auto_radio.setChecked(True)
+
+
         if self.main_window:
             pass
             # # 通用设置区域
@@ -1678,23 +1833,7 @@ class setting_Window(QMainWindow):
             # if hasattr(self.main_window, 'gray_color_space'):
             #     self.gray_radio.setChecked(self.main_window.gray_color_space)
 
-        
-        else:
-            """默认设置区域"""
-            # 通用设置区域
-            self.maxed_radio.setChecked(True)
 
-            # 颜色设置区域
-
-            # 显示设置区域
-            self.roi_checkbox.setChecked(True)
-
-            # EXIF显示
-
-            # 色彩空间区域
-            self.auto_radio.setChecked(True)
-
-            # 关于
 
 
     def set_shortcut(self):
@@ -1709,6 +1848,9 @@ class setting_Window(QMainWindow):
 
         """内容区组件的槽函数"""
         # 通用设置区域；设置圆形选择按钮的链接事件
+        self.opencv_player.clicked.connect(self.toggle_player)
+        self.vlc_player.clicked.connect(self.toggle_player)
+        self.normal_radio.clicked.connect(self.toggle_screen_display)
         self.normal_radio.clicked.connect(self.toggle_screen_display)
         self.maxed_radio.clicked.connect(self.toggle_screen_display)
         self.full_radio.clicked.connect(self.toggle_screen_display)
@@ -1775,8 +1917,8 @@ class setting_Window(QMainWindow):
         w, h = main_window_rect.width(), main_window_rect.height()
         w, h = int(w * 0.55), int(h * 0.60)
 
-        w = 1000 if w < 1000 else w
-        h = 800 if h < 800 else h
+        w = 1400 if w < 1400 else w
+        h = 900 if h < 900 else h
 
         # 设置搜索界面位置和大小
         self.move(x, y)
