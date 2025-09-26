@@ -1,22 +1,16 @@
 {
     "combobox_history": [
-        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.25-O19-IN-二供-小数包/video/N19123",
-        "D:\\Tuning\\Somalia-A(M953)\\03_pic\\2025-09-24自测\\camera_dump\\gc08",
-        "D:/Tuning/Somalia-A(M953)/03_pic/2025-09-24自测/camera_dump/gc08",
-        "C:\\Users\\caozhen\\Downloads\\camera_dump2\\camera_dump2\\camera_dump",
-        "C:/Users/caozhen/Downloads/camera_dump2/camera_dump2/camera_dump/gc08"
+        "D:/Tuning/Somalia-A(M953)/03_pic/HDR压制偏色验证/C3Z/前摄/normal",
+        "D:/Tuning/Somalia-A(M953)/03_pic/HDR压制偏色验证/C3Z/前摄/HDR",
+        "D:/Tuning/Somalia-A(M953)/03_pic/HDR压制偏色验证/POP10/前摄/normal"
     ],
-    "current_directory": "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.25-O19-IN-二供-小数包/video/N19123",
-    "file_type_option": "显示视频文件",
+    "current_directory": "D:/Tuning/Somalia-A(M953)/03_pic/HDR压制偏色验证/C3Z/前摄/normal",
+    "file_type_option": "显示图片文件",
     "combobox1_checked_items": [
-        "O19-1st",
-        "O19-2nd",
-        "vivo"
+        "HDR"
     ],
     "combobox1_all_items": [
-        "O19-1st",
-        "O19-2nd",
-        "vivo"
+        "HDR"
     ],
     "sort_option": "按文件名称排序",
     "theme_option": "默认主题",

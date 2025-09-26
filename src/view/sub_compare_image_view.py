@@ -1591,7 +1591,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 self.tableWidget_medium.setHorizontalHeaderLabels(folder_names)
                 
 
-
                 # 3. 使用线程池并行处理图片
                 self.progress_updated.emit(50)
                 # 使用并行解析图片的pil格式图、cv_img、histogram、pixmap、gray_pixmap、p3_pixmap以及exif等信息
@@ -2409,7 +2408,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
             # 图片尺寸，pixmap是旋转后的图像，尺寸会更准确
             width, height = pixmap.width(), pixmap.height()
-
             basic_info = f"图片名称: {pic_name}\n图片大小: {size_str}\n图片尺寸: {width} x {height}\n图片张数: {index}"
 
             # 针对小米相机拍图会写入hdr和zoom增加额外信息
@@ -2483,7 +2481,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                                 value = value.decode('utf-8')
                             # 曝光时间处理
                             if tag_id == 33434: 
-                                exp_s = (value[0]/value[1])*1000000
+                                exp_s = (value[0]/value[1])*1000
                                 # 设置保留小数点后两位
                                 exp_s = round(exp_s, 2)
                                 exp_s = f"{exp_s}ms"

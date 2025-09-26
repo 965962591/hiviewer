@@ -42,7 +42,6 @@ USERPATH = BASEPATH / "resource" / "docs" / "User_Manual.md"
 VWESIONPATH = BASEPATH / "resource" / "docs" / "Version_Updates.md"
 
 # 设置图标路径
-ICONPATH = Path(BASEPATH, "resource", "icons", "about.ico").as_posix()
 ICONLABELPATH = Path(BASEPATH, "resource", "icons", "viewer_3.ico").as_posix()
 
 # 设置配置文件路基
@@ -1703,7 +1702,7 @@ class setting_Window(QMainWindow):
         self.scroll_content.setStyleSheet("background: #F0F0F0;")
         self.bottom_spacer.setStyleSheet("background: #F0F0F0;")
         
-        
+
         """内容取组件初始化"""
         # 设置界面相关按钮复选框初始化
         if BASICSET.exists():
@@ -1756,78 +1755,11 @@ class setting_Window(QMainWindow):
         # 色彩空间区域
         self.auto_radio.setChecked(True)
 
-
+        # 读取内存中的变化, 进行相关组件初始化
         if self.main_window:
-            pass
-            # # 通用设置区域
-            # if hasattr(self.main_window, 'is_maxscreen') and self.main_window.is_maxscreen:
-            #     self.maxed_radio.setChecked(True)
-            # if hasattr(self.main_window, 'is_norscreen') and self.main_window.is_norscreen:
-            #     self.normal_radio.setChecked(True)
-            # if hasattr(self.main_window, 'is_fullscreen') and self.main_window.is_fullscreen:
-            #     self.full_radio.setChecked(True)
-
-            # if hasattr(self.main_window, 'parent_window') and hasattr(self.main_window.parent_window, 'current_theme'):
-            #     if self.main_window.parent_window.current_theme == "默认主题":
-            #         self.light_radio.setChecked(True)
-            #     if self.main_window.parent_window.current_theme == "暗黑主题":
-            #         self.dark_radio.setChecked(True)
-            # else:
-            #     self.light_radio.setChecked(True)
-            # self.update_card_styles()  # 更新主题设置
-
-            # # 颜色设置区域
-            # if hasattr(self.main_window, 'background_color_default'):
-            #     try:
-            #         idx = self.list_colors.index(self.main_window.background_color_default)
-            #     except ValueError:
-            #         idx = 0  
-            #     self.select_color(self.background_btns, idx, "背景颜色")
-            # if hasattr(self.main_window, 'background_color_table'):
-            #     try:
-            #         idx = self.list_colors.index(self.main_window.background_color_table)
-            #     except ValueError:
-            #         idx = 0  
-            #     self.select_color(self.fill_btns, idx, "填充颜色")
-            # if hasattr(self.main_window, 'font_color_default'):
-            #     try:
-            #         idx = self.list_colors.index(self.main_window.font_color_default)
-            #     except ValueError:
-            #         idx = 0  
-            #     self.select_color(self.font_btns, idx, "字体颜色")
-            # if hasattr(self.main_window, 'font_color_exif'):
-            #     try:
-            #         idx = self.list_colors.index(self.main_window.font_color_exif)
-            #     except ValueError:
-            #         idx = 0  
-            #     self.select_color(self.exif_btns, idx, "EXIF颜色")
-
-
-            # # 显示设置区域
-            # if hasattr(self.main_window, 'checkBox_1'):
-            #     self.hisgram_checkbox.setChecked(self.main_window.checkBox_1.isChecked())
-            # if hasattr(self.main_window, 'checkBox_2'):
-            #     self.exif_checkbox.setChecked(self.main_window.checkBox_2.isChecked())
-            # if hasattr(self.main_window, 'checkBox_3'):
-            #     self.roi_checkbox.setChecked(self.main_window.checkBox_3.isChecked())
-            # if hasattr(self.main_window, 'checkBox_4'):
-            #     self.ai_checkbox.setChecked(self.main_window.checkBox_4.isChecked())
-            # if hasattr(self.main_window, 'is_title_on'):
-            #     self.title_checkbox.setChecked(self.main_window.is_title_on)
-            #     if not self.title_checkbox.isChecked():
-            #         self.radio_custom.setEnabled(self.title_checkbox.isChecked())
-            #         self.radio_folder.setEnabled(self.title_checkbox.isChecked())
-
-            # # 色彩空间区域
-            # if hasattr(self.main_window, 'auto_color_space'):
-            #     self.auto_radio.setChecked(self.main_window.auto_color_space)
-            # if hasattr(self.main_window, 'srgb_color_space'):
-            #     self.rgb_radio.setChecked(self.main_window.srgb_color_space)
-            # if hasattr(self.main_window, 'p3_color_space'):
-            #     self.p3_radio.setChecked(self.main_window.p3_color_space)
-            # if hasattr(self.main_window, 'gray_color_space'):
-            #     self.gray_radio.setChecked(self.main_window.gray_color_space)
-
+            if hasattr(self.main_window, "player_key"):
+                # 初始化播放器设置
+                self.opencv_player.setChecked(self.main_window.player_key)
 
 
 

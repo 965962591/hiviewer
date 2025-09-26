@@ -25,51 +25,31 @@ import stat
 import shutil
 import subprocess
 from pathlib import Path
-from collections import Counter
 from itertools import zip_longest
+from collections import Counter
 
 """导入python第三方模块"""
 from PyQt5.QtGui import (
     QIcon, QKeySequence, QPixmap)
 from PyQt5.QtWidgets import (
-    QFileSystemModel, QAbstractItemView, QTableWidgetItem, 
-    QHeaderView, QShortcut, QSplashScreen, QMainWindow, 
-    QSizePolicy, QApplication, QMenu, QInputDialog, QTreeView, 
-    QProgressDialog, QDialog, QLabel)
+    QFileSystemModel, QAbstractItemView, QMenu, QHeaderView, QShortcut, QMainWindow,  
+    QSplashScreen, QSizePolicy, QApplication, QTableWidgetItem, QTreeView, QProgressDialog, QDialog, QLabel)
 from PyQt5.QtCore import (
     Qt, QDir, QSize, QTimer, QThreadPool, QUrl, QSize, 
     QMimeData, QPropertyAnimation, QItemSelection, QItemSelectionModel)
 
 
 """导入用户自定义的模块"""
-from src.view.sub_compare_image_view import SubMainWindow                   # 假设这是你的子窗口类名
-from src.view.sub_rename_view import FileOrganizer                          # 添加这行以导入批量重名名类名
-from src.view.sub_image_process_view import SubCompare                      # 确保导入 SubCompare 类
-from src.view.sub_bat_view import LogVerboseMaskApp                         # 导入批量执行命令的类
-from src.view.sub_search_view import SearchOverlay                          # 导入图片搜索工具类(ctrl+f)
-from src.components.ui_main import Ui_MainWindow                            # 假设你的主窗口类名为Ui_MainWindow
-from src.components.custom_qMbox_showinfo import show_message_box           # 导入消息框类
-
-from src.components.custom_qdialog_rename import SingleFileRenameDialog     # 导入自定义重命名对话框类
-from src.common.font import JetBrainsMonoLoader                             # 字体管理器
-
-from src.components.custom_qCombox_spinner import CheckBoxListModel,CheckBoxDelegate        # 导入自定义下拉框类中的数据模型和委托代理类
-from src.common.img_preview import ImageViewer                              # 导入自定义图片预览组件  
-from src.common.manager_version import version_init, fastapi_init           # 版本号&IP地址初始化
-from src.common.manager_color_exif import load_color_settings               # 导入自定义json配置文件
-from src.common.manager_log import setup_logging, get_logger                # 导入日志文件相关配置
-from src.common.decorator import log_performance_decorator                  # 导入自定义装饰器函数 
-from src.common.decorator import log_error_decorator
-from src.utils.raw2jpg import Mipi2RawConverterApp                          # 导入MIPI RAW文件转换为JPG文件的类
-from src.utils.update import check_update, pre_check_update                 # 导入自动更新检查程序
-from src.utils.hisnot import WScreenshot                                    # 导入截图工具类
-from src.utils.xml import save_excel_data                                   # 导入xml文件解析工具类
-from src.utils.Icon import IconCache, ImagePreloader                        # 导入文件Icon图标加载类
-from src.utils.video import extract_video_first_frame                       # 导入视频预览工具类
-from src.utils.image import ImageProcessor                                  # 导入图片处理工具类
-from src.utils.sort import sort_by_custom                                   # 导入文件排序工具类
-
-
+from src.components.ui_main import Ui_MainWindow                                     # 假设你的主窗口类名为Ui_MainWindow
+from src.components.custom_qMbox_showinfo import show_message_box                    # 导入消息框类
+from src.components.custom_qCombox_spinner import CheckBoxListModel,CheckBoxDelegate # 导入自定义下拉框类中的数据模型和委托代理类
+from src.utils.xml import save_excel_data                                            # 导入xml文件解析工具类
+from src.utils.Icon import IconCache                                                 # 导入文件Icon图标加载类
+from src.common.decorator import log_performance_decorator, log_error_decorator      # 导入自定义装饰器函数 
+from src.common.manager_version import version_init, fastapi_init                    # 版本号&IP地址初始化
+from src.common.manager_color_exif import load_color_settings                        # 导入自定义json配置文件
+from src.common.manager_log import setup_logging, get_logger                         # 导入日志文件相关配置
+from src.common.font import JetBrainsMonoLoader                                      # 字体管理器
 
 """
 设置全局函数的方法
@@ -1056,29 +1036,30 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def rename_file(self, path):
         """重命名文件/文件夹"""
         try:
-            # 如果选中多个文件或者文件夹，只取列表中的第一个
+            # 导入自定义重命名对话框类
+            from src.components.custom_qdialog_rename import SingleFileRenameDialog 
+
+            # 分别处理选中多个文件夹和单个文件夹重命名的情况
             if isinstance(path, list):
-                if len(path) != 1:
-                    # show_message_box(f"🚩仅支持对单个文件/文件夹进行重命名", "提示", 1500)
+                # 多个选中
+                if len(path) != 1: 
                     self.open_rename_tool(path)
                     return
-
-            # 默认从列表中取字符串，打开重命名会话窗口
-            path = path[0]
-            dialog = SingleFileRenameDialog(path, self)
-            dialog.setWindowTitle("重命名文件/文件夹")
-            if dialog.exec_() == QDialog.Accepted:
-                if (new_path := dialog.get_new_file_path()):
-                    # 更新文件系统模型以及地址栏和表格显示
-                    if (index := self.file_system_model.index(new_path)).isValid():
-                        # 设置当前索引,展开该目录,滚动到该项，确保垂直方向居中,水平滚动条置0
-                        self.Left_QTreeView.setCurrentIndex(index)    
-                        self.Left_QTreeView.setExpanded(index, True)  
-                        self.Left_QTreeView.scrollTo(index, QAbstractItemView.PositionAtCenter)
-                        self.Left_QTreeView.horizontalScrollBar().setValue(0)
-                        self.update_combobox(index)
-                    # self.file_system_model.setRootPath('')
-                    # self.Left_QTreeView.viewport().update()
+                # 单个选中
+                else: 
+                    path = path[0]
+                    dialog = SingleFileRenameDialog(path, self)
+                    dialog.setWindowTitle("重命名文件/文件夹")
+                    if dialog.exec_() == QDialog.Accepted:
+                        if (new_path := dialog.get_new_file_path()):
+                            # 更新文件系统模型以及地址栏和表格显示
+                            if (index := self.file_system_model.index(new_path)).isValid():
+                                # 设置当前索引,展开该目录,滚动到该项，确保垂直方向居中,水平滚动条置0
+                                self.Left_QTreeView.setCurrentIndex(index)    
+                                self.Left_QTreeView.setExpanded(index, True)  
+                                self.Left_QTreeView.scrollTo(index, QAbstractItemView.PositionAtCenter)
+                                self.Left_QTreeView.horizontalScrollBar().setValue(0)
+                                self.update_combobox(index)
         except Exception as e:
             print(f"[rename_file]-->error--执行重命名事件时 | 报错: {e}")
             self.logger.error(f"【rename_file】-->执行重命名事件时 | 报错: {e}")
@@ -1625,6 +1606,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     @log_error_decorator(tips="打开【T】键截图界面")
     def screen_shot_tool(self):
         """截图功能"""
+        # 导入截图工具类
+        from src.utils.hisnot import WScreenshot 
         WScreenshot.run()
 
     def on_x_pressed(self):
@@ -2011,6 +1994,11 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         
     def filter_files(self, folder):
         """根据选项过滤文件"""
+        # 导入图片处理工具类
+        from src.utils.image import ImageProcessor 
+        # 导入文件排序工具类
+        from src.utils.sort import sort_by_custom 
+
         files_and_dirs_with_mtime = [] 
         opt = self.RT_QComboBox0.currentText()
         sort_option = self.RT_QComboBox2.currentText()
@@ -2061,6 +2049,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         
     def start_image_preloading(self, file_paths):
         """开始预加载图片"""
+        # 导入文件Icon图标加载类
+        from src.utils.Icon import ImagePreloader                        
+
         # 输出打印日志文件
         print("[start_image_preloading]-->执行函数任务, 开始预加载图标, 启动预加载线程")
         self.logger.info(f"[start_image_preloading]-->执行函数任务, 开始预加载图标, 启动预加载线程")
@@ -2263,12 +2254,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def display_preview_image_dynamically(self, preview_file_path):
         """动态显示预览图像"""
         try:
+            # 导入视频预览工具类
+            from src.utils.video import extract_video_first_frame   
+            # 导入heic文件解析工具类
+            from src.utils.heic import extract_jpg_from_heic
+
             # 图片文件处理,更具文件类型创建图片预览
             if (file_extension := os.path.splitext(preview_file_path)[1].lower()).endswith(self.IMAGE_FORMATS):
                 # 处理HEIC格式图片，成功提取则创建并显示图片预览，反之则显示提取失败
                 if file_extension.endswith(".heic"):
-                    # 导入heic文件解析工具类
-                    from src.utils.heic import extract_jpg_from_heic                            
                     if new_path := extract_jpg_from_heic(preview_file_path):
                         self.create_image_preview(new_path)
                         return
@@ -2279,7 +2273,10 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
             # 视频文件处理,提取视频文件首帧图，创建并显示预览图
             elif file_extension.endswith(self.VIDEO_FORMATS):
-                self.create_image_preview(video_path) if (video_path := extract_video_first_frame(preview_file_path)) else self.show_preview_error("视频文件预览失败")
+                if (video_path := extract_video_first_frame(preview_file_path)):
+                    self.create_image_preview(video_path) 
+                else: 
+                    self.show_preview_error("视频文件预览失败")
                 return
 
             # 非图片/视频格式文件处理
@@ -2319,6 +2316,9 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def create_image_preview(self, path):
         """创建图片预览"""
         try:
+            # 导入自定义图片预览组件
+            from src.common.img_preview import ImageViewer                                
+
             # 清空旧预览内容
             self.clear_preview_layout()
             # 创建 ImageViewer 实例-->加载图片-->添加到layout
@@ -3316,17 +3316,18 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             return [], []
     
     @log_error_decorator(tips="处理F1键按下事件")
-    def on_f1_pressed(self):
+    def on_f1_pressed(self):                        
         """处理F1键按下事件
         函数功能说明: 打开MIPI RAW文件转换为JPG文件工具
         """
-        # 初始化文件格式转化类
+        # 导入MIPI RAW文件转换为JPG文件的类
+        from src.utils.raw2jpg import Mipi2RawConverterApp  
+
+        # 初始化文件格式转化类，设置窗口图标，添加链接关闭事件
         self.raw2jpg_tool = Mipi2RawConverterApp()
         self.raw2jpg_tool.setWindowTitle("MIPI RAW文件转换为JPG文件")
-        # 设置窗口图标
         icon_path = (self.icon_path / "raw_ico_96x96.ico").as_posix()
         self.raw2jpg_tool.setWindowIcon(QIcon(icon_path))
-        # 添加链接关闭事件
         self.raw2jpg_tool.closed.connect(self.on_raw2jpg_tool_closed)
         self.raw2jpg_tool.show()
 
@@ -3736,14 +3737,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         """处理【Ctrl+f】键按下事件
         函数功能说明: 打开主界面图片模糊搜索工具
         """
+        # 导入图片搜索工具类(ctrl+f)
+        from src.view.sub_search_view import SearchOverlay                          
+        
         # 构建图片名称列表，保持多维列表的结构, 保持图片名称的完整路径
         image_names = [[os.path.basename(path) for path in folder_paths] for folder_paths in self.paths_list]
-        # 创建搜索窗口
+        # 创建搜索窗口并显示；设置链接信号；打印输出日志文件
         self.search_window = SearchOverlay(self, image_names)
         self.search_window.show_search_overlay()
-        # 连接搜索窗口的选中项信号
         self.search_window.item_selected_from_search.connect(self.on_item_selected_from_search)
-        # 打印输出日志文件
         self.logger.info("on_ctrl_f_pressed()-->打开图片模糊搜索工具成功")
 
     @log_error_decorator(tips="处理图片模糊搜索工具选中事件")
@@ -3886,6 +3888,10 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     @log_error_decorator(tips="创建看图子窗口的统一方法")
     def create_compare_window(self, selected_file_paths, image_indexs):
         """创建看图子窗口的统一方法"""
+        # 导入看图子界面类
+        from src.view.sub_compare_image_view import SubMainWindow  
+
+        # 初始化看图子界面类，设置窗口图标以及相关槽函数
         # self.pause_preloading() # modify by diamond_cz 20250217 禁用暂停预加载功能，看图时默认后台加载图标
         # 打印主界面底部栏标签提示信息并立即重绘
         self.statusbar_label1.setText(f"📢:正在打开看图子界面..."), self.statusbar_label1.repaint()
@@ -3897,7 +3903,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.logger.info("[create_compare_window]-->看图子界面已存在，直接传入图片路径和索引列表")
             self.compare_window.set_images(selected_file_paths, image_indexs)
             self.compare_window.show()
-        # 连接看图子窗口的关闭信号
         self.compare_window.closed.connect(self.on_compare_window_closed)
         self.statusbar_label1.setText(f"📢:看图子界面打开成功")
         self.statusbar_label1.repaint()  # 刷新标签文本
@@ -3975,6 +3980,10 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     @log_error_decorator(tips="打开单文件重命名功能子界面")
     def open_sigle_file_rename_tool(self, current_folder, selected_items):
         """创建单文件重命名方法"""
+        # 导入自定义重命名对话框类
+        from src.components.custom_qdialog_rename import SingleFileRenameDialog     
+         
+        # 初始化单文件重命名类，设置接受事件 
         dialog = SingleFileRenameDialog(current_folder, self)
         if dialog.exec_() == QDialog.Accepted:
             if (new_file_path := dialog.get_new_file_path()):
@@ -3995,12 +4004,14 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     @log_error_decorator(tips="打开批量重命名功能子界面")
     def open_rename_tool(self, current_folder):
         """创建批量重命名的统一方法"""
+        # 导入批量重命名子界面类
+        from src.view.sub_rename_view import FileOrganizer
+        
+        # 初始化批量重命名类，设置窗口图标以及相关槽函数
         self.rename_tool = FileOrganizer(dir_list=current_folder)
         self.rename_tool.setWindowTitle("批量重命名")
-        # 设置窗口图标
         icon_path = (self.icon_path / "rename_ico_96x96.ico").as_posix()
         self.rename_tool.setWindowIcon(QIcon(icon_path))
-        # 链接关闭事件
         self.rename_tool.imagesRenamed.connect(self.on_rename_tool_closed) 
         self.rename_tool.show()
         self.hide()
@@ -4008,13 +4019,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     @log_error_decorator(tips="打开图片调整功能子界面")
     def open_image_process_window(self, image_path):
         """创建图片处理子窗口的统一方法"""
+        # 导入图片调整子界面类
+        from src.view.sub_image_process_view import SubCompare  
+        
+        # 初始化相关图片调整子界面类，设置图标以及相关槽函数
         self.image_process_window = SubCompare(image_path)
         self.image_process_window.setWindowTitle("图片调整") 
         self.image_process_window.setWindowFlags(Qt.Window)
-        # 设置窗口图标
         icon_path = (self.icon_path / "ps_ico_96x96.ico").as_posix()
         self.image_process_window.setWindowIcon(QIcon(icon_path))
-        # 链接关闭事件
         self.image_process_window.closed.connect(self.on_image_process_window_closed) 
         self.image_process_window.show()
         self.hide()
@@ -4022,12 +4035,14 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     @log_error_decorator(tips="批量执行命令界面")
     def open_bat_tool(self):
         """创建批量执行命令的统一方法"""
+        # 导入批量执行命令的类
+        from src.view.sub_bat_view import LogVerboseMaskApp                         
+        
+        # 初始化类并设置窗口图标以及相关槽函数
         self.bat_tool = LogVerboseMaskApp()
         self.bat_tool.setWindowTitle("批量执行命令")
-        # 设置窗口图标
         icon_path = (self.icon_path / "cmd_ico_96x96.ico").as_posix()
         self.bat_tool.setWindowIcon(QIcon(icon_path))
-        # 链接关闭事件
         self.bat_tool.closed.connect(self.on_bat_tool_closed)
         self.bat_tool.show()
         self.hide()

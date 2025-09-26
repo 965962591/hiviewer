@@ -6,6 +6,9 @@ from PyQt5.QtCore import Qt, QSettings, QTimer
 from PyQt5.QtGui import QIcon
 from src.components.custom_qMbox_showinfo import show_message_box 
 
+"""设置本项目的入口路径,全局变量BasePath,设置图标路径ICONPATH"""
+BASEPATH = Path(__file__).parent.parent.parent
+ICONPATH = Path(BASEPATH, "resource", "icons", "rename_ico_96x96.ico").as_posix()
 
 class SingleFileRenameDialog(QDialog):
     """单文件重命名对话框类"""
@@ -29,8 +32,7 @@ class SingleFileRenameDialog(QDialog):
         self.setFixedSize(650, 180)
 
         # 设置图标
-        icon_path = (Path(__file__).parent.parent.parent / "resource" / "icons" / "rename_ico_96x96.ico").as_posix()
-        self.setWindowIcon(QIcon(icon_path))
+        self.setWindowIcon(QIcon(ICONPATH))
         
         # 主布局
         layout = QVBoxLayout()

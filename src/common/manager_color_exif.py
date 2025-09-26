@@ -27,9 +27,15 @@ def load_exif_settings():
                     "exif_info": bool(1),
                     "roi_info": bool(1),
                     "ai_tips": bool(0),
+                    "auto_color_space": bool(1),
+                    "srgb_color_space": bool(0),
                     "p3_color_space": bool(0),
                     "gray_color_space": bool(0),
-                    "srgb_color_space": bool(1),
+                    "is_fullscreen": bool(0),
+                    "is_norscreen": bool(0),
+                    "is_maxscreen": bool(1),
+                    "is_title_on": bool(1),
+                    
                 }
 
                 exif_visable_setting = {
@@ -61,8 +67,8 @@ def load_exif_settings():
                     "Long_gain": bool(1),
                     
                     # 展锐平台关键字
-                    "Mulaes": bool(1),
-                    "HM": bool(1),
+                    "Mulaes": bool(0),
+                    "HM": bool(0),
                     "Face": bool(1),
                     "LCG": bool(1),
 

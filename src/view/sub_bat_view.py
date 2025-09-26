@@ -38,11 +38,14 @@ import sys
 import wmi
 import pythoncom
 import configparser
+from pathlib import Path
 from datetime import datetime
 
 
-# 全局变量定义缓存目录
-APP_CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "config")
+"""设置本项目的入口路径,全局变量BasePath,设置图标路径ICONPATH"""
+BASEPATH = Path(__file__).parent.parent.parent
+APP_CACHE_DIR = (BASEPATH / "config").as_posix()
+ICONPATH = Path(BASEPATH, "resource", "icons", "file_down.ico").as_posix()
 
 class USBDeviceMonitor:
     """USB设备实时监控类（Windows平台专用）"""
@@ -1121,13 +1124,9 @@ class LogVerboseMaskApp(QMainWindow):
         lightscreen_action.triggered.connect(self.lightscreen)
         quick_menu.addAction(lightscreen_action)
         
-
-
     def initUI(self):
         self.setWindowTitle("Bat脚本管理器")
         self.resize(1200, 900)
-        # icon_path = os.path.join(os.path.dirname(__file__), "icon", "bat.ico")
-        # self.setWindowIcon(QIcon(icon_path))
         self.mask_value = 0x00000000
 
         # 创建菜单栏
@@ -2593,9 +2592,8 @@ class FileDownloadDialog(QDialog):
         self.setMinimumSize(600, 500)
         
         # 设置图标
-        icon_path = os.path.join(os.path.dirname(__file__), "icon", "file_down.ico")
-        if os.path.exists(icon_path):
-            self.setWindowIcon(QIcon(icon_path))
+        if os.path.exists(ICONPATH):
+            self.setWindowIcon(QIcon(ICONPATH))
         
         # 初始化变量
         self.selected_source_paths = []

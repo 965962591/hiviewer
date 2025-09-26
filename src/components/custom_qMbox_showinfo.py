@@ -4,6 +4,10 @@ from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QIcon
 from pathlib import Path
 
+"""设置本项目的入口路径,全局变量BasePath,设置图标路径ICONPATH"""
+BASEPATH = Path(__file__).parent.parent.parent
+ICONPATH = Path(BASEPATH, "resource", "icons", "viewer_3.ico").as_posix()
+
 
 def show_message_box(text, title="提示", timeout=None):
     """显示消息框，宽度自适应文本内容
@@ -18,8 +22,7 @@ def show_message_box(text, title="提示", timeout=None):
     msg_box.setText(text)
     
     # 设置消息框主图标,获取项目根目录并拼接图标路径
-    BasePath = Path(__file__).parent.parent.parent / "resource" / "icons" / "viewer_3.ico"
-    msg_box.setWindowIcon(QIcon(BasePath.as_posix()))
+    msg_box.setWindowIcon(QIcon(ICONPATH))
 
     # 设置定时器自动关闭
     if timeout is not None:
