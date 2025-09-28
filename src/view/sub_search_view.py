@@ -15,10 +15,10 @@
 4、支持按esc键关闭搜索界面
 5、点击搜索到的项，可以返回该项在多维列表中的位置
 """
+import sys
 from PyQt5.QtWidgets import QLineEdit, QListWidget, QListWidgetItem, QVBoxLayout, QShortcut, QMainWindow, QWidget, QApplication, QFrame
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QKeySequence, QPalette, QColor
-import sys
 
 
 class SearchOverlay(QMainWindow):
@@ -31,7 +31,6 @@ class SearchOverlay(QMainWindow):
         
         # 初始化ui
         self.init_ui()
-
 
         # 连接信号和槽
         self.search_input.textChanged.connect(self.update_search_results)
@@ -122,10 +121,10 @@ class SearchOverlay(QMainWindow):
             }
         """)
         
-        if self.main_window is not None and self.main_window.custom_font_jetbrains_medium:
+        if self.main_window and hasattr(self.main_window, "font_jetbrains_m") :
             #设置字体
-            self.search_input.setFont(self.main_window.custom_font_jetbrains_medium)
-            self.search_results_list.setFont(self.main_window.custom_font_jetbrains_medium)
+            self.search_input.setFont(self.main_window.font_jetbrains_m)
+            self.search_results_list.setFont(self.main_window.font_jetbrains_m)
 
         # 将frame添加到主布局
         main_layout.addWidget(self.frame)
@@ -209,7 +208,6 @@ class SearchOverlay(QMainWindow):
         position = item.data(Qt.UserRole)
         self.item_selected_from_search.emit(position)
         self.hide_search_overlay()
-
 
 
 if __name__ == "__main__":

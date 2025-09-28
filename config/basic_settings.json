@@ -5,12 +5,12 @@
         "D:/Tuning/Somalia-A(M953)/03_pic/HDR压制偏色验证/POP10/前摄/normal",
         "D:/Tuning/Somalia-A(M953)/03_pic/HDR压制偏色验证/C3Z/前摄/test"
     ],
-    "current_directory": "D:/Tuning/Somalia-A(M953)/03_pic/HDR压制偏色验证/C3Z/前摄/test",
+    "current_directory": "D:/Tuning/Somalia-A(M953)/03_pic/HDR压制偏色验证/C3Z/前摄/normal",
     "file_type_option": "显示所有文件",
     "combobox1_checked_items": [],
     "combobox1_all_items": [
         "HDR",
-        "normal"
+        "test"
     ],
     "sort_option": "按创建时间排序",
     "theme_option": "默认主题",
