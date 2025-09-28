@@ -23,8 +23,8 @@ from src.common.font import JetBrainsMonoLoader
 from src.common.manager_color_exif import load_color_settings 
 
 """设置本项目的入口路径, 以及图标根目录"""
-BasePath = pathlib.Path(sys.argv[0]).parent
-DIRICON = BasePath / "resource" / "icons"
+BASEPATH = pathlib.Path(__file__).parent.parent.parent
+ICONPATH = BASEPATH / "resource" / "icons"
 
 
 """"自定义类"""
@@ -746,14 +746,14 @@ class VideoPlayer(QWidget):
 
         # 控制按钮和设置
         self.play_button = QPushButton(self)
-        play_icon_path = (DIRICON / "play.ico").as_posix()
+        play_icon_path = (ICONPATH / "play.ico").as_posix()
         self.play_button.setIcon(QIcon(play_icon_path))  # 设置播放图标
         self.play_button.setToolTip("播放/暂停")
         self.play_button.setStyleSheet("border: none;")  # 去掉按钮边框
         self.play_button.clicked.connect(self.play_pause)
 
         self.replay_button = QPushButton(self)
-        replay_icon_path = (DIRICON / "replay.ico").as_posix()
+        replay_icon_path = (ICONPATH / "replay.ico").as_posix()
         self.replay_button.setIcon(QIcon(replay_icon_path))  # 设置重播图标
         self.replay_button.setStyleSheet("border: none;")    # 去掉按钮边框
         self.replay_button.setToolTip("重播")
@@ -779,21 +779,21 @@ class VideoPlayer(QWidget):
         # 旋转按钮
         self.rotate_left_button = QPushButton(self)
         self.rotate_left_button.setStyleSheet("border: none;")
-        rotate_left_icon_path = (DIRICON / "left.ico").as_posix()
+        rotate_left_icon_path = (ICONPATH / "left.ico").as_posix()
         self.rotate_left_button.setToolTip("左转90°")
         self.rotate_left_button.setIcon(QIcon(rotate_left_icon_path))  # 设置左转图标
         self.rotate_left_button.clicked.connect(self.rotate_left)
 
         self.rotate_right_button = QPushButton(self)
         self.rotate_right_button.setStyleSheet("border: none;")
-        rotate_right_icon_path = (DIRICON / "right.ico").as_posix()
+        rotate_right_icon_path = (ICONPATH / "right.ico").as_posix()
         self.rotate_right_button.setToolTip("右转90°")
         self.rotate_right_button.setIcon(QIcon(rotate_right_icon_path))  # 设置右转图标
         self.rotate_right_button.clicked.connect(self.rotate_right)
 
         # 添加 "main" 按钮
         self.main_button = QPushButton(self)
-        main_icon_path = (DIRICON / "base.ico").as_posix()
+        main_icon_path = (ICONPATH / "base.ico").as_posix()
         self.main_button.setIcon(QIcon(main_icon_path))  # 设置主图标
         self.main_button.setToolTip("设置为基准视频，计算并设置其他视频的跳帧数")
         self.main_button.setStyleSheet("border: none;")
@@ -1008,12 +1008,12 @@ class VideoPlayer(QWidget):
             self.is_paused = False
             self.frame_reader.resume()
             self.last_update_time = time.time()  # 重置时间基准
-            play_icon_path = (DIRICON / "play.ico").as_posix()
+            play_icon_path = (ICONPATH / "play.ico").as_posix()
             self.play_button.setIcon(QIcon(play_icon_path))
         else:
             self.is_paused = True
             self.frame_reader.pause()
-            pause_icon_path = (DIRICON / "pause.ico").as_posix()
+            pause_icon_path = (ICONPATH / "pause.ico").as_posix()
             self.play_button.setIcon(QIcon(pause_icon_path))
 
     def replay(self):
@@ -1152,7 +1152,7 @@ class VideoPlayer(QWidget):
         # 创建 QLabel 用于显示 GIF
         self.progress_label = QLabel(self.progress_widget)
         # 路径
-        gif_path = (DIRICON / "ncat.ico").as_posix()
+        gif_path = (ICONPATH / "ncat.ico").as_posix()
         self.movie = QMovie(gif_path)
         
         # 设置GIF显示大小
@@ -1669,7 +1669,7 @@ class VideoWall(QWidget):
                             player.last_update_time = time.time()  # 重置时间基准
                             
                             # 更新播放/暂停按钮图标
-                            play_icon_path = (DIRICON / "play.ico").as_posix()
+                            play_icon_path = (ICONPATH / "play.ico").as_posix()
                             player.play_button.setIcon(QIcon(play_icon_path))
                         
                         # 恢复视频读取器运行

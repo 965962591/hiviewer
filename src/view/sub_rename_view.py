@@ -1,20 +1,20 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
-from ntpath import isfile
-import sys
-import os
-import tempfile
-import re
-import datetime
-from collections import defaultdict
-from pathlib import Path
 
+import os
+import re
+import sys
+import tempfile
+import datetime
+from pathlib import Path
+from collections import defaultdict
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
-# 设置全局基本路径
-BasePath = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+"""设置本项目的入口路径,全局变量BASEPATH,设置图标路径ICONPATH"""
+BASEPATH = Path(__file__).parent.parent.parent
+ICONPATH = BASEPATH / "resource" / "icons"
 
 class ExcludeFilterProxyModel(QSortFilterProxyModel):
     def __init__(self, parent=None):
@@ -104,7 +104,7 @@ class PowerRenameDialog(QWidget):
         self.setWindowFlags(Qt.Window | Qt.WindowStaysOnTopHint)
         
         # 设置图标
-        icon_path = os.path.join(BasePath, "resource", "icons", "rename_ico_96x96.ico")
+        icon_path = (ICONPATH / "rename_ico_96x96.ico").as_posix()
         self.setWindowIcon(QIcon(icon_path))
         
         # 添加ESC键关闭快捷键
@@ -981,7 +981,7 @@ class PreviewDialog(QDialog):
     def __init__(self, rename_data):
         super().__init__()
         self.setWindowTitle("重命名预览")
-        icon_path = os.path.join(BasePath, "resource", "icons", "rename_ico_96x96.ico")
+        icon_path = (ICONPATH / "rename_ico_96x96.ico").as_posix()
         self.setWindowIcon(QIcon(icon_path))
 
         self.resize(1800, 1200)
@@ -1017,7 +1017,7 @@ class FileOrganizer(QWidget):
 
         # UI初始化,以及图标设置
         self.initUI()
-        icon_path = os.path.join(BasePath, "resource", "icons", "rename_ico_96x96.ico")
+        icon_path = (ICONPATH / "rename_ico_96x96.ico").as_posix()
         self.setWindowIcon(QIcon(icon_path))
 
         # 处理传入文件/文件夹路径

@@ -29,7 +29,7 @@ import platform
 
 """设置本项目的入口路径, 以及图标根目录"""
 BASEPATH = pathlib.Path(__file__).parent.parent.parent
-ICONDIR = BASEPATH / "resource" / "icons" 
+ICONPATH = BASEPATH / "resource" / "icons" 
 
 
 # 全局VLC参数缓存
@@ -97,7 +97,7 @@ def check_vlc_installation():
 def show_vlc_startup_dialog():
     """程序启动时的VLC检测和下载对话框"""
     vlc_dialog = VlcTipsDialog()    
-    icon_path = (ICONDIR / "viewer_3.ico").as_posix()
+    icon_path = (ICONPATH / "viewer_3.ico").as_posix()
     vlc_dialog.setWindowIcon(QIcon(icon_path))
     if vlc_dialog.exec_() == QDialog.Accepted:
         # 打开下载链接并复制密码到剪切板
@@ -139,8 +139,8 @@ def show_message_box(text, title="提示", timeout=None):
     msg_box.setText(text)
     
     # 设置消息框主图标,获取项目根目录并拼接图标路径
-    BasePath = pathlib.Path(__file__).parent.parent.parent / "resource" / "icons" / "viewer_3.ico"
-    msg_box.setWindowIcon(QIcon(BasePath.as_posix()))
+    icon_path = (ICONPATH / "viewer_3.ico").as_posix()
+    msg_box.setWindowIcon(QIcon(icon_path))
 
     # 设置定时器自动关闭
     if timeout is not None:
@@ -1766,7 +1766,7 @@ class VideoPlayer(QWidget):
         # 控制按钮和设置
         self.play_button = QPushButton(self)
         # 设置图标路径
-        play_icon_path = (ICONDIR / "play.ico").as_posix()
+        play_icon_path = (ICONPATH / "play.ico").as_posix()
         self.play_button.setIcon(QIcon(play_icon_path))  # 设置播放图标
         self.play_button.setToolTip("播放/暂停")
         self.play_button.setStyleSheet("border: none;")  # 去掉按钮边框
@@ -1774,7 +1774,7 @@ class VideoPlayer(QWidget):
 
         self.replay_button = QPushButton(self)
         # 设置图标路径
-        replay_icon_path = (ICONDIR / "replay.ico").as_posix()
+        replay_icon_path = (ICONPATH / "replay.ico").as_posix()
         self.replay_button.setIcon(QIcon(replay_icon_path))  # 设置重播图标
         self.replay_button.setStyleSheet("border: none;")  # 去掉按钮边框
         self.replay_button.setToolTip("重播")
@@ -1798,7 +1798,7 @@ class VideoPlayer(QWidget):
         # 旋转控制按钮 - 左转90度
         self.rotate_left_button = QPushButton(self)
         # 设置左转图标路径
-        left_icon_path = (ICONDIR / "left.ico").as_posix()
+        left_icon_path = (ICONPATH / "left.ico").as_posix()
         self.rotate_left_button.setIcon(QIcon(left_icon_path))  # 设置左转图标
         self.rotate_left_button.setToolTip("向左旋转90度")
         self.rotate_left_button.setStyleSheet("border: none;")  # 去掉按钮边框
@@ -1807,7 +1807,7 @@ class VideoPlayer(QWidget):
         # 旋转控制按钮 - 右转90度  
         self.rotate_right_button = QPushButton(self)
         # 设置右转图标路径
-        right_icon_path = (ICONDIR / "right.ico").as_posix()
+        right_icon_path = (ICONPATH / "right.ico").as_posix()
         self.rotate_right_button.setIcon(QIcon(right_icon_path))  # 设置右转图标
         self.rotate_right_button.setToolTip("向右旋转90度")
         self.rotate_right_button.setStyleSheet("border: none;")  # 去掉按钮边框
@@ -1958,12 +1958,12 @@ class VideoPlayer(QWidget):
             self.is_paused = False
             self.frame_reader.resume()
             self.last_update_time = time.time()  # 重置时间基准
-            play_icon_path = (ICONDIR / "play.ico").as_posix()
+            play_icon_path = (ICONPATH / "play.ico").as_posix()
             self.play_button.setIcon(QIcon(play_icon_path))
         else:
             self.is_paused = True
             self.frame_reader.pause()
-            pause_icon_path = (ICONDIR / "pause.ico").as_posix()
+            pause_icon_path = (ICONPATH / "pause.ico").as_posix()
             self.play_button.setIcon(QIcon(pause_icon_path))
 
     def replay(self):
@@ -2299,7 +2299,7 @@ class VideoWall(QWidget):
             return 
 
         # 设置图标路径
-        icon_path = (ICONDIR / "video_icon.ico").as_posix()
+        icon_path = (ICONPATH / "video_icon.ico").as_posix()
         self.setWindowIcon(QIcon(icon_path))
         self.setWindowTitle("多视频播放器")
         self.setAcceptDrops(True)
@@ -2785,7 +2785,7 @@ class VideoWall(QWidget):
                         player.last_update_time = time.time()  # 重置时间基准
 
                         # 更新播放/暂停按钮图标
-                        play_icon_path = (ICONDIR / "play.ico").as_posix()
+                        play_icon_path = (ICONPATH / "play.ico").as_posix()
                         player.play_button.setIcon(QIcon(play_icon_path))
             except Exception as e:
                 print(f"跳转到帧时出错: {str(e)}")

@@ -50,13 +50,10 @@ from src.utils.p3_converter import ColorSpaceConverter                  # 导入
 from src.common.decorator import CC_TimeDec                             # 导入自定义装饰器
 from src.common.progress_round import RoundProgress                     # 导入自定义进度条
 
-"""设置本项目的入口路径,全局变量BasePath"""
-# 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
-if True:
-    BasePath = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# 方法二：直接读取主函数的路径，获取项目入口目录,只适用于hiviewer.py同级目录下的py文件调用
-if False: # 暂时禁用，不支持单独运行该模块
-    BasePath = os.path.dirname(os.path.abspath(sys.argv[0]))    
+"""设置本项目的入口路径,全局变量BASEPATH,设置图标路径ICONPATH"""
+BASEPATH = Path(__file__).parent.parent.parent
+ICONPATH = BASEPATH / "resource" / "icons"
+
 
 """
 设置全局函数区域开始线
@@ -1232,7 +1229,7 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
         第三排, self.label_bottom
         """
         # 设置主界面图标以及标题
-        icon_path = Path(BasePath, "resource", "icons", "viewer.ico").as_posix()
+        icon_path = (ICONPATH / "viewer.ico").as_posix()
         self.setWindowIcon(QIcon(icon_path))
         self.setWindowTitle("图片对比界面")
 
@@ -2061,8 +2058,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
 
         # 更新当前缩放因子, zoom_scale < 0 时 直接设置为 1.0不缩放
         zoom_scale = zoom_scale if zoom_scale > 0 else 1.0
-
-
         return zoom_scale
     
 
@@ -2084,7 +2079,6 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
             if self.roi_selection_active: # 切换图片自动清除ROI信息框
                 self.roi_selection_active = False
             
-
             # 清理所有列表
             self.exif_texts.clear()
             self.histograms.clear()

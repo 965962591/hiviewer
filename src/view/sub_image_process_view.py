@@ -68,8 +68,10 @@ class ImageTransform:
             print(f"处理图片失败 {icon_path}: {str(e)}")
             return QPixmap()
 
+# 图片调整子界面
 class SubCompare(QWidget):
-    closed = pyqtSignal()  # 添加关闭信号
+    # 添加关闭信号
+    closed = pyqtSignal()  
     def __init__(self, image_path=None):
         super().__init__()
 

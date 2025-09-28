@@ -4,12 +4,10 @@
 图片压缩工具
 使用PyQt5和Pyvips实现多格式图片压缩和尺寸修改
 """
-
 import sys
 import os
 from pathlib import Path
 import time
-
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QTableWidget, QTableWidgetItem, QPushButton, QLabel, QComboBox,
@@ -56,6 +54,11 @@ SUPPORTED_FORMATS = {
     'SUN': ['.ras'],
     'WAL': ['.wal']
 }
+
+
+"""设置本项目的入口路径,全局变量BASEPATH,设置图标路径ICONPATH"""
+BASEPATH = Path(__file__).parent.parent.parent
+ICONPATH = BASEPATH / "resource" / "icons"
 
 # 所有支持的扩展名
 ALL_EXTENSIONS = []
@@ -1671,7 +1674,7 @@ class PicZipMainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("图片压缩")
         self.resize(1500, 1000)
-        icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icon", "compress.ico")
+        icon_path = (ICONPATH / "compress.ico").as_posix()
         self.setWindowIcon(QIcon(icon_path))        
         # 设置文件
         self.settings = QSettings("PicZip", "ImageCompressor")

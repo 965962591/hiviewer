@@ -1,12 +1,12 @@
 # -*- encoding: utf-8 -*-
-'''
+"""
 @File         :__init__.py
 @Time         :2025/06/03 10:28:23
 @Author       :diamond_cz@163.com
 @Version      :1.0
 @Description  :代码结构,python使用技巧
 
-(1) 反斜杠 \ 续行符
+(1) 反斜杠 等于 续行符
 (2) 链式比较 bool(5<b<10) 
 (3) 列表推导式 [x**2 for x in range(10) if x % 2 == 0]
 (4) 扁平化列表 [item for sublist in matrix for item in sublist]
@@ -37,4 +37,4 @@ python命令行操作技巧:
     方法二, python -m pydoc -w 模块名, 在当前目录生成模块的html文档
 
 
-'''
+"""

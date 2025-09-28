@@ -25,12 +25,10 @@ from src.view.sub_compare_image_view import pil_to_pixmap
 
 
 """设置本项目的入口路径,全局变量BASEICONPATH"""
-# 方法一：手动找寻上级目录，获取项目入口路径，支持单独运行该模块
-if True:
-    BASEICONPATH = Path(__file__).parent.parent.parent
-# 方法二：直接读取主函数的路径，获取项目入口目录,只适用于hiviewer.py同级目录下的py文件调用
-if False: # 暂时禁用，不支持单独运行该模块
-    BASEICONPATH = Path(sys.argv[0]).resolve().parent
+# 手动找寻上级目录，获取项目入口路径
+BASEPATH = Path(__file__).parent.parent.parent
+# 设置图标基础路径
+BASEICONPATH = BASEPATH / "resource" / "icons"
 
 
 class WorkerSignals(QObject):
@@ -93,9 +91,9 @@ class ImagePreloader(QRunnable):
 class IconCache:
     """图标缓存类"""
     _max_cache_size = 200  # 最大缓存数量，超过会删除最旧的缓存
-    _cache_base_dir = BASEICONPATH / "cache"
-    _cache_dir = BASEICONPATH / "cache" / "icons"
-    _cache_index_file = BASEICONPATH / "cache" / "icons.json"
+    _cache_base_dir = BASEPATH / "cache"
+    _cache_dir = BASEPATH / "cache" / "icons"
+    _cache_index_file = BASEPATH / "cache" / "icons.json"
     
     # 视频文件格式
     VIDEO_FORMATS = ('.mp4', '.avi', '.mov', '.wmv', '.mpeg', '.mpg', '.mkv') 
@@ -228,7 +226,7 @@ class IconCache:
         """
         try:
             # 构建默认图标路径
-            default_icon_path = BASEICONPATH / "resource" / "icons" / icon_path
+            default_icon_path = BASEICONPATH / icon_path
             
             # 检查图标文件是否存在
             if default_icon_path.exists():
@@ -307,13 +305,11 @@ class IconCache:
             return QIcon(pixmap)
         except Exception as e:
             print(f"get_video_thumbnail()-获取视频缩略图失败--{video_path}: {str(e)}")
-            
-            # 将默认图标video_icon.png替换video_preview_frame.jpg
-            default_video_icon_path = BASEICONPATH / "resource" / "icons" / "video_icon.png"
-            video_preview_frame_path = BASEICONPATH / "cache" / "videos" / "video_preview_frame.jpg"
+            # 将默认图标替换视频第一帧图
+            video_icon_path = BASEICONPATH / "video_icon.png"
+            video_preview_frame_path = cls._cache_base_dir / "videos" / "video_preview_frame.jpg"
             video_preview_frame_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy(default_video_icon_path, video_preview_frame_path)
-
+            shutil.copy(video_icon_path, video_preview_frame_path)
             # 返回默认视频图标
             return cls.get_default_icon("video_icon.png", (48, 48))
 

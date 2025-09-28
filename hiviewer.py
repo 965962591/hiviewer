@@ -32,8 +32,10 @@ from collections import Counter
 from PyQt5.QtGui import (
     QIcon, QKeySequence, QPixmap)
 from PyQt5.QtWidgets import (
-    QFileSystemModel, QAbstractItemView, QMenu, QHeaderView, QShortcut, QMainWindow,  
-    QSplashScreen, QSizePolicy, QApplication, QTableWidgetItem, QTreeView, QProgressDialog, QDialog, QLabel)
+    QFileSystemModel, QAbstractItemView, QMenu, 
+    QHeaderView, QShortcut, QMainWindow, QDialog,
+    QSplashScreen, QSizePolicy, QTableWidgetItem,
+    QApplication, QTreeView, QProgressDialog, QLabel)
 from PyQt5.QtCore import (
     Qt, QDir, QSize, QTimer, QThreadPool, QUrl, QSize, 
     QMimeData, QPropertyAnimation, QItemSelection, QItemSelectionModel)
@@ -2103,13 +2105,10 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def update_table_icon(self, file_path, icon):
         """更新表格中的指定图标"""
         # 使用字典self.paths_index快速查找索引
-        # if False:
         if file_path and file_path in self.paths_index:
             col, row = self.paths_index[file_path]
             if (item := self.RB_QTableWidget0.item(row, col)) and icon:
                 item.setIcon(icon)
-
-
         if False: # 原来双循环方案，效率较低，移除
             filename = os.path.basename(file_path)
             folder = os.path.basename(os.path.dirname(file_path))

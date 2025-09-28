@@ -22,6 +22,9 @@ if sys.platform == "win32":
         '--include-data-dir=./resource=resource',               # 将resource目录下的资源文件包含到exe中
         '--include-data-dir=./config=config',                   # 将config目录下的资源文件包含到exe中
         '--windows-icon-from-ico=resource/icons/viewer_3.ico',  # 使用ico图标作为windows应用图标
+        '--windows-file-description=hiviewer看图工具',
+        '--windows-company-name=LongCheer',
+        '--copyright=diamond_cz'
         '--output-dir=dist',                    # 输出目录
         '--remove-output',                      # 删除输出目录
         'hiviewer.py',                          # 主程序文件
