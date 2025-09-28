@@ -672,7 +672,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 添加快捷键 u 打开MTK工具解析窗口
         self.p_shortcut = QShortcut(QKeySequence('u'), self)
         self.p_shortcut.activated.connect(self.on_u_pressed)
-        # 添加快捷键 y 打开高通工具解析窗口
+        # 添加快捷键 y 打开展锐工具解析窗口
         self.p_shortcut = QShortcut(QKeySequence('y'), self)
         self.p_shortcut.activated.connect(self.on_y_pressed)
         # 添加快捷键 Ctrl+i 打开图片处理窗口
@@ -3628,12 +3628,12 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         函数功能说明: 展锐IQT工具后台解析图片线程完成后的链接事件
         """
         try:
+            # 导入展锐平台txt文件解析函数
+            from src.utils.xml import save_excel_data_by_unisoc                                            
             if success and images_path:
                 # 解析txt文件将其保存到excel中去
-                xml_exists = any(f for f in os.listdir(images_path) if f.endswith('.txt'))
-                if xml_exists:
-                    # save_excel_data(images_path)
-                    pass
+                if any(f for f in os.listdir(images_path) if f.endswith('.txt')):
+                    save_excel_data_by_unisoc(images_path)
                 use_time = time.time() - self.time_start
                 show_message_box(f"展锐IQT工具后台解析图片成功! 用时: {use_time:.2f}秒", "提示", 1500)
                 self.logger.info(f"on_unisoc_finished()-->展锐IQT工具后台解析图片成功! | 耗时: {use_time:.2f}秒")
