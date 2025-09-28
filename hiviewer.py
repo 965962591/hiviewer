@@ -154,7 +154,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.paths_index = {}                   # 文件路径索引字典
         self.dirnames_list = []                 # 选中的同级文件夹列表
         self.image_index_max = []               # 存储当前选中及复选框选中的，所有图片列有效行最大值
-        self.preloading_file_name_paths = []    # 预加载图标前的文件路径列表
         self.additional_folders_for_table = []  # 存储通过右键菜单添加到表格的文件夹的完整路径
         self.compare_window = None              # 添加子窗口引用
         self.last_key_press = False             # 记录第一次按下键盘空格键或B键
@@ -1520,12 +1519,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             # 按列和行的逆序排序，确保删除时不会影响其他项的索引
             items_to_delete.sort(reverse=True)
             
-            # 执行删除操作
+            # 执行移除操作
             for col_idx, row in items_to_delete:
                 if col_idx < len(self.files_list) and row < len(self.files_list[col_idx]):
                     del self.files_list[col_idx][row]
                     del self.paths_list[col_idx][row]
             
+            # 更新文件路径索引，方便加载图标
+            self.paths_index = {value: (i, j) for i, row in enumerate(self.paths_list) for j, value in enumerate(row)}
+
             # 更新表格显示
             self.update_RB_QTableWidget0_from_list(self.files_list, self.paths_list, self.dirnames_list)
         except Exception as e:
@@ -1807,9 +1809,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
             # 对file_paths进行转置,实现加载图标按行加载,使用列表推导式
             file_name_paths = [path for column in zip_longest(*file_paths, fillvalue=None) for path in column if path is not None]
-
-            # 确保文件路径存在后，开始预加载
-            if file_name_paths:  
+            if file_name_paths: # 确保文件路径存在后，开始预加载
                 self.start_image_preloading(file_name_paths)
 
         except Exception as e:
@@ -1834,8 +1834,8 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             file_infos_list, file_paths, path_indexs, dir_name_list = self.collect_file_paths()
             self.files_list = file_infos_list      # 初始化文件名及基本信息列表
             self.paths_list = file_paths           # 初始化文件路径列表
-            self.dirnames_list = dir_name_list     # 初始化选中的同级文件夹列表
             self.paths_index = path_indexs         # 初始化文件路径索引字典
+            self.dirnames_list = dir_name_list     # 初始化选中的同级文件夹列表
 
             # 先初始化表格结构和内容，不加载图标, 并获取图片列有效行最大值；重绘表格,更新显示    
             self.image_index_max = self.init_table_structure(file_infos_list, dir_name_list)    
@@ -1843,10 +1843,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
             # 对file_paths进行转置,实现加载图标按行加载，并初始化预加载图标线程前的问价排列列表
             file_name_paths = [path for column in zip_longest(*file_paths, fillvalue=None) for path in column if path is not None]
-            self.preloading_file_name_paths = file_name_paths 
-
-            # 开始预加载图标    
-            if file_name_paths:  # 确保有文件路径才开始预加载
+            if file_name_paths:  # 确保有文件路径, 开始预加载图标  
                 self.start_image_preloading(file_name_paths)
 
         except Exception as e:
@@ -2106,10 +2103,13 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     def update_table_icon(self, file_path, icon):
         """更新表格中的指定图标"""
         # 使用字典self.paths_index快速查找索引
+        # if False:
         if file_path and file_path in self.paths_index:
             col, row = self.paths_index[file_path]
             if (item := self.RB_QTableWidget0.item(row, col)) and icon:
                 item.setIcon(icon)
+
+
         if False: # 原来双循环方案，效率较低，移除
             filename = os.path.basename(file_path)
             folder = os.path.basename(os.path.dirname(file_path))
@@ -2981,7 +2981,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.paths_list = []
             self.paths_index = {}  
             self.dirnames_list = []
-            self.preloading_file_name_paths = []
             self.additional_folders_for_table = []
             # 12. 强制垃圾回收
             gc.collect()
