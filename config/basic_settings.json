@@ -6,17 +6,15 @@
         "D:/Tuning/Somalia-A(M953)/03_pic/HDR压制偏色验证/C3Z/前摄/test",
         "D:/Tuning/Somalia-A(M953)/03_pic/HDR压制偏色验证/C3Z/前摄",
         "D:/Tuning/Somalia-A(M953)/03_pic/HDR压制偏色验证/C3Z/后摄/normal",
-        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.26-O19-IN-二供-小数包/2025.8.26-O19-IN-二供-小数包/video"
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.26-O19-IN-二供-小数包/2025.8.26-O19-IN-二供-小数包/video",
+        "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.26-O19-IN-二供-小数包/2025.8.26-O19-IN-二供-小数包/补光灯"
     ],
-    "current_directory": "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.26-O19-IN-二供-小数包/2025.8.26-O19-IN-二供-小数包/video",
+    "current_directory": "D:/Tuning/O19/0_pic/02_IN_pic/2025.8.26-O19-IN-二供-小数包/2025.8.26-O19-IN-二供-小数包/补光灯",
     "file_type_option": "显示图片文件",
-    "combobox1_checked_items": [
-        "补光灯",
-        "超夜"
-    ],
+    "combobox1_checked_items": [],
     "combobox1_all_items": [
         "normal",
-        "补光灯",
+        "video",
         "超夜"
     ],
     "sort_option": "按创建时间排序",
@@ -25,5 +23,5 @@
     "simple_mode": true,
     "drag_flag": true,
     "api_flag": true,
-    "player_key": false
+    "player_key": true
 }

@@ -89,7 +89,13 @@
         ]
     },
     "MTK": {},
-    "Unisoc": {},
+    "Unisoc": {
+        "开3A": [
+            "adb root",
+            "adb remount",
+            "adb shell setprop persist.vendor.cam.Vivimagic.enable3Adebug 1"
+        ]
+    },
     "Others": {
         "HDR": [
             "adb shell setenforce 0",

@@ -535,51 +535,65 @@ class setting_Window(QMainWindow):
     def toggle_screen_display(self):
         """通用设置-->尺寸设置的槽函数"""
         try:
-
             if self.normal_radio.isChecked():
-                print("切换到常规尺寸")
-                if self.main_window: 
-                        if hasattr(self.main_window,'toggle_screen_display'):
-                            self.main_window.is_fullscreen = False      
-                            self.main_window.is_norscreen = True
-                            self.main_window.is_maxscreen = False
-                            self.main_window.toggle_screen_display()
-                        if (hasattr(self.main_window, 'compare_window') 
-                        and hasattr(self.main_window.compare_window, 'toggle_screen_display')):   
-                            self.main_window.compare_window.is_fullscreen = False      
-                            self.main_window.compare_window.is_norscreen = True
-                            self.main_window.compare_window.is_maxscreen = False
-                            self.main_window.compare_window.toggle_screen_display()
+                print("[toggle_screen_display]-->切换到常规尺寸")
+                self.exif_setting["label_visable_settings"]["is_fullscreen"] = False
+                self.exif_setting["label_visable_settings"]["is_norscreen"] = True
+                self.exif_setting["label_visable_settings"]["is_maxscreen"] = False
+                # 在看图界面打开，直接调用函数切换
+                if self.main_window and hasattr(self.main_window,'toggle_screen_display'): 
+                    self.main_window.is_fullscreen = False      
+                    self.main_window.is_norscreen = True
+                    self.main_window.is_maxscreen = False
+                    self.main_window.toggle_screen_display()
+                # 在主界面打开，写入json文件中
+                if (self.main_window and hasattr(self.main_window,'compare_window') 
+                and hasattr(self.main_window.compare_window,'is_fullscreen')):
+                    self.main_window.compare_window.is_fullscreen = False   
+                    self.main_window.compare_window.is_norscreen =  True
+                    self.main_window.compare_window.is_maxscreen = False
 
             elif self.maxed_radio.isChecked():
-                print("切换到最大化显示")
-                if self.main_window:
-                    if hasattr(self.main_window,'toggle_screen_display'):
-                        self.main_window.is_fullscreen = False      
-                        self.main_window.is_norscreen = False
-                        self.main_window.is_maxscreen = True
-                        self.main_window.toggle_screen_display()
-                    if (hasattr(self.main_window, 'compare_window') 
-                    and hasattr(self.main_window.compare_window, 'toggle_screen_display')):   
-                        self.main_window.compare_window.is_fullscreen = False      
-                        self.main_window.compare_window.is_norscreen = False
-                        self.main_window.compare_window.is_maxscreen = True
-                        self.main_window.compare_window.toggle_screen_display()
+                print("[toggle_screen_display]-->切换到最大化显示")
+                self.exif_setting["label_visable_settings"]["is_fullscreen"] = False
+                self.exif_setting["label_visable_settings"]["is_norscreen"] = False
+                self.exif_setting["label_visable_settings"]["is_maxscreen"] = True
+                # 在看图界面打开，直接调用函数切换
+                if self.main_window and hasattr(self.main_window,'toggle_screen_display'):
+                    self.main_window.is_fullscreen = False      
+                    self.main_window.is_norscreen = False
+                    self.main_window.is_maxscreen = True
+                    self.main_window.toggle_screen_display()
+                # 在主界面打开，写入json文件中
+                if (self.main_window and hasattr(self.main_window,'compare_window') 
+                and hasattr(self.main_window.compare_window,'is_fullscreen')):
+                    self.main_window.compare_window.is_fullscreen = False   
+                    self.main_window.compare_window.is_norscreen = False
+                    self.main_window.compare_window.is_maxscreen = True   
 
             elif self.full_radio.isChecked():
-                print("切换到全屏显示")
-                if self.main_window:
-                    if hasattr(self.main_window,'toggle_screen_display'):
-                        self.main_window.is_fullscreen = True   
-                        self.main_window.is_norscreen = False
-                        self.main_window.is_maxscreen = False   
-                        self.main_window.toggle_screen_display()
-                    if (hasattr(self.main_window, 'compare_window') 
-                    and hasattr(self.main_window.compare_window, 'toggle_screen_display')):   
-                        self.main_window.compare_window.is_fullscreen = True  
-                        self.main_window.compare_window.is_norscreen = False
-                        self.main_window.compare_window.is_maxscreen = False
-                        self.main_window.compare_window.toggle_screen_display()
+                print("[toggle_screen_display]-->切换到全屏显示")
+                self.exif_setting["label_visable_settings"]["is_fullscreen"] = True
+                self.exif_setting["label_visable_settings"]["is_norscreen"] = False
+                self.exif_setting["label_visable_settings"]["is_maxscreen"] = False
+                # 在看图界面打开，直接调用函数切换
+                if self.main_window and hasattr(self.main_window,'toggle_screen_display'):
+                    self.main_window.is_fullscreen = True   
+                    self.main_window.is_norscreen = False
+                    self.main_window.is_maxscreen = False   
+                    self.main_window.toggle_screen_display()
+                # 在主界面打开，写入json文件中
+                if (self.main_window and hasattr(self.main_window,'compare_window') 
+                and hasattr(self.main_window.compare_window,'toggle_screen_display')):
+                    self.main_window.compare_window.is_fullscreen = True   
+                    self.main_window.compare_window.is_norscreen = False
+                    self.main_window.compare_window.is_maxscreen = False   
+                    
+            # 保存设置
+            if EXIFSET.exists():
+                with open(EXIFSET, "w", encoding="utf-8") as f:
+                    json.dump(self.exif_setting, f, ensure_ascii=False, indent=4)
+                print("[toggle_screen_display]-->已写回原json文件!")
 
         except Exception as e:
             print(f"[toggle_screen_display]-->设置界面-->通用设置—-尺寸设置发生错误: {e}")
@@ -587,15 +601,22 @@ class setting_Window(QMainWindow):
 
     def toggle_player(self):
         """通用设置-->播放器设置的槽函数"""
-        if self.opencv_player.isChecked():
+        if not self.opencv_player.isChecked() and not self.vlc_player.isChecked():
+            print("[toggle_player]-->无法切换播放器核心，无效的点击事件!!!")
+            return 
+        elif self.opencv_player.isChecked():
             print("[toggle_player]-->切换播放器核心为CV")
-            if self.main_window and hasattr(self.main_window, 'player_key'):
-                self.main_window.player_key = True
-                
-        if self.vlc_player.isChecked():
+            if self.basic_settings:
+                self.basic_settings["player_key"] = True
+        elif self.vlc_player.isChecked():
             print("[toggle_player]-->切换播放器核心为VLC")
-            if self.main_window and hasattr(self.main_window, 'player_key'):
-                self.main_window.player_key = False
+            if self.basic_settings:
+                self.basic_settings["player_key"] = False
+        # 保存设置
+        if BASICSET.exists():
+            with open(BASICSET, "w", encoding="utf-8") as f:
+                json.dump(self.basic_settings, f, ensure_ascii=False, indent=4)
+            print("[toggle_player]-->已写回原json文件!")
 
     # 互斥逻辑
     def on_follow_system_changed(self):
@@ -1701,21 +1722,29 @@ class setting_Window(QMainWindow):
         """
         self.scroll_content.setStyleSheet("background: #F0F0F0;")
         self.bottom_spacer.setStyleSheet("background: #F0F0F0;")
-        
+        """
+        设置界面-->右侧内容区--关于页--的样式设置
+        -----------------------------------------------------------------------------------------------------------
+        """
+
+
 
         """内容取组件初始化"""
         # 设置界面相关按钮复选框初始化
+        self.basic_settings = []
         if BASICSET.exists():
             with open(BASICSET, "r", encoding='utf-8', errors='ignore') as f:
-                settings = json.load(f)
+                self.basic_settings = json.load(f)
 
                 # 初始化播放器设置
-                player = settings.get("player_key", True)
+                player = self.basic_settings.get("player_key", True)
                 self.opencv_player.setChecked(True) if player else self.vlc_player.setChecked(True)
-
+        # 初始化exif相关标签信息
+        self.exif_setting = []
         if EXIFSET.exists():
             with open(EXIFSET, "r", encoding='utf-8', errors='ignore') as f:
-                label_setting = json.load(f).get("label_visable_settings",{})
+                self.exif_setting = json.load(f)
+                label_setting = self.exif_setting.get("label_visable_settings",{})
 
                 # 初始化--尺寸设置
                 self.full_radio.setChecked(True) if label_setting.get("is_fullscreen", False) else ...
@@ -1752,14 +1781,10 @@ class setting_Window(QMainWindow):
 
         # EXIF显示
 
+
         # 色彩空间区域
         self.auto_radio.setChecked(True)
 
-        # 读取内存中的变化, 进行相关组件初始化
-        if self.main_window:
-            if hasattr(self.main_window, "player_key"):
-                # 初始化播放器设置
-                self.opencv_player.setChecked(self.main_window.player_key)
 
 
 
@@ -1777,7 +1802,6 @@ class setting_Window(QMainWindow):
         # 通用设置区域；设置圆形选择按钮的链接事件
         self.opencv_player.clicked.connect(self.toggle_player)
         self.vlc_player.clicked.connect(self.toggle_player)
-        self.normal_radio.clicked.connect(self.toggle_screen_display)
         self.normal_radio.clicked.connect(self.toggle_screen_display)
         self.maxed_radio.clicked.connect(self.toggle_screen_display)
         self.full_radio.clicked.connect(self.toggle_screen_display)

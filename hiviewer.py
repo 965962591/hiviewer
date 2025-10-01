@@ -3899,8 +3899,11 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.compare_window = SubMainWindow(selected_file_paths, image_indexs, self)
         else:
             self.logger.info("[create_compare_window]-->看图子界面已存在，直接传入图片路径和索引列表")
+            self.compare_window.load_settings()
             self.compare_window.set_images(selected_file_paths, image_indexs)
-            self.compare_window.show()
+            # self.compare_window.show()
+            self.compare_window.toggle_screen_display()
+
         self.compare_window.closed.connect(self.on_compare_window_closed)
         self.statusbar_label1.setText(f"📢:看图子界面打开成功")
         self.statusbar_label1.repaint()  # 刷新标签文本
