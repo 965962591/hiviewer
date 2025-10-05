@@ -18,6 +18,7 @@ import time
 import json
 import threading
 from pathlib import Path 
+from collections import Counter
 from multiprocessing import cpu_count
 from concurrent.futures import ThreadPoolExecutor
 
@@ -504,6 +505,26 @@ def load_txt_data(txt_path):
     except Exception as e:
         print(f"解析TXT失败{txt_path}:\n报错信息: {e}")
         return '', False
+
+
+def make_unique_dir_names(folder_paths):
+    """ 从【文件夹路径列表】中获取唯一的【名称列表】
+    输入: 文件夹路径列表(str 或 Path)
+    返回: 与输入顺序对应的唯一化目录名列表
+    """
+    try:
+        ps = [Path(p).resolve() for p in folder_paths]
+        cnt = Counter(p.name for p in ps)
+        # 第一轮：只用 parent/name
+        names = [f"{p.parent.name}/{p.name}" if cnt[p.name] > 1 else p.name for p in ps]
+        # 如果仍全同名，再往上加一层，一般也就加到这一层就可以保证唯一
+        if len(set(names)) == 1:
+            names = [f"{p.parent.parent.name}/{p.parent.name}/{p.name}" if cnt[p.name] > 1 else p.name for p in ps]
+        return names
+    except Exception as e:
+        print(f"[make_unique_dir_names]-->获取文件唯一目录名称列表失败 | 报错信息：{e}")
+        return None
+    
 
 
 """
@@ -1581,13 +1602,12 @@ class SubMainWindow(QMainWindow, Ui_MainWindow):
                 self.toggle_title_display(self.is_title_on) # 设置列表头是否显示和隐藏
                 self.tableWidget_medium.setColumnCount(num_images)
                 self.tableWidget_medium.setRowCount(1)
-                folder_names = [os.path.basename(os.path.dirname(path)) for path in image_paths]
-                if len(set(folder_names)) == 1: # 如果图片路径都在同一个文件夹下，则将文件夹名作为表头
-                    _tmp = folder_names[0]
-                    folder_names = [_tmp + ":" + os.path.basename(path) for path in image_paths]
-                self.tableWidget_medium.setHorizontalHeaderLabels(folder_names)
+                # 如果图片路径上一个文件夹名称相同，则会遍历上一级文件夹以获取唯一列名称
+                tar_folder_name = [os.path.basename(os.path.dirname(path)) for path in image_paths]
+                if folder_names := [os.path.dirname(path) for path in image_paths]:
+                    tar_folder_name = make_unique_dir_names(folder_names)
+                self.tableWidget_medium.setHorizontalHeaderLabels(tar_folder_name)
                 
-
                 # 3. 使用线程池并行处理图片
                 self.progress_updated.emit(50)
                 # 使用并行解析图片的pil格式图、cv_img、histogram、pixmap、gray_pixmap、p3_pixmap以及exif等信息
