@@ -27,6 +27,7 @@ import subprocess
 from pathlib import Path
 from itertools import zip_longest
 from collections import Counter
+from typing import Iterable, Tuple
 
 """导入python第三方模块"""
 from PyQt5.QtGui import (
@@ -405,42 +406,49 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         sub_menu2.addAction(icon_0, "复制文件路径(C)", self.copy_selected_file_path)  
         sub_menu2.addAction(icon_1, "复制文件(Ctrl+C)", self.copy_selected_files)  
 
+        # 创建二级菜单-压缩选项
+        sub_menu3 = QMenu("压缩选项", self.context_menu)  
+        sub_menu3.setIcon(zip_icon)  
+        sub_menu3.addAction(icon_0, "快速按照共同父文件夹压缩选中的文件(Z)", self.compress_selected_files_under_common_parent)  
+        sub_menu3.addAction(icon_1, "自定义压缩选中的文件到指定目录(Ctrl+Z)", self.compress_selected_files)  
+
         # 创建二级菜单-无损旋转
-        sub_menu3 = QMenu("无损旋转", self.context_menu)  
-        sub_menu3.setIcon(rotator_icon)  
-        sub_menu3.addAction(icon_0, "逆时针旋转", lambda: self.jpg_lossless_rotator('l'))  
-        sub_menu3.addAction(icon_1, "顺时针旋转", lambda: self.jpg_lossless_rotator('r'))  
-        sub_menu3.addAction(icon_2, "旋转180度", lambda: self.jpg_lossless_rotator('u'))  
-        sub_menu3.addAction(icon_3, "水平翻转", lambda: self.jpg_lossless_rotator('h'))  
-        sub_menu3.addAction(icon_4, "垂直翻转", lambda: self.jpg_lossless_rotator('v'))  
-        sub_menu3.addAction(icon_5, "自动校准EXIF旋转信息", lambda: self.jpg_lossless_rotator('auto'))  
+        sub_menu4 = QMenu("无损旋转", self.context_menu)  
+        sub_menu4.setIcon(rotator_icon)  
+        sub_menu4.addAction(icon_0, "逆时针旋转", lambda: self.jpg_lossless_rotator('l'))  
+        sub_menu4.addAction(icon_1, "顺时针旋转", lambda: self.jpg_lossless_rotator('r'))  
+        sub_menu4.addAction(icon_2, "旋转180度", lambda: self.jpg_lossless_rotator('u'))  
+        sub_menu4.addAction(icon_3, "水平翻转", lambda: self.jpg_lossless_rotator('h'))  
+        sub_menu4.addAction(icon_4, "垂直翻转", lambda: self.jpg_lossless_rotator('v'))  
+        sub_menu4.addAction(icon_5, "自动校准EXIF旋转信息", lambda: self.jpg_lossless_rotator('auto'))  
 
         # 创建二级菜单-按行筛选
-        sub_menu4 = QMenu("按行筛选", self.context_menu)  
-        sub_menu4.setIcon(filtrate_icon)  
-        sub_menu4.addAction(icon_0, "奇数行", lambda: self.show_filter_rows('odd'))  
-        sub_menu4.addAction(icon_1, "偶数行", lambda: self.show_filter_rows('even'))  
-        sub_menu4.addAction(icon_2, "3选1", lambda: self.show_filter_rows('three_1'))  
-        sub_menu4.addAction(icon_3, "3选2", lambda: self.show_filter_rows('three_2'))  
-        sub_menu4.addAction(icon_4, "5选1", lambda: self.show_filter_rows('five_1'))  
+        sub_menu5 = QMenu("按行筛选", self.context_menu)  
+        sub_menu5.setIcon(filtrate_icon)  
+        sub_menu5.addAction(icon_0, "奇数行", lambda: self.show_filter_rows('odd'))  
+        sub_menu5.addAction(icon_1, "偶数行", lambda: self.show_filter_rows('even'))  
+        sub_menu5.addAction(icon_2, "3选1", lambda: self.show_filter_rows('three_1'))  
+        sub_menu5.addAction(icon_3, "3选2", lambda: self.show_filter_rows('three_2'))  
+        sub_menu5.addAction(icon_4, "5选1", lambda: self.show_filter_rows('five_1'))  
 
         # 创建二级菜单-平台图片解析工具
-        sub_menu5 = QMenu("平台图片解析工具", self.context_menu)  
-        sub_menu5.setIcon(exif_icon)  
-        sub_menu5.addAction(icon_0, "高通_C7工具解析图片(I)", self.on_i_pressed)  
-        sub_menu5.addAction(icon_1, "联发科_DP工具解析图片(U)", self.on_u_pressed)  
-        sub_menu5.addAction(icon_2, "展锐_IQT工具解析图片(Y)", self.on_y_pressed)  
+        sub_menu6 = QMenu("平台图片解析工具", self.context_menu)  
+        sub_menu6.setIcon(exif_icon)  
+        sub_menu6.addAction(icon_0, "高通_C7工具解析图片(I)", self.on_i_pressed)  
+        sub_menu6.addAction(icon_1, "联发科_DP工具解析图片(U)", self.on_u_pressed)  
+        sub_menu6.addAction(icon_2, "展锐_IQT工具解析图片(Y)", self.on_y_pressed)  
 
 
         # 将二级菜单添加到主菜单
         self.context_menu.addMenu(sub_menu)   
-        self.context_menu.addMenu(sub_menu2)  
+        self.context_menu.addMenu(sub_menu2) 
+        self.context_menu.addMenu(sub_menu3)   
         self.context_menu.addMenu(sub_menu4)  
         self.context_menu.addMenu(sub_menu5) 
-        self.context_menu.addMenu(sub_menu3)  
+        self.context_menu.addMenu(sub_menu6) 
+        
         
         # 设置右键菜单槽函数
-        self.context_menu.addAction(zip_icon, "压缩文件(Z)", self.compress_selected_files)
         self.context_menu.addAction(theme_icon, "切换主题(P)", self.on_p_pressed)
         self.context_menu.addAction(image_size_reduce_icon, "图片瘦身(X)", self.on_x_pressed) 
         self.context_menu.addAction(ps_icon, "图片调整(L)", self.on_l_pressed)
@@ -697,8 +705,11 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 添加快捷键 Ctrl+d 从原文件删除选中的文件
         self.d_shortcut = QShortcut(QKeySequence(Qt.ControlModifier + Qt.Key_D), self)
         self.d_shortcut.activated.connect(self.delete_from_file)
-        # 添加快捷键 Z 压缩选中的文件
+        # 添加快捷键 Z 快速按照共同父文件夹压缩选中的文件
         self.z_shortcut = QShortcut(QKeySequence('z'), self)
+        self.z_shortcut.activated.connect(self.compress_selected_files_under_common_parent)
+        # 添加快捷键 Ctrl+z 自定义压缩选中的文件
+        self.z_shortcut = QShortcut(QKeySequence(Qt.ControlModifier + Qt.Key_Z), self)
         self.z_shortcut.activated.connect(self.compress_selected_files)
         # 添加快捷键 T 打开--局域网传输工具--，改为截图功能
         self.z_shortcut = QShortcut(QKeySequence('t'), self)
@@ -1558,6 +1569,97 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             self.logger.error(f"【delete_from_file】-->从源文件删除选中的单元格文件时 | 报错: {e}")
             show_message_box("🚩从源文件删除选中的文件时发生错误!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
             
+    def compress_selected_files_under_common_parent(self):
+        """压缩选中的文件并复制压缩包文件到剪贴板"""
+        try:
+            # 获取选中的项文件路径列表
+            if not(file_paths := self.get_selected_file_path()):
+                show_message_box(f"🚩无法获取选中项的文件路径列表, 请确保选中了单元格", "提示", 2000)
+                return
+
+            # 将文件路径复制到当前目录下的“共同父文件夹”内，并保持原始相对目录结构
+            success, message = self.batch_copy_under_common_parent(file_paths)
+            if not success:
+                show_message_box(f"🚩无法复制文件路径到当前目录下的“共同父文件夹”内, 请确保选中了单元格", "提示", 2000)
+                return
+            show_message_box(message, "提示", 2000)
+
+        except Exception as e:
+            print(f"[compress_selected_files_under_common_parent]-->error--压缩选中的文件并复制压缩包文件到剪贴板时 | 报错: {e}")
+            self.logger.error(f"[compress_selected_files_under_common_parent]-->压缩选中的文件并复制压缩包文件到剪贴板时 | 报错: {e}")
+            return  
+
+
+    def batch_copy_under_common_parent(self, file_list: Iterable[str],
+                                    dst_root: str = '.') -> Tuple[bool, str]:
+        """
+        将文件列表复制到共同父文件夹，压缩为zip并复制到剪贴板。
+        
+        参数
+        ----
+        file_list : 文件路径列表（绝对路径或相对路径）
+        dst_root  : 目标根目录，默认当前工作目录
+        
+        返回
+        ----
+        (success: bool, message: str)
+        success: True表示成功，False表示失败
+        message: 状态信息
+        """
+        import zipfile
+        
+        try:
+            # 验证并规范化文件列表
+            file_list = [Path(p).resolve() for p in file_list if p]
+            if not file_list:
+                return False, "文件列表为空"
+            
+            # 验证文件存在
+            missing = [p for p in file_list if not p.exists()]
+            if missing:
+                return False, f"文件不存在: {missing[0].name}"
+            
+            # 计算共同父目录
+            common_parent = Path(os.path.commonpath([str(p) for p in file_list]))
+            common_parent_name = common_parent.name or "files"
+            
+            # 准备目标目录
+            dst_top = Path(dst_root).resolve() / "cache" / common_parent_name
+            if dst_top.exists():
+                shutil.rmtree(dst_top)
+            dst_top.mkdir(parents=True, exist_ok=True)
+            
+            # 批量复制文件（保持目录结构）
+            for src in file_list:
+                rel_path = src.relative_to(common_parent)
+                dst_file = dst_top / rel_path
+                dst_file.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dst_file)
+            
+            # 压缩为zip
+            zip_path = dst_top.parent / f"{common_parent_name}.zip"
+            if zip_path.exists():
+                zip_path.unlink()
+            
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for file_path in dst_top.rglob('*'):
+                    if file_path.is_file():
+                        zipf.write(file_path, file_path.relative_to(dst_top))
+            
+            # 复制到剪贴板
+            mime_data = QMimeData()
+            mime_data.setUrls([QUrl.fromLocalFile(str(zip_path))])
+            QApplication.clipboard().setMimeData(mime_data)
+            
+            return True, f"成功处理 {len(file_list)} 个文件，已压缩并复制到剪贴板"
+            
+        except ValueError as e:
+            return False, f"路径错误: {str(e)}"
+        except OSError as e:
+            return False, f"文件操作失败: {str(e)}"
+        except Exception as e:
+            return False, f"未知错误: {str(e)}"
+
 
     def compress_selected_files(self):
         """压缩选中的文件并复制压缩包文件到剪贴板"""

@@ -15,6 +15,8 @@
     },
     "exif_visable_setting": {
         "图片名称": true,
+        "Lux": true,
+        "LCG": true,
         "品牌": true,
         "型号": true,
         "图片大小": true,
@@ -23,11 +25,10 @@
         "曝光时间": true,
         "光圈值": true,
         "ISO值": true,
-        "原始时间": true,
-        "测光模式": true,
+        "原始时间": false,
+        "测光模式": false,
         "HDR": true,
         "Zoom": true,
-        "Lux": true,
         "CCT": true,
         "FaceSA": true,
         "DRCgain": true,
@@ -40,7 +41,6 @@
         "Long_gain": true,
         "Mulaes": false,
         "HM": false,
-        "Face": false,
-        "LCG": true
+        "Face": false
     }
 }
