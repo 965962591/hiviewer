@@ -1570,48 +1570,61 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             show_message_box("🚩从源文件删除选中的文件时发生错误!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
             
     def compress_selected_files_under_common_parent(self):
-        """压缩选中的文件并复制压缩包文件到剪贴板"""
+        """快速按照共同父文件夹压缩选中的文件并复制压缩包文件到剪贴板"""
         try:
             # 获取选中的项文件路径列表
             if not(file_paths := self.get_selected_file_path()):
                 show_message_box(f"🚩无法获取选中项的文件路径列表, 请确保选中了单元格", "提示", 2000)
                 return
 
-            # 判断文件数量，决定是否使用进度条
-            file_count = len(file_paths)
-            if file_count > 10:  # 超过5个文件使用进度条
-                # 导入自定义压缩进度对话框类和Worker
-                from src.components.custom_qdialog_progress import ProgressDialog, BatchCopyCompressWorker
-                
-                # 创建并启动工作线程
-                self.batch_compress_worker = BatchCopyCompressWorker(file_paths, str(self.root_path))
-                
-                # 连接信号
-                self.batch_compress_worker.signals.progress.connect(self.on_batch_compress_progress)
-                self.batch_compress_worker.signals.finished.connect(self.on_batch_compress_finished)
-                self.batch_compress_worker.signals.error.connect(self.on_batch_compress_error)
-                
-                # 显示进度窗口
-                self.progress_dialog = ProgressDialog(self)
-                # 断开原有连接（如果存在），连接新的取消方法
-                try:
-                    self.progress_dialog.cancel_button.clicked.disconnect()
-                except TypeError:
-                    pass  # 没有已存在的连接
-                self.progress_dialog.cancel_button.clicked.connect(self.cancel_batch_compression)
-                self.progress_dialog.show()
-                
-                # 启动任务
-                self.threadpool.start(self.batch_compress_worker)
-                print(f"[compress_selected_files_under_common_parent]-->启动批量压缩任务线程")
-                self.logger.info(f"[compress_selected_files_under_common_parent]-->启动批量压缩任务线程")
+            # 计算共同父文件夹名称作为默认值
+            try:
+                common_parent = Path(os.path.commonpath([str(p) for p in file_paths]))
+                default_zip_name = common_parent.name or "files"
+            except (ValueError, OSError):
+                default_zip_name = "files"
+            
+            # 导入自定义压缩进度对话框类和Worker
+            from src.components.custom_qdialog_progress import InputDialog, ProgressDialog, BatchCopyCompressWorker
+            
+            # 显示对话框让用户输入或修改压缩包名称
+            zip_name_dialog = InputDialog(self, default_text=default_zip_name)
+            zip_name_dialog.setWindowTitle("设置压缩包名称")
+            
+            if zip_name_dialog.exec_() == QDialog.Accepted:
+                # 获取输入框的名称，确保不为空
+                zip_name = zip_name if (zip_name := zip_name_dialog.get_result().strip()) else default_zip_name
+                # 清理对话框
+                zip_name_dialog.deleteLater()
             else:
-                # 少量文件直接同步处理
-                success, message = self.batch_copy_under_common_parent(file_paths, str(self.root_path))
-                if not success:
-                    show_message_box(f"🚩{message}", "提示", 2000)
-                    return
-                show_message_box(message, "提示", 2000)
+                print(f"[compress_selected_files_under_common_parent]-->取消压缩文件 | 未输入有效压缩文件名")
+                self.logger.info(f"[compress_selected_files_under_common_parent]-->取消压缩文件 | 未输入有效压缩文件名")
+                zip_name_dialog.deleteLater()
+                return
+
+            # 创建并启动工作线程
+            self.batch_compress_worker = BatchCopyCompressWorker(file_paths, str(self.root_path), zip_name=zip_name)
+            
+            # 连接信号
+            self.batch_compress_worker.signals.progress.connect(self.on_batch_compress_progress)
+            self.batch_compress_worker.signals.finished.connect(self.on_batch_compress_finished)
+            self.batch_compress_worker.signals.error.connect(self.on_batch_compress_error)
+            
+            # 显示进度窗口
+            self.progress_dialog = ProgressDialog(self)
+            # 断开原有连接（如果存在），连接新的取消方法
+            try:
+                self.progress_dialog.cancel_button.clicked.disconnect()
+            except TypeError:
+                pass  # 没有已存在的连接
+            self.progress_dialog.cancel_button.clicked.connect(self.cancel_batch_compression)
+            self.progress_dialog.show()
+            
+            # 启动任务
+            self.threadpool.start(self.batch_compress_worker)
+            print(f"[compress_selected_files_under_common_parent]-->启动批量压缩任务线程")
+            self.logger.info(f"[compress_selected_files_under_common_parent]-->启动批量压缩任务线程")
+
 
         except Exception as e:
             print(f"[compress_selected_files_under_common_parent]-->error--压缩选中的文件并复制压缩包文件到剪贴板时 | 报错: {e}")
@@ -1621,7 +1634,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
 
 
     def batch_copy_under_common_parent(self, file_paths: Iterable[str],
-                                    dst_root: str = '.') -> Tuple[bool, str]:
+                                    dst_root: str = '.', zip_name: str = None) -> Tuple[bool, str]:
         """
         将文件列表直接压缩为zip（跳过复制步骤，提高效率）并复制到剪贴板。
         
@@ -1629,6 +1642,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         ----
         file_paths : 文件路径列表（绝对路径或相对路径）
         dst_root   : 目标根目录，默认当前工作目录
+        zip_name   : 自定义压缩包名称，如果为None则自动计算
         
         返回
         ----
@@ -1653,7 +1667,12 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             
             # 计算共同父目录
             common_parent = Path(os.path.commonpath([str(p) for p in normalized_paths]))
-            common_parent_name = common_parent.name or "files"
+            
+            # 确定压缩包名称
+            if not zip_name:
+                common_parent_name = common_parent.name or "files"
+            else:
+                common_parent_name = zip_name
             
             # 准备zip文件路径
             zip_path = Path(dst_root).resolve() / "cache" / f"{common_parent_name}.zip"

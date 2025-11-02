@@ -66,10 +66,11 @@ class BatchCopyCompressWorker(QRunnable):
         error = pyqtSignal(str)  # 错误信号
         cancel = pyqtSignal()  # 取消信号
         
-    def __init__(self, file_list, dst_root='.'):
+    def __init__(self, file_list, dst_root='.', zip_name=None):
         super().__init__()
         self.file_list = file_list
         self.dst_root = dst_root
+        self.zip_name = zip_name  # 自定义zip文件名，如果为None则自动计算
         self.signals = self.Signals()
         self._stop = False
         
@@ -92,13 +93,19 @@ class BatchCopyCompressWorker(QRunnable):
                 self.signals.error.emit("文件列表为空")
                 return
             
-            # 计算共同父目录
-            import os as oos
-            common_parent = Path(oos.path.commonpath([str(p) for p in file_paths]))
-            common_parent_name = common_parent.name or "files"
+            # 计算共同父目录（如果未提供自定义名称）
+            if not self.zip_name:
+                import os as oos
+                common_parent = Path(oos.path.commonpath([str(p) for p in file_paths]))
+                zip_name = common_parent.name or "files"
+            else:
+                zip_name = self.zip_name
+                # 计算共同父目录用于保持相对路径结构
+                import os as oos
+                common_parent = Path(oos.path.commonpath([str(p) for p in file_paths]))
             
             # 准备zip文件路径
-            zip_path = Path(self.dst_root).resolve() / "cache" / f"{common_parent_name}.zip"
+            zip_path = Path(self.dst_root).resolve() / "cache" / f"{zip_name}.zip"
             zip_path.parent.mkdir(parents=True, exist_ok=True)
             
             # 删除已存在的zip文件
@@ -196,7 +203,7 @@ class ProgressDialog(QDialog):
 
 
 class InputDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, default_text=""):
         super().__init__(parent)
         self.setWindowTitle("设置 ZIP 名称")
         self.setFixedSize(400, 150)
@@ -215,6 +222,11 @@ class InputDialog(QDialog):
         self.label = QLabel("请输入压缩包名称(zip格式):")
         self.label.setStyleSheet("color: #fff; font-weight: bold;")
         self.edit = QLineEdit()
+        # 设置默认文本
+        if default_text:
+            self.edit.setText(default_text)
+            # 选中所有文本，方便用户直接输入替换
+            self.edit.selectAll()
         opera_layout.addWidget(self.label)
         opera_layout.addWidget(self.edit)
         layout.addLayout(opera_layout)
