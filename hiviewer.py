@@ -1609,34 +1609,36 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         import zipfile
         
         try:
-            # 验证并规范化文件列表
-            file_list = [Path(p).resolve() for p in file_list if p]
-            if not file_list:
+            # 验证并规范化文件列表（合并存在性检查）
+            file_paths = []
+            for p in file_list:
+                if not p:
+                    continue
+                path = Path(p).resolve()
+                if not path.exists():
+                    return False, f"文件不存在: {path.name}"
+                file_paths.append(path)
+            
+            if not file_paths:
                 return False, "文件列表为空"
             
-            # 验证文件存在
-            missing = [p for p in file_list if not p.exists()]
-            if missing:
-                return False, f"文件不存在: {missing[0].name}"
-            
             # 计算共同父目录
-            common_parent = Path(os.path.commonpath([str(p) for p in file_list]))
+            common_parent = Path(os.path.commonpath([str(p) for p in file_paths]))
             common_parent_name = common_parent.name or "files"
             
-            # 准备目标目录
+            # 准备目标目录（清除旧目录）
             dst_top = Path(dst_root).resolve() / "cache" / common_parent_name
             if dst_top.exists():
                 shutil.rmtree(dst_top)
             dst_top.mkdir(parents=True, exist_ok=True)
             
-            # 批量复制文件（保持目录结构）
-            for src in file_list:
-                rel_path = src.relative_to(common_parent)
-                dst_file = dst_top / rel_path
+            # 复制文件（保持目录结构）
+            for src in file_paths:
+                dst_file = dst_top / src.relative_to(common_parent)
                 dst_file.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src, dst_file)
             
-            # 压缩为zip
+            # 压缩为zip并删除临时文件夹
             zip_path = dst_top.parent / f"{common_parent_name}.zip"
             if zip_path.exists():
                 zip_path.unlink()
@@ -1646,17 +1648,21 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                     if file_path.is_file():
                         zipf.write(file_path, file_path.relative_to(dst_top))
             
-            # 复制到剪贴板
+            # 压缩完成后删除临时文件夹
+            shutil.rmtree(dst_top)
+            
+            # 复制到剪贴板：先设置路径文本，再设置文件
+            zip_path_str = str(zip_path)
+            clipboard = QApplication.clipboard()
             mime_data = QMimeData()
-            mime_data.setUrls([QUrl.fromLocalFile(str(zip_path))])
-            QApplication.clipboard().setMimeData(mime_data)
+            mime_data.setText(zip_path_str)  # 先设置路径文本
+            mime_data.setUrls([QUrl.fromLocalFile(zip_path_str)])  # 再设置文件URL
+            clipboard.setMimeData(mime_data)
             
-            return True, f"成功处理 {len(file_list)} 个文件，已压缩并复制到剪贴板"
+            return True, f"成功处理 {len(file_paths)} 个文件，已压缩并复制到剪贴板"
             
-        except ValueError as e:
-            return False, f"路径错误: {str(e)}"
-        except OSError as e:
-            return False, f"文件操作失败: {str(e)}"
+        except (ValueError, OSError) as e:
+            return False, f"操作失败: {str(e)}"
         except Exception as e:
             return False, f"未知错误: {str(e)}"
 
