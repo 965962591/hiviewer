@@ -1577,28 +1577,58 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 show_message_box(f"🚩无法获取选中项的文件路径列表, 请确保选中了单元格", "提示", 2000)
                 return
 
-            # 将文件路径复制到当前目录下的“共同父文件夹”内，并保持原始相对目录结构
-            success, message = self.batch_copy_under_common_parent(file_paths)
-            if not success:
-                show_message_box(f"🚩无法复制文件路径到当前目录下的“共同父文件夹”内, 请确保选中了单元格", "提示", 2000)
-                return
-            show_message_box(message, "提示", 2000)
+            # 判断文件数量，决定是否使用进度条
+            file_count = len(file_paths)
+            if file_count > 10:  # 超过5个文件使用进度条
+                # 导入自定义压缩进度对话框类和Worker
+                from src.components.custom_qdialog_progress import ProgressDialog, BatchCopyCompressWorker
+                
+                # 创建并启动工作线程
+                self.batch_compress_worker = BatchCopyCompressWorker(file_paths, str(self.root_path))
+                
+                # 连接信号
+                self.batch_compress_worker.signals.progress.connect(self.on_batch_compress_progress)
+                self.batch_compress_worker.signals.finished.connect(self.on_batch_compress_finished)
+                self.batch_compress_worker.signals.error.connect(self.on_batch_compress_error)
+                
+                # 显示进度窗口
+                self.progress_dialog = ProgressDialog(self)
+                # 断开原有连接（如果存在），连接新的取消方法
+                try:
+                    self.progress_dialog.cancel_button.clicked.disconnect()
+                except TypeError:
+                    pass  # 没有已存在的连接
+                self.progress_dialog.cancel_button.clicked.connect(self.cancel_batch_compression)
+                self.progress_dialog.show()
+                
+                # 启动任务
+                self.threadpool.start(self.batch_compress_worker)
+                print(f"[compress_selected_files_under_common_parent]-->启动批量压缩任务线程")
+                self.logger.info(f"[compress_selected_files_under_common_parent]-->启动批量压缩任务线程")
+            else:
+                # 少量文件直接同步处理
+                success, message = self.batch_copy_under_common_parent(file_paths, str(self.root_path))
+                if not success:
+                    show_message_box(f"🚩{message}", "提示", 2000)
+                    return
+                show_message_box(message, "提示", 2000)
 
         except Exception as e:
             print(f"[compress_selected_files_under_common_parent]-->error--压缩选中的文件并复制压缩包文件到剪贴板时 | 报错: {e}")
             self.logger.error(f"[compress_selected_files_under_common_parent]-->压缩选中的文件并复制压缩包文件到剪贴板时 | 报错: {e}")
+            show_message_box(f"🚩压缩文件时发生错误: {str(e)}", "错误", 2000)
             return  
 
 
-    def batch_copy_under_common_parent(self, file_list: Iterable[str],
+    def batch_copy_under_common_parent(self, file_paths: Iterable[str],
                                     dst_root: str = '.') -> Tuple[bool, str]:
         """
-        将文件列表复制到共同父文件夹，压缩为zip并复制到剪贴板。
+        将文件列表直接压缩为zip（跳过复制步骤，提高效率）并复制到剪贴板。
         
         参数
         ----
-        file_list : 文件路径列表（绝对路径或相对路径）
-        dst_root  : 目标根目录，默认当前工作目录
+        file_paths : 文件路径列表（绝对路径或相对路径）
+        dst_root   : 目标根目录，默认当前工作目录
         
         返回
         ----
@@ -1609,47 +1639,36 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         import zipfile
         
         try:
-            # 验证并规范化文件列表（合并存在性检查）
-            file_paths = []
-            for p in file_list:
-                if not p:
-                    continue
-                path = Path(p).resolve()
-                if not path.exists():
-                    return False, f"文件不存在: {path.name}"
-                file_paths.append(path)
-            
+            # 存在性检查
             if not file_paths:
                 return False, "文件列表为空"
             
+            # 规范化文件路径
+            normalized_paths = [Path(p).resolve() for p in file_paths]
+            
+            # 验证文件存在
+            for path in normalized_paths:
+                if not path.exists():
+                    return False, f"文件不存在: {path.name}"
+            
             # 计算共同父目录
-            common_parent = Path(os.path.commonpath([str(p) for p in file_paths]))
+            common_parent = Path(os.path.commonpath([str(p) for p in normalized_paths]))
             common_parent_name = common_parent.name or "files"
             
-            # 准备目标目录（清除旧目录）
-            dst_top = Path(dst_root).resolve() / "cache" / common_parent_name
-            if dst_top.exists():
-                shutil.rmtree(dst_top)
-            dst_top.mkdir(parents=True, exist_ok=True)
+            # 准备zip文件路径
+            zip_path = Path(dst_root).resolve() / "cache" / f"{common_parent_name}.zip"
+            zip_path.parent.mkdir(parents=True, exist_ok=True)
             
-            # 复制文件（保持目录结构）
-            for src in file_paths:
-                dst_file = dst_top / src.relative_to(common_parent)
-                dst_file.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src, dst_file)
-            
-            # 压缩为zip并删除临时文件夹
-            zip_path = dst_top.parent / f"{common_parent_name}.zip"
+            # 删除已存在的zip文件
             if zip_path.exists():
                 zip_path.unlink()
             
+            # 直接压缩原始文件，保持相对目录结构
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                for file_path in dst_top.rglob('*'):
-                    if file_path.is_file():
-                        zipf.write(file_path, file_path.relative_to(dst_top))
-            
-            # 压缩完成后删除临时文件夹
-            shutil.rmtree(dst_top)
+                for src_path in normalized_paths:
+                    # 计算文件在zip中的相对路径（保持目录结构）
+                    arcname = src_path.relative_to(common_parent)
+                    zipf.write(src_path, arcname)
             
             # 复制到剪贴板：先设置路径文本，再设置文件
             zip_path_str = str(zip_path)
@@ -1659,7 +1678,7 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             mime_data.setUrls([QUrl.fromLocalFile(zip_path_str)])  # 再设置文件URL
             clipboard.setMimeData(mime_data)
             
-            return True, f"成功处理 {len(file_paths)} 个文件，已压缩并复制到剪贴板"
+            return True, f"成功处理 {len(normalized_paths)} 个文件，已压缩并复制到剪贴板"
             
         except (ValueError, OSError) as e:
             return False, f"操作失败: {str(e)}"
@@ -1825,6 +1844,63 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         self.logger.error(f"【on_compress_error】-->触发压缩错误信号 | 报错：{error_msg}")
         # 弹出提示框
         show_message_box(error_msg, "错误", 2000)
+
+    def on_batch_compress_progress(self, current, total, message):
+        """处理批量压缩进度"""
+        try:
+            progress_value = int((current / total * 100)) if total > 0 else 0
+            self.progress_dialog.update_progress(progress_value)
+            self.progress_dialog.set_message(message)
+        except Exception as e:
+            print(f"[on_batch_compress_progress]-->error--批量压缩进度信号 | 报错：{e}")
+            self.logger.error(f"【on_batch_compress_progress】-->批量压缩进度信号 | 报错：{e}")
+
+    def on_batch_compress_finished(self, zip_path):
+        """处理批量压缩完成"""
+        try:
+            if hasattr(self, 'progress_dialog'):
+                self.progress_dialog.close()
+            
+            # 复制到剪贴板：先设置路径文本，再设置文件
+            zip_path_str = str(zip_path)
+            clipboard = QApplication.clipboard()
+            mime_data = QMimeData()
+            mime_data.setText(zip_path_str)  # 先设置路径文本
+            mime_data.setUrls([QUrl.fromLocalFile(zip_path_str)])  # 再设置文件URL
+            clipboard.setMimeData(mime_data)
+            
+            # 更新状态栏
+            self.statusbar_label1.setText(f"📢:文件压缩完成,已复制到剪贴板🍃")
+            self.logger.info(f"[on_batch_compress_finished]-->批量压缩完成 | 保存路径: {zip_path}")
+            show_message_box(f"🚩文件压缩完成,已复制到剪贴板", "提示", 2000)
+        except Exception as e:
+            print(f"[on_batch_compress_finished]-->error--批量压缩完成信号 | 报错：{e}")
+            self.logger.error(f"【on_batch_compress_finished】-->批量压缩完成信号 | 报错：{e}")
+
+    def on_batch_compress_error(self, error_msg):
+        """处理批量压缩错误"""
+        try:
+            if hasattr(self, 'progress_dialog'):
+                self.progress_dialog.close()
+            self.statusbar_label1.setText(f"📢:压缩出错🍃")
+            print(f"[on_batch_compress_error]-->error--批量压缩错误信号 | 报错：{error_msg}")
+            self.logger.error(f"【on_batch_compress_error】-->批量压缩错误信号 | 报错：{error_msg}")
+            show_message_box(error_msg, "错误", 2000)
+        except Exception as e:
+            print(f"[on_batch_compress_error]-->error--处理批量压缩错误时 | 报错：{e}")
+
+    def cancel_batch_compression(self):
+        """取消批量压缩任务"""
+        try:
+            if hasattr(self, 'batch_compress_worker'):
+                self.batch_compress_worker.cancel()
+            if hasattr(self, 'progress_dialog'):
+                self.progress_dialog.close()
+            print(f"-->成功 取消批量压缩任务")
+            self.logger.info(f"-->成功 取消批量压缩任务")
+        except Exception as e:
+            print(f"[cancel_batch_compression]-->error--取消批量压缩任务 | 报错：{e}")
+            self.logger.error(f"【cancel_batch_compression】-->取消批量压缩任务 | 报错：{e}")
 
 
     """

@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import os
+import shutil
 import zipfile
+from pathlib import Path
 from PyQt5.QtGui import QCursor
 from PyQt5.QtWidgets import QApplication, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QProgressBar, QLineEdit
 from PyQt5.QtCore import QRunnable, Qt, QObject, pyqtSignal
@@ -53,6 +55,84 @@ class CompressWorker(QRunnable):
     def cancel(self):
         """取消压缩任务"""
         self._stop = True  # 设置停止标志
+
+
+class BatchCopyCompressWorker(QRunnable):
+    """批量压缩工作线程类（跳过复制，直接压缩原始文件）"""
+    class Signals(QObject):
+        """工作线程信号"""
+        progress = pyqtSignal(int, int, str)  # 当前进度,总数,阶段描述
+        finished = pyqtSignal(str)  # 完成信号,返回压缩包路径
+        error = pyqtSignal(str)  # 错误信号
+        cancel = pyqtSignal()  # 取消信号
+        
+    def __init__(self, file_list, dst_root='.'):
+        super().__init__()
+        self.file_list = file_list
+        self.dst_root = dst_root
+        self.signals = self.Signals()
+        self._stop = False
+        
+    def run(self):
+        try:
+            # 验证并规范化文件列表
+            file_paths = []
+            for p in self.file_list:
+                if self._stop:
+                    return
+                if not p:
+                    continue
+                path = Path(p).resolve()
+                if not path.exists():
+                    self.signals.error.emit(f"文件不存在: {path.name}")
+                    return
+                file_paths.append(path)
+            
+            if not file_paths:
+                self.signals.error.emit("文件列表为空")
+                return
+            
+            # 计算共同父目录
+            import os as oos
+            common_parent = Path(oos.path.commonpath([str(p) for p in file_paths]))
+            common_parent_name = common_parent.name or "files"
+            
+            # 准备zip文件路径
+            zip_path = Path(self.dst_root).resolve() / "cache" / f"{common_parent_name}.zip"
+            zip_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # 删除已存在的zip文件
+            if zip_path.exists():
+                zip_path.unlink()
+            
+            # 直接压缩原始文件，保持相对目录结构
+            total_files = len(file_paths)
+            self.signals.progress.emit(0, total_files, f"正在压缩文件... 0/{total_files}")
+            
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for i, src_path in enumerate(file_paths):
+                    if self._stop:
+                        return
+                    try:
+                        # 计算文件在zip中的相对路径（保持目录结构）
+                        arcname = src_path.relative_to(common_parent)
+                        zipf.write(src_path, arcname)
+                        self.signals.progress.emit(i + 1, total_files, f"正在压缩文件... {i + 1}/{total_files}")
+                    except Exception as e:
+                        self.signals.error.emit(f"压缩文件失败: {src_path.name}, 错误: {e}")
+                        continue
+            
+            # 压缩完成
+            if not self._stop:
+                self.signals.progress.emit(total_files, total_files, "处理完成")
+                self.signals.finished.emit(str(zip_path))
+            
+        except Exception as e:
+            self.signals.error.emit(f"操作失败: {str(e)}")
+        
+    def cancel(self):
+        """取消任务"""
+        self._stop = True
 
 
 # 更新 ProgressDialog 类以添加取消按钮
