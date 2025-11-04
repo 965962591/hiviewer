@@ -403,14 +403,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 创建二级菜单-复制选项
         sub_menu2 = QMenu("复制选项", self.context_menu)  
         sub_menu2.setIcon(paste_icon)  
-        sub_menu2.addAction(icon_0, "复制文件路径(C)", self.copy_selected_file_path)  
-        sub_menu2.addAction(icon_1, "复制文件(Ctrl+C)", self.copy_selected_files)  
+        sub_menu2.addAction(icon_0, "复制文件<按共同父文件夹层级>(C)", self.copy_selected_files_under_common_parent)  
+        sub_menu2.addAction(icon_1, "复制文件<按文件复制>(Ctrl+C)", self.copy_selected_files)  
+        sub_menu2.addAction(icon_2, "复制文件路径(Ctrl+Shift+C)", self.copy_selected_file_path)  
 
         # 创建二级菜单-压缩选项
         sub_menu3 = QMenu("压缩选项", self.context_menu)  
         sub_menu3.setIcon(zip_icon)  
-        sub_menu3.addAction(icon_0, "快速按照共同父文件夹压缩选中的文件(Z)", self.compress_selected_files_under_common_parent)  
-        sub_menu3.addAction(icon_1, "自定义压缩选中的文件到指定目录(Ctrl+Z)", self.compress_selected_files)  
+        sub_menu3.addAction(icon_0, "压缩文件<按共同父文件夹层级>(Z)", self.compress_selected_files_under_common_parent)  
+        sub_menu3.addAction(icon_1, "压缩文件<按文件压压缩>(Ctrl+Z)", self.compress_selected_files)  
 
         # 创建二级菜单-无损旋转
         sub_menu4 = QMenu("无损旋转", self.context_menu)  
@@ -693,12 +694,15 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         # 添加快捷键 Ctrl+f 打开图片搜索工具
         self.f_shortcut = QShortcut(QKeySequence(Qt.ControlModifier + Qt.Key_F), self)
         self.f_shortcut.activated.connect(self.on_ctrl_f_pressed)
-        # 添加快捷键 C,复制选中的文件路径
+        # 添加快捷键 C, 快速按照共同父文件夹复制选中的文件
         self.c_shortcut = QShortcut(QKeySequence('c'), self)
-        self.c_shortcut.activated.connect(self.copy_selected_file_path)
+        self.c_shortcut.activated.connect(self.copy_selected_files_under_common_parent)
         # 添加快捷键 Ctrl+c 复制选中的文件
         self.c_shortcut = QShortcut(QKeySequence(Qt.ControlModifier + Qt.Key_C), self)
         self.c_shortcut.activated.connect(self.copy_selected_files)
+        # 添加快捷键 Ctrl+Shift+c 复制选中的文件路径
+        self.c_shortcut = QShortcut(QKeySequence(Qt.ControlModifier + Qt.ShiftModifier + Qt.Key_C), self)
+        self.c_shortcut.activated.connect(self.copy_selected_file_path)
         # 添加快捷键 D 从列表中删除选中的文件
         self.d_shortcut = QShortcut(QKeySequence('d'), self)
         self.d_shortcut.activated.connect(self.delete_from_list)
@@ -1457,6 +1461,76 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 self.logger.error(f"【get_single_full_path】-->获取被选中的单个单元格完整文件路径 | 报错: {e}")
                 return ""
 
+
+    def copy_selected_files_under_common_parent(self):
+        """快速按照共同父文件夹复制选中的文件到临时文件夹并复制到剪贴板"""
+        try:
+            # 获取选中的项文件路径列表
+            if not(file_paths := self.get_selected_file_path()):
+                show_message_box(f"🚩无法获取选中项的文件路径列表, 请确保选中了单元格", "提示", 2000)
+                return
+            
+            # 准备临时目录，若存在先清理再创建
+            temp_folder = self.root_path / "cache" / "temp"
+            if temp_folder.exists():
+                shutil.rmtree(temp_folder)
+            temp_folder.mkdir(parents=True, exist_ok=True)
+
+
+            # 计算共同父目录名称（作为默认文件夹名称）
+            try:
+                common_parent = Path(os.path.commonpath(file_paths))
+                default_folder_name = common_parent.name or "files"
+            except (ValueError, OSError):
+                default_folder_name = "files"
+
+            # 导入自定义输入对话框类
+            from src.components.custom_qdialog_progress import InputDialog
+            
+            # 显示对话框让用户输入或修改文件夹名称
+            folder_name_dialog = InputDialog(self, default_text=default_folder_name)
+            folder_name_dialog.setWindowTitle("设置文件夹名称")
+            folder_name_dialog.label.setText("请输入文件夹名称:")
+            
+            if folder_name_dialog.exec_() == QDialog.Accepted:
+                # 获取输入框的名称，确保不为空
+                folder_name = folder_name if (folder_name := folder_name_dialog.get_result().strip()) else default_folder_name
+                folder_name_dialog.deleteLater()
+            else:
+                print(f"[copy_selected_files_under_common_parent]-->取消复制文件 | 未输入有效文件夹名称")
+                self.logger.info(f"[copy_selected_files_under_common_parent]-->取消复制文件 | 未输入有效文件夹名称")
+                folder_name_dialog.deleteLater()
+                return
+
+            # 准备目标文件夹路径
+            target_folder = self.root_path / "cache" / "temp" / folder_name
+            target_folder.mkdir(parents=True, exist_ok=True)
+
+            # 统一转成 Path 对象
+            selected_paths = [Path(p) for p in file_paths]
+
+            # 复制文件到目标文件夹（保持目录结构）
+            copied_files = []
+            for src_path in selected_paths:
+                dst_file = target_folder / src_path.relative_to(common_parent)
+                dst_file.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src_path, dst_file)
+                copied_files.append(dst_file)
+
+            # 复制到剪贴板：先设置文件夹路径文本，再设置文件夹
+            folder_path_str = str(target_folder)
+            clipboard = QApplication.clipboard()
+            mime_data = QMimeData()
+            mime_data.setText(folder_path_str)  # 先设置路径文本
+            mime_data.setUrls([QUrl.fromLocalFile(folder_path_str)])  # 再设置文件夹URL
+            clipboard.setMimeData(mime_data)
+            
+            show_message_box(f"{folder_name} 文件夹下 {len(copied_files)} 个文件已复制到剪贴板", "提示", 2000)
+
+        except Exception as e:
+            print(f"[copy_selected_files_under_common_parent]-->error--快速按照共同父文件夹复制选中的文件时 | 报错: {e}")
+            self.logger.error(f"【copy_selected_files_under_common_parent】-->快速按照共同父文件夹复制选中的文件时 | 报错: {e}")
+            show_message_box("🚩快速按照共同父文件夹复制选中的文件时发生错误!\n🐬具体报错请按【F3】键查看日志信息", "提示", 1500)
 
     def copy_selected_file_path(self):
         """复制所有选中的单元格的文件路径到系统粘贴板"""
