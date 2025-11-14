@@ -1101,8 +1101,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
         IconCache.clear_cache()
         # 清除日志文件和缓存
         self.clear_log_and_cache_files()
-        # 模拟用户在地址回车
-        self.input_enter_action()
         # 释放内存
         self.cleanup() 
         
@@ -1707,78 +1705,6 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
             return  
 
 
-    def batch_copy_under_common_parent(self, file_paths: Iterable[str],
-                                    dst_root: str = '.', zip_name: str = None) -> Tuple[bool, str]:
-        """
-        将文件列表直接压缩为zip（跳过复制步骤，提高效率）并复制到剪贴板。
-        
-        参数
-        ----
-        file_paths : 文件路径列表（绝对路径或相对路径）
-        dst_root   : 目标根目录，默认当前工作目录
-        zip_name   : 自定义压缩包名称，如果为None则自动计算
-        
-        返回
-        ----
-        (success: bool, message: str)
-        success: True表示成功，False表示失败
-        message: 状态信息
-        """
-        import zipfile
-        
-        try:
-            # 存在性检查
-            if not file_paths:
-                return False, "文件列表为空"
-            
-            # 规范化文件路径
-            normalized_paths = [Path(p).resolve() for p in file_paths]
-            
-            # 验证文件存在
-            for path in normalized_paths:
-                if not path.exists():
-                    return False, f"文件不存在: {path.name}"
-            
-            # 计算共同父目录
-            common_parent = Path(os.path.commonpath([str(p) for p in normalized_paths]))
-            
-            # 确定压缩包名称
-            if not zip_name:
-                common_parent_name = common_parent.name or "files"
-            else:
-                common_parent_name = zip_name
-            
-            # 准备zip文件路径
-            zip_path = Path(dst_root).resolve() / "cache" / f"{common_parent_name}.zip"
-            zip_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            # 删除已存在的zip文件
-            if zip_path.exists():
-                zip_path.unlink()
-            
-            # 直接压缩原始文件，保持相对目录结构
-            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                for src_path in normalized_paths:
-                    # 计算文件在zip中的相对路径（保持目录结构）
-                    arcname = src_path.relative_to(common_parent)
-                    zipf.write(src_path, arcname)
-            
-            # 复制到剪贴板：先设置路径文本，再设置文件
-            zip_path_str = str(zip_path)
-            clipboard = QApplication.clipboard()
-            mime_data = QMimeData()
-            mime_data.setText(zip_path_str)  # 先设置路径文本
-            mime_data.setUrls([QUrl.fromLocalFile(zip_path_str)])  # 再设置文件URL
-            clipboard.setMimeData(mime_data)
-            
-            return True, f"成功处理 {len(normalized_paths)} 个文件，已压缩并复制到剪贴板"
-            
-        except (ValueError, OSError) as e:
-            return False, f"操作失败: {str(e)}"
-        except Exception as e:
-            return False, f"未知错误: {str(e)}"
-
-
     def compress_selected_files(self):
         """压缩选中的文件并复制压缩包文件到剪贴板"""
         try:
@@ -1800,9 +1726,14 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
                 self.logger.error(f"[compress_selected_files]-->取消压缩文件 | 未输入有效压缩文件名")
                 return
 
+            # 准备临时目录存放压缩包，若存在先清理再创建
+            temp_folder = self.root_path / "cache" / "temp"
+            if temp_folder.exists():
+                shutil.rmtree(temp_folder)
+            temp_folder.mkdir(parents=True, exist_ok=True)
+
             # 设置压缩包文件路径存在; 确保父目录存在; 将path格式转换为str格式
-            zip_path = self.root_path / "cache" / f"{zip_name}.zip"
-            zip_path.parent.mkdir(parents=True, exist_ok=True)
+            zip_path = self.root_path / "cache" / "temp" / f"{zip_name}.zip"
             zip_path = zip_path.as_posix()
 
             # 创建并启动压缩工作线程
@@ -3668,10 +3599,13 @@ class HiviewerMainwindow(QMainWindow, Ui_MainWindow):
     @log_error_decorator(tips="清除日志文件以及zip缓存文件")
     def clear_log_and_cache_files(self):
         """清除日志文件以及zip缓存文件"""
-        from src.utils.delete import clear_log_files, clear_cache_files
-        # 使用工具函数清除日志文件以及zip等缓存
+        from src.utils.delete import clear_log_files, clear_cache_files, force_delete_directory
+        # 使用工具函数清除日志文件以及zip等相关缓存
         clear_log_files()
         clear_cache_files(base_path=None, file_types=[".zip",".json",".ini"])
+        force_delete_directory((self.root_path/"cache"/"temp").as_posix())
+        force_delete_directory((self.root_path/"cache"/"photos").as_posix())
+        force_delete_directory((self.root_path/"cache"/"videos").as_posix())
         # 重新初始化日志系统
         setup_logging(self.root_path)
         self.logger = get_logger(__name__)

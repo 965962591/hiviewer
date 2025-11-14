@@ -104,9 +104,13 @@ class BatchCopyCompressWorker(QRunnable):
                 import os as oos
                 common_parent = Path(oos.path.commonpath([str(p) for p in file_paths]))
             
+            # 准备临时目录存放压缩包，若存在先清理再创建
+            temp_folder = Path(self.dst_root).resolve() / "cache" / "temp"
+            if temp_folder.exists():
+                shutil.rmtree(temp_folder)
+            temp_folder.mkdir(parents=True, exist_ok=True)
             # 准备zip文件路径
-            zip_path = Path(self.dst_root).resolve() / "cache" / f"{zip_name}.zip"
-            zip_path.parent.mkdir(parents=True, exist_ok=True)
+            zip_path = temp_folder / f"{zip_name}.zip"
             
             # 删除已存在的zip文件
             if zip_path.exists():

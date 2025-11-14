@@ -1,17 +1,10 @@
 # -*- coding: utf-8 -*-
 import os
+import shutil
+import stat
 import ctypes
 import logging
-
-def force_delete_folder(folder_path, suffix='.zip'):
-    """强制删除文件夹内指定后缀文件"""
-    try:
-        for file in os.listdir(folder_path):
-            if file.endswith(suffix):
-                force_delete_file(os.path.join(folder_path, file))
-    except Exception as e:
-        print(f"强制删除文件夹失败: {e}")  
-
+from pathlib import Path
 
 def force_delete_file(file_path):
     """强制删除指定文件"""
@@ -24,6 +17,37 @@ def force_delete_file(file_path):
             ctypes.windll.kernel32.DeleteFileW(file_path)
         except Exception as e:
             print(f"强制删除文件失败: {e}")
+
+def force_delete_folder(folder_path, suffix='.zip'):
+    """强制删除文件夹内指定后缀文件"""
+    try:
+        for file in os.listdir(folder_path):
+            if file.endswith(suffix):
+                force_delete_file(os.path.join(folder_path, file))
+    except Exception as e:
+        print(f"强制删除文件夹失败: {e}")  
+
+
+def force_delete_directory(folder_path):
+    """强制删除指定文件夹及其所有内容"""
+    try:
+        if not os.path.exists(folder_path):
+            print(f"[force_delete_directory]-->强制删除文件夹--目标不存在: {folder_path}")
+            return True
+
+        def _on_rm_error(func, path, exc_info):
+            try:
+                os.chmod(path, stat.S_IWRITE)
+                func(path)
+            except Exception as inner_e:
+                print(f"[force_delete_directory]-->强制删除文件夹--处理失败 {path}: {inner_e}")
+
+        shutil.rmtree(folder_path, onerror=_on_rm_error)
+        print(f"[force_delete_directory]-->强制删除文件夹--完成: {folder_path}")
+        return True
+    except Exception as e:
+        print(f"[force_delete_directory]-->强制删除文件夹失败: {e}")
+        return False
 
 
 def close_log_handlers():
@@ -62,14 +86,10 @@ def clear_log_files(base_path=None):
         base_path: 项目根目录路径，如果为None则自动检测
     """
     try:
-        if base_path is None:
-            # 自动检测项目根目录
-            import sys
-            from pathlib import Path
+        # 自动检测项目根目录
+        if base_path is None: 
             base_path = Path(__file__).parent.parent.parent
-        
         log_dir = os.path.join(base_path, "cache", "logs")
-        
         if not os.path.exists(log_dir):
             print("[clear_log_files]--日志目录不存在")
             return False
@@ -77,6 +97,7 @@ def clear_log_files(base_path=None):
         # 首先关闭所有活动的日志处理器
         close_log_handlers()
             
+        # 删除日志相关文件    
         deleted_count = 0
         for file in os.listdir(log_dir):
             if file.endswith('.log'):
